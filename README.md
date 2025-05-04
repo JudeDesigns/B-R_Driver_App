@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# B&R Food Services Admin & Driver Web System
 
-## Getting Started
+This is a web-based system for B&R Food Services consisting of an Admin Console and a Driver Portal. The system aims to streamline route management, automate delivery tracking, digitize data capture, improve communication, and enhance operational efficiency.
 
-First, run the development server:
+## Phase 1: Foundation & Login
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This initial phase includes:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Project infrastructure setup (codebase, database)
+- Functional login screens for Admin and Driver roles
+- Basic application navigation shells
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Frontend**: Next.js with TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT
+- **Password Hashing**: Argon2
+- **Real-time Communication**: Socket.io (to be implemented in Phase 4)
 
-## Learn More
+## Setup Instructions
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js (v18 or later)
+- PostgreSQL database
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Installation
 
-## Deploy on Vercel
+1. Clone the repository:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```
+   git clone <repository-url>
+   cd br-food-services
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Install dependencies:
+
+   ```
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following content:
+
+   ```
+   DATABASE_URL="postgresql://username:password@localhost:5432/br_food_services"
+   JWT_SECRET="your-secret-key-here"
+   NEXT_PUBLIC_API_URL="http://localhost:3000/api"
+   ```
+
+   Replace the database credentials with your own.
+
+4. Set up the database:
+
+   ```
+   npx prisma migrate dev --name init
+   ```
+
+5. Seed the database with initial data:
+
+   ```
+   npm run db:seed
+   ```
+
+6. Start the development server:
+
+   ```
+   npm run dev
+   ```
+
+7. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Default Login Credentials
+
+### Admin
+
+- Username: admin
+- Password: admin123
+
+### Super Admin
+
+- Username: superadmin
+- Password: superadmin123
+
+### Driver
+
+- Username: driver
+- Password: driver123
+
+## Project Structure
+
+- `src/app`: Next.js App Router
+  - `admin`: Admin Console pages
+  - `driver`: Driver Portal pages
+  - `auth`: Authentication pages
+  - `api`: API endpoints
+- `src/components`: Reusable UI components
+- `src/lib`: Utility functions and shared code
+- `prisma`: Database schema and migrations
+
+## Development Roadmap
+
+### Phase 1: Foundation & Login (Current)
+
+- Set up project infrastructure
+- Build functional login screens
+- Create basic application navigation shells
+
+### Phase 2: Route Upload & Display
+
+- Develop Admin feature to upload routes via Excel
+- Build Admin screen to display uploaded routes/stops
+- Build Driver screen to display their assigned route/stops
+
+### Phase 3: Driver Stop Actions & Basic Data Capture
+
+- Implement Driver status update buttons
+- Build invoice photo upload feature
+- Implement PDF generation from photos
+- Build Driver Notes entry feature
+
+### Phase 4: Live Tracking & Admin Communication
+
+- Implement real-time updates for status changes
+- Build feature for Admins to send notes for specific stops
+- Ensure Drivers receive/view these notes
+
+### Phase 5: Handling Returns & End-of-Day Process
+
+- Develop Driver screens for logging returns
+- Build Admin view for logged returns
+- Create End-of-Route screen for Drivers
+
+### Phase 6: MVP Completion
+
+- Integrate mandatory Safety Checklists
+- Implement basic Admin Customer management
+- Add basic Admin filtering
+- Set up automated Customer Confirmation Email
+- Add basic Super Admin tools
+- Apply consistent UI styling
+- Conduct integration testing

@@ -1,0 +1,164 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      Role     @default(DRIVER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  routes    Route[]  @relation("DriverRoutes")
+  adminNotes AdminNote[] @relation("AdminNotes")
+  
+  @@map("users")
+}
+
+// Customer model
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  contactInfo String?
+  preferences String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  stops     Stop[]
+
+  @@map("customers")
+}
+
+// Route model
+model Route {
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+  status    RouteStatus @default(PENDING)
+  driverId  String
+  driver    User     @relation("DriverRoutes", fields: [driverId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  stops     Stop[]
+  safetyChecks SafetyCheck[]
+
+  @@map("routes")
+}
+
+// Stop model
+model Stop {
+  id        String   @id @default(uuid())
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id])
+  customerId String
+  customer  Customer @relation(fields: [customerId], references: [id])
+  sequence  Int
+  address   String
+  orderNumber String?
+  qbInvoiceNumber String?
+  initialDriverNotes String?
+  status    StopStatus @default(PENDING)
+  arrivalTime DateTime?
+  completionTime DateTime?
+  signedInvoicePdfUrl String?
+  driverNotes String?
+  returnFlag Boolean @default(false)
+  codFlag    Boolean @default(false)
+  paymentCash Boolean @default(false)
+  paymentCheck Boolean @default(false)
+  paymentCreditCard Boolean @default(false)
+  paymentNotPaid Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  returns   Return[]
+  adminNotes AdminNote[]
+
+  @@map("stops")
+}
+
+// Return model
+model Return {
+  id        String   @id @default(uuid())
+  stopId    String
+  stop      Stop     @relation(fields: [stopId], references: [id])
+  productId String
+  quantity  Int
+  reasonCode String
+  warehouseLocation String?
+  vendorCreditNumber String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("returns")
+}
+
+// AdminNote model
+model AdminNote {
+  id        String   @id @default(uuid())
+  stopId    String
+  stop      Stop     @relation(fields: [stopId], references: [id])
+  adminId   String
+  admin     User     @relation("AdminNotes", fields: [adminId], references: [id])
+  note      String
+  readStatus Boolean @default(false)
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admin_notes")
+}
+
+// SafetyCheck model
+model SafetyCheck {
+  id        String   @id @default(uuid())
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id])
+  type      ChecklistType
+  responses Json
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("safety_checks")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+  DRIVER
+}
+
+enum RouteStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum StopStatus {
+  PENDING
+  ON_THE_WAY
+  ARRIVED
+  COMPLETED
+}
+
+enum ChecklistType {
+  START_OF_DAY
+  END_OF_DAY
+}
