@@ -36,22 +36,24 @@ export default function LoginPage() {
     let isAuthenticated = false;
     let userRole = "";
 
+    // Check admin credentials
     if (
-      role === "ADMIN" &&
       username === validCredentials.admin.username &&
       password === validCredentials.admin.password
     ) {
       isAuthenticated = true;
       userRole = "ADMIN";
-    } else if (
-      role === "SUPER_ADMIN" &&
+    }
+    // Check super admin credentials
+    else if (
       username === validCredentials.superadmin.username &&
       password === validCredentials.superadmin.password
     ) {
       isAuthenticated = true;
       userRole = "SUPER_ADMIN";
-    } else if (
-      role === "DRIVER" &&
+    }
+    // Check driver credentials
+    else if (
       username === validCredentials.driver.username &&
       password === validCredentials.driver.password
     ) {
@@ -101,6 +103,24 @@ export default function LoginPage() {
 
         {error && <div className="text-red-600 text-center mb-4">{error}</div>}
 
+        <div className="bg-gray-50 p-4 rounded mb-6 text-sm text-gray-600">
+          <p className="font-medium mb-1">Available test accounts:</p>
+          <ul className="space-y-1">
+            <li>
+              <span className="font-medium">Admin:</span> username: admin,
+              password: admin123
+            </li>
+            <li>
+              <span className="font-medium">Super Admin:</span> username:
+              superadmin, password: superadmin123
+            </li>
+            <li>
+              <span className="font-medium">Driver:</span> username: driver,
+              password: driver123
+            </li>
+          </ul>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="hidden">
             <select
@@ -119,7 +139,7 @@ export default function LoginPage() {
             <input
               id="username"
               type="text"
-              placeholder="Email address"
+              placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full p-4 border border-gray-200 rounded focus:outline-none"
