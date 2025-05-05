@@ -18,13 +18,15 @@ interface Stop {
   initialDriverNotes?: string;
 }
 
-interface StopDetailPageProps {
-  params: {
-    id: string;
-  };
-}
+type Params = {
+  id: string;
+};
 
-export default function StopDetailPage({ params }: StopDetailPageProps) {
+type Props = {
+  params: Params;
+};
+
+export default function StopDetailPage({ params }: Props) {
   const [stop, setStop] = useState<Stop | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
