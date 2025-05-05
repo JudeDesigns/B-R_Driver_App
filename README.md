@@ -48,9 +48,12 @@ This initial phase includes:
    DATABASE_URL="postgresql://username:password@localhost:5432/br_food_services"
    JWT_SECRET="your-secret-key-here"
    NEXT_PUBLIC_API_URL="http://localhost:3000/api"
+   USE_DATABASE="false"  # Set to "true" to use database authentication
    ```
 
    Replace the database credentials with your own.
+
+   Note: For Phase 1, you can set `USE_DATABASE="false"` to use mock authentication without a database connection.
 
 4. Set up the database:
 
@@ -72,19 +75,30 @@ This initial phase includes:
 
 7. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Default Login Credentials
+## Authentication
 
-### Admin
+The system supports two authentication methods:
+
+1. **Mock Authentication**: Uses hardcoded credentials (default in Phase 1)
+2. **Database Authentication**: Uses credentials stored in the database
+
+You can switch between these methods by setting the `USE_DATABASE` environment variable.
+
+### Default Login Credentials
+
+These credentials work with both authentication methods:
+
+#### Admin
 
 - Username: admin
 - Password: admin123
 
-### Super Admin
+#### Super Admin
 
 - Username: superadmin
 - Password: superadmin123
 
-### Driver
+#### Driver
 
 - Username: driver
 - Password: driver123

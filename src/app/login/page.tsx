@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -12,16 +11,53 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // For Phase 1, we'll use mock authentication
+  // Handle login form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // First try to authenticate via the API
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    // Mock credentials for Phase 1
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store authentication data
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("role", data.user.role);
+        localStorage.setItem("userId", data.user.id);
+
+        // Redirect based on role
+        if (data.user.role === "DRIVER") {
+          router.push("/driver");
+        } else {
+          router.push("/admin");
+        }
+      } else {
+        // If API fails, fall back to client-side mock authentication
+        // This is a fallback in case the API is not available
+        await fallbackAuthentication();
+      }
+    } catch (error) {
+      console.error("Authentication error:", error);
+      // If API call fails completely, fall back to client-side mock authentication
+      await fallbackAuthentication();
+    }
+
+    setLoading(false);
+  };
+
+  // Fallback to client-side mock authentication if API fails
+  const fallbackAuthentication = async () => {
+    // Mock credentials for fallback
     const validCredentials = {
       admin: { username: "admin", password: "admin123", role: "ADMIN" },
       superadmin: {
@@ -62,10 +98,10 @@ export default function LoginPage() {
     }
 
     if (isAuthenticated) {
-      // Create a mock token (in a real app, this would be a JWT)
+      // Create a mock token
       const mockToken = btoa(
         JSON.stringify({
-          id: "123",
+          id: "mock-id-123",
           username,
           role: userRole,
         })
@@ -74,7 +110,7 @@ export default function LoginPage() {
       // Store in localStorage
       localStorage.setItem("token", mockToken);
       localStorage.setItem("role", userRole);
-      localStorage.setItem("userId", "123");
+      localStorage.setItem("userId", "mock-id-123");
 
       // Redirect based on role
       if (userRole === "DRIVER") {
@@ -85,8 +121,6 @@ export default function LoginPage() {
     } else {
       setError("Invalid username or password");
     }
-
-    setLoading(false);
   };
 
   return (

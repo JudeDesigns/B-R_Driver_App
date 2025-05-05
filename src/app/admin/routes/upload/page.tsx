@@ -1,61 +1,63 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function RouteUploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setError('');
+      setError("");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!file) {
-      setError('Please select an Excel file to upload');
+      setError("Please select an Excel file to upload");
       return;
     }
 
     // Check file extension
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    if (fileExtension !== 'xlsx' && fileExtension !== 'xls') {
-      setError('Please upload a valid Excel file (.xlsx or .xls)');
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    if (fileExtension !== "xlsx" && fileExtension !== "xls") {
+      setError("Please upload a valid Excel file (.xlsx or .xls)");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await fetch('/api/admin/routes/upload', {
-        method: 'POST',
+      const response = await fetch("/api/admin/routes/upload", {
+        method: "POST",
         body: formData,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to upload route');
+        throw new Error(data.message || "Failed to upload route");
       }
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/admin');
+        router.push("/admin");
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during upload');
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "An error occurred during upload";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,7 +112,8 @@ export default function RouteUploadPage() {
                       <span className="text-gray-700">{file.name}</span>
                     ) : (
                       <>
-                        <span className="text-blue-500">Click to upload</span> or drag and drop
+                        <span className="text-blue-500">Click to upload</span>{" "}
+                        or drag and drop
                       </>
                     )}
                   </label>
@@ -121,9 +124,12 @@ export default function RouteUploadPage() {
               </div>
 
               <div className="bg-gray-50 p-4 rounded-md mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Column Mapping</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">
+                  Column Mapping
+                </h3>
                 <p className="text-xs text-gray-500 mb-2">
-                  The system will map the following columns from your Excel file:
+                  The system will map the following columns from your Excel
+                  file:
                 </p>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>Column C → Assigned Driver</li>
@@ -143,7 +149,7 @@ export default function RouteUploadPage() {
                 disabled={loading || !file}
                 className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Uploading...' : 'Upload Route'}
+                {loading ? "Uploading..." : "Upload Route"}
               </button>
             </form>
           )}

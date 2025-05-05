@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 
 interface Stop {
   id: string;
@@ -11,19 +12,25 @@ interface Stop {
     name: string;
     address: string;
   };
-  status: 'PENDING' | 'ON_THE_WAY' | 'ARRIVED' | 'COMPLETED';
+  status: "PENDING" | "ON_THE_WAY" | "ARRIVED" | "COMPLETED";
   orderNumber?: string;
   qbInvoiceNumber?: string;
   initialDriverNotes?: string;
 }
 
-export default function StopDetailPage({ params }: { params: { id: string } }) {
+interface StopDetailPageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function StopDetailPage({ params }: StopDetailPageProps) {
   const [stop, setStop] = useState<Stop | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [invoiceImage, setInvoiceImage] = useState<File | null>(null);
   const [hasReturns, setHasReturns] = useState(false);
-  const [driverNote, setDriverNote] = useState('');
+  const [driverNote, setDriverNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1); // 1: Invoice, 2: Returns, 3: Notes
   const router = useRouter();
@@ -38,13 +45,17 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
         id: params.id,
         sequence: parseInt(params.id),
         customer: {
-          name: params.id === '1' ? 'ABC Restaurant' : 'XYZ Grocery',
-          address: params.id === '1' ? '123 Main St, Anytown, USA' : '456 Oak Ave, Somewhere, USA',
+          name: params.id === "1" ? "ABC Restaurant" : "XYZ Grocery",
+          address:
+            params.id === "1"
+              ? "123 Main St, Anytown, USA"
+              : "456 Oak Ave, Somewhere, USA",
         },
-        status: 'ARRIVED',
+        status: "ARRIVED",
         orderNumber: `ORD-00${params.id}`,
         qbInvoiceNumber: `INV-00${params.id}`,
-        initialDriverNotes: params.id === '1' ? 'Deliver to back entrance' : undefined,
+        initialDriverNotes:
+          params.id === "1" ? "Deliver to back entrance" : undefined,
       });
     }, 1000);
 
@@ -59,7 +70,7 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
 
   const handleSubmit = async () => {
     if (!invoiceImage) {
-      alert('Please upload a signed invoice image');
+      alert("Please upload a signed invoice image");
       return;
     }
 
@@ -71,14 +82,14 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
       // 2. Process returns if any
       // 3. Save driver notes
       // 4. Mark the stop as completed
-      
+
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       // Redirect back to route page
-      router.push('/driver/route');
-    } catch (err) {
-      setError('Failed to complete delivery. Please try again.');
+      router.push("/driver/route");
+    } catch {
+      setError("Failed to complete delivery. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -86,7 +97,7 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
 
   const nextStep = () => {
     if (step === 1 && !invoiceImage) {
-      alert('Please upload a signed invoice image');
+      alert("Please upload a signed invoice image");
       return;
     }
     setStep(step + 1);
@@ -139,9 +150,7 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-20">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">
-          Complete Delivery
-        </h1>
+        <h1 className="text-xl font-bold text-gray-800">Complete Delivery</h1>
         <Link
           href="/driver/route"
           className="text-green-500 hover:text-green-600 transition duration-200"
@@ -166,21 +175,21 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
         <div className="p-4">
           <h3 className="font-medium text-gray-900">{stop.customer.name}</h3>
           <p className="text-sm text-gray-600 mt-1">{stop.customer.address}</p>
-          
+
           {stop.orderNumber && (
             <div className="mt-2 text-sm">
-              <span className="text-gray-500">Order #:</span>{' '}
+              <span className="text-gray-500">Order #:</span>{" "}
               <span className="text-gray-900">{stop.orderNumber}</span>
             </div>
           )}
-          
+
           {stop.qbInvoiceNumber && (
             <div className="mt-1 text-sm">
-              <span className="text-gray-500">Invoice #:</span>{' '}
+              <span className="text-gray-500">Invoice #:</span>{" "}
               <span className="text-gray-900">{stop.qbInvoiceNumber}</span>
             </div>
           )}
-          
+
           {stop.initialDriverNotes && (
             <div className="mt-3 p-2 bg-yellow-50 border-l-4 border-yellow-400 text-sm text-yellow-700">
               <p className="font-medium">Note:</p>
@@ -193,9 +202,9 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
           <h2 className="font-medium text-gray-700">
-            {step === 1 && 'Upload Signed Invoice'}
-            {step === 2 && 'Any Returns?'}
-            {step === 3 && 'Delivery Notes'}
+            {step === 1 && "Upload Signed Invoice"}
+            {step === 2 && "Any Returns?"}
+            {step === 3 && "Delivery Notes"}
           </h2>
         </div>
         <div className="p-4">
@@ -220,10 +229,12 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
                   >
                     {invoiceImage ? (
                       <div className="flex flex-col items-center">
-                        <img
+                        <Image
                           src={URL.createObjectURL(invoiceImage)}
                           alt="Signed Invoice"
-                          className="max-h-40 mb-2 rounded"
+                          width={200}
+                          height={150}
+                          className="max-h-40 mb-2 rounded object-contain"
                         />
                         <span className="text-sm text-gray-700">
                           {invoiceImage.name}
@@ -275,8 +286,8 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
                   onClick={() => setHasReturns(true)}
                   className={`flex-1 py-2 px-4 rounded-md border ${
                     hasReturns
-                      ? 'bg-green-50 border-green-500 text-green-700'
-                      : 'border-gray-300 text-gray-700'
+                      ? "bg-green-50 border-green-500 text-green-700"
+                      : "border-gray-300 text-gray-700"
                   }`}
                 >
                   Yes
@@ -286,8 +297,8 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
                   onClick={() => setHasReturns(false)}
                   className={`flex-1 py-2 px-4 rounded-md border ${
                     hasReturns === false
-                      ? 'bg-green-50 border-green-500 text-green-700'
-                      : 'border-gray-300 text-gray-700'
+                      ? "bg-green-50 border-green-500 text-green-700"
+                      : "border-gray-300 text-gray-700"
                   }`}
                 >
                   No
@@ -350,7 +361,7 @@ export default function StopDetailPage({ params }: { params: { id: string } }) {
                 disabled={submitting}
                 className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Completing...' : 'Complete Delivery'}
+                {submitting ? "Completing..." : "Complete Delivery"}
               </button>
             )}
           </div>

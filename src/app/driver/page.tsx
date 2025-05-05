@@ -6,8 +6,8 @@ import Link from "next/link";
 export default function DriverDashboard() {
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [safetyCheckCompleted, setSafetyCheckCompleted] = useState(false);
+  const [error] = useState("");
+  const [safetyCheckCompleted] = useState(false);
 
   useEffect(() => {
     // In a real implementation, this would fetch data from the API
@@ -24,7 +24,7 @@ export default function DriverDashboard() {
   return (
     <div className="max-w-lg mx-auto space-y-8 pb-20">
       <h1 className="text-2xl font-medium text-black text-center mt-6">
-        Today's Route
+        Today&apos;s Route
       </h1>
 
       {loading ? (
@@ -105,7 +105,7 @@ export default function DriverDashboard() {
             No route assigned
           </h3>
           <p className="mt-2 text-sm text-gray-500">
-            You don't have any routes assigned for today.
+            You don&apos;t have any routes assigned for today.
           </p>
         </div>
       )}

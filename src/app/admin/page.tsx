@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function AdminDashboard() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error] = useState("");
 
   useEffect(() => {
     // In a real implementation, this would fetch data from the API
@@ -55,7 +55,9 @@ export default function AdminDashboard() {
 
       <div className="border border-gray-200 rounded overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-black">Today's Routes</h2>
+          <h2 className="text-lg font-medium text-black">
+            Today&apos;s Routes
+          </h2>
         </div>
         <div className="p-6">
           {loading ? (

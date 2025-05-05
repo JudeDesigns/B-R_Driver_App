@@ -1,26 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import * as XLSX from 'xlsx';
-
-const prisma = new PrismaClient();
+import { NextRequest, NextResponse } from "next/server";
+import * as XLSX from "xlsx";
+// Prisma client will be used in a future implementation
+// import { PrismaClient } from '@prisma/client';
+// We'll uncomment and use this in a future implementation
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get("file") as File;
 
     if (!file) {
       return NextResponse.json(
-        { message: 'No file provided' },
+        { message: "No file provided" },
         { status: 400 }
       );
     }
 
     // Read the Excel file
     const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
+    const workbook = XLSX.read(buffer, { type: "array" });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(worksheet, { header: 'A' });
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: "A" });
 
     // Process the data
     // This is a simplified version - in a real implementation, you would:
@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
 
     // For now, we'll just return success
     return NextResponse.json({
-      message: 'Route uploaded successfully',
+      message: "Route uploaded successfully",
       rowCount: data.length,
     });
   } catch (error) {
-    console.error('Route upload error:', error);
+    console.error("Route upload error:", error);
     return NextResponse.json(
-      { message: 'An error occurred during route upload' },
+      { message: "An error occurred during route upload" },
       { status: 500 }
     );
   }
