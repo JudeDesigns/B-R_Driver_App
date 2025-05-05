@@ -1,6 +1,19 @@
-import { prisma } from "./db";
 import * as argon2 from "argon2";
 import jwt from "jsonwebtoken";
+
+// Import prisma dynamically to handle cases where it might not be available
+let prisma: any;
+try {
+  // This is wrapped in a try-catch to handle cases where Prisma might not be generated yet
+  // This is particularly useful during the build process on Vercel
+  const { prisma: prismaClient } = require("./db");
+  prisma = prismaClient;
+} catch (e) {
+  console.warn(
+    "Prisma client not available, falling back to mock authentication"
+  );
+  prisma = null;
+}
 
 // Mock credentials for fallback
 export const mockCredentials = {
@@ -19,8 +32,8 @@ export const USE_DATABASE = process.env.USE_DATABASE === "true";
 
 // Function to authenticate a user
 export async function authenticateUser(username: string, password: string) {
-  // First try database authentication if enabled
-  if (USE_DATABASE) {
+  // First try database authentication if enabled and prisma is available
+  if (USE_DATABASE && prisma) {
     try {
       // Find user by username
       const user = await prisma.user.findUnique({
@@ -40,6 +53,10 @@ export async function authenticateUser(username: string, password: string) {
       console.error("Database authentication error:", error);
       // Fall back to mock authentication if database fails
     }
+  } else if (USE_DATABASE && !prisma) {
+    console.warn(
+      "Database authentication is enabled but Prisma client is not available. Falling back to mock authentication."
+    );
   }
 
   // Fall back to mock authentication
