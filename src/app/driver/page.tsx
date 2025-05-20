@@ -1,31 +1,191 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSocket } from "@/contexts/SocketContext";
+import { SocketEvents, RouteStatusUpdateData } from "@/lib/socketClient";
 
 export default function DriverDashboard() {
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState("");
-  const [safetyCheckCompleted] = useState(false);
+  const [safetyCheckCompleted, setSafetyCheckCompleted] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+  const router = useRouter();
+
+  const [token, setToken] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<any[]>([]);
+
+  // Initialize socket connection
+  const { isConnected, joinRoom, subscribe } = useSocket();
 
   useEffect(() => {
-    // In a real implementation, this would fetch data from the API
-    // For now, we'll just simulate loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-      // Mock data for demonstration
-      setRoute(null);
-    }, 1000);
+    // Check if user is logged in and has driver role
+    try {
+      // Check both localStorage and sessionStorage, with preference for sessionStorage for drivers
+      let storedToken, userRole, userName;
 
-    return () => clearTimeout(timer);
-  }, []);
+      // First check sessionStorage (preferred for drivers)
+      storedToken = sessionStorage.getItem("token");
+      userRole = sessionStorage.getItem("userRole");
+      userName = sessionStorage.getItem("username");
+
+      // If not found in sessionStorage, check localStorage
+      if (!storedToken) {
+        storedToken = localStorage.getItem("token");
+        userRole = localStorage.getItem("userRole");
+        userName = localStorage.getItem("username");
+      }
+
+      if (!storedToken || userRole !== "DRIVER") {
+        console.log("Driver authentication failed, redirecting to login");
+        router.push("/login");
+      } else {
+        console.log("Driver authenticated successfully");
+        setUsername(userName);
+        setToken(storedToken);
+      }
+    } catch (error) {
+      console.error("Error checking driver authentication:", error);
+      router.push("/login");
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (token) {
+      fetchAssignedRoutes();
+    }
+  }, [token]);
+
+  // Set up WebSocket connection and event listeners
+  useEffect(() => {
+    if (!isConnected || !token) return;
+
+    console.log("Setting up WebSocket connection for driver dashboard");
+
+    // Join the driver's room
+    if (typeof window !== "undefined") {
+      try {
+        // Try sessionStorage first (preferred for drivers)
+        let userId = sessionStorage.getItem("userId");
+
+        // If not found in sessionStorage, try localStorage
+        if (!userId) {
+          userId = localStorage.getItem("userId");
+        }
+
+        if (userId) {
+          console.log("Joining driver room:", `driver:${userId}`);
+          joinRoom(`driver:${userId}`);
+        }
+      } catch (error) {
+        console.error("Error getting userId for WebSocket connection:", error);
+      }
+    }
+
+    // Subscribe to route status update events
+    const unsubscribeRouteStatus = subscribe<RouteStatusUpdateData>(
+      SocketEvents.ROUTE_STATUS_UPDATED,
+      (data) => {
+        console.log("Received route status update event:", data);
+        // Refresh routes when any route status changes
+        fetchAssignedRoutes();
+      }
+    );
+
+    return () => {
+      unsubscribeRouteStatus();
+    };
+  }, [isConnected, token, joinRoom, subscribe]);
+
+  const fetchAssignedRoutes = async () => {
+    if (!token) return;
+
+    setLoading(true);
+
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split("T")[0];
+
+      // Fetch routes
+      const routesResponse = await fetch(
+        `/api/driver/assigned-routes?date=${today}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!routesResponse.ok) {
+        const errorData = await routesResponse.json();
+        throw new Error(errorData.message || "Failed to fetch routes");
+      }
+
+      const routesData = await routesResponse.json();
+      setRoutes(routesData.routes || []);
+
+      // If there's at least one route, set the first one as the current route
+      if (routesData.routes && routesData.routes.length > 0) {
+        setRoute(routesData.routes[0]);
+      }
+
+      // Check if any safety checks are completed
+      const safetyChecksResponse = await fetch(
+        `/api/driver/safety-check/status?date=${today}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (safetyChecksResponse.ok) {
+        const safetyData = await safetyChecksResponse.json();
+        setSafetyCheckCompleted(safetyData.hasCompletedChecks || false);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    // Clear both localStorage and sessionStorage
+    localStorage.removeItem("token");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("username");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("storageType");
+
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("userRole");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("userId");
+    sessionStorage.removeItem("storageType");
+
+    console.log("Driver logged out successfully");
+    router.push("/login");
+  };
 
   return (
     <div className="max-w-lg mx-auto space-y-8 pb-20">
-      <h1 className="text-2xl font-medium text-black text-center mt-6">
-        Today&apos;s Route
-      </h1>
+      <div className="flex justify-between items-center mt-6">
+        <h1 className="text-2xl font-medium text-black">Driver Dashboard</h1>
+        <div className="flex items-center">
+          <span className="text-sm text-gray-600">
+            Welcome, {username || "Driver"}
+          </span>
+        </div>
+      </div>
+
+      {/* Menu buttons removed as requested */}
+
+      <h2 className="text-xl font-medium text-black mt-4">
+        Today&apos;s Deliveries
+      </h2>
 
       {loading ? (
         <div className="flex justify-center items-center h-40">
@@ -33,58 +193,77 @@ export default function DriverDashboard() {
         </div>
       ) : error ? (
         <div className="text-red-600 text-center p-4">{error}</div>
-      ) : route ? (
-        <div className="border border-gray-200 rounded overflow-hidden">
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Route ID</span>
-                <span className="text-sm font-medium">{route.id}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Date</span>
-                <span className="text-sm font-medium">
-                  {new Date(route.date).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Status</span>
-                <span className="text-sm font-medium px-3 py-1 bg-gray-100 rounded-full">
-                  {route.status}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Total Stops</span>
-                <span className="text-sm font-medium">
-                  {route.stops?.length || 0}
-                </span>
+      ) : routes.length > 0 ? (
+        <div className="space-y-4">
+          {routes.map((route) => (
+            <div
+              key={route.id}
+              className="border border-gray-200 rounded overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Route Number</span>
+                    <span className="text-sm font-medium">
+                      {route.routeNumber || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Date</span>
+                    <span className="text-sm font-medium">
+                      {new Date(route.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Status</span>
+                    <span
+                      className={`text-sm font-medium px-3 py-1 rounded-full ${
+                        route.status === "PENDING"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : route.status === "IN_PROGRESS"
+                          ? "bg-blue-100 text-blue-800"
+                          : route.status === "COMPLETED"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {route.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Total Stops</span>
+                    <span className="text-sm font-medium">
+                      {route._count?.stops || 0}
+                    </span>
+                  </div>
+                </div>
+
+                {route.status === "PENDING" ? (
+                  <div className="mt-8">
+                    <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-6 bg-yellow-50">
+                      <p className="text-sm text-gray-600">
+                        You must complete the safety checklist before starting
+                        this route.
+                      </p>
+                    </div>
+                    <Link
+                      href="/driver/safety-check"
+                      className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200"
+                    >
+                      Complete Safety Checklist
+                    </Link>
+                  </div>
+                ) : (
+                  <Link
+                    href="/driver/stops"
+                    className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 mt-8"
+                  >
+                    View Stop Details
+                  </Link>
+                )}
               </div>
             </div>
-
-            {!safetyCheckCompleted ? (
-              <div className="mt-8">
-                <div className="border-l-4 border-gray-300 pl-4 py-2 mb-6">
-                  <p className="text-sm text-gray-600">
-                    You must complete the safety checklist before starting your
-                    route.
-                  </p>
-                </div>
-                <Link
-                  href="/driver/safety-check"
-                  className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200"
-                >
-                  Complete Safety Checklist
-                </Link>
-              </div>
-            ) : (
-              <Link
-                href="/driver/route"
-                className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 mt-8"
-              >
-                View Route Details
-              </Link>
-            )}
-          </div>
+          ))}
         </div>
       ) : (
         <div className="border border-gray-200 rounded p-8 text-center">
@@ -102,11 +281,17 @@ export default function DriverDashboard() {
             />
           </svg>
           <h3 className="mt-4 text-base font-medium text-black">
-            No route assigned
+            No routes assigned
           </h3>
           <p className="mt-2 text-sm text-gray-500">
             You don&apos;t have any routes assigned for today.
           </p>
+          <Link
+            href="/driver/stops"
+            className="mt-4 inline-block text-blue-600 hover:text-blue-800 transition duration-200"
+          >
+            View all stops
+          </Link>
         </div>
       )}
     </div>

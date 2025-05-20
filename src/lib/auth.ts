@@ -1,123 +1,120 @@
 import * as argon2 from "argon2";
 import jwt from "jsonwebtoken";
 
-// Import prisma dynamically to handle cases where it might not be available
-let prisma: any;
-try {
-  // This is wrapped in a try-catch to handle cases where Prisma might not be generated yet
-  // This is particularly useful during the build process on Vercel
-  const { prisma: prismaClient } = require("./db");
-  prisma = prismaClient;
-} catch (e) {
-  console.warn(
-    "Prisma client not available, falling back to mock authentication"
-  );
-  prisma = null;
-}
-
-// Mock credentials for fallback
-export const mockCredentials = {
-  admin: { username: "admin", password: "admin123", role: "ADMIN" },
-  superadmin: {
-    username: "superadmin",
-    password: "superadmin123",
-    role: "SUPER_ADMIN",
-  },
-  driver: { username: "driver", password: "driver123", role: "DRIVER" },
-};
-
-// Environment flag to determine if we should use the database
-// This can be set in .env file
-export const USE_DATABASE = process.env.USE_DATABASE === "true";
+// Import prisma client
+import prisma from "./db";
 
 // Function to authenticate a user
 export async function authenticateUser(username: string, password: string) {
-  // First try database authentication if enabled and prisma is available
-  if (USE_DATABASE && prisma) {
-    try {
-      // Find user by username
-      const user = await prisma.user.findUnique({
-        where: { username },
-      });
+  try {
+    // Validate inputs
+    if (!username || !password) {
+      console.error("Missing username or password");
+      return {
+        isAuthenticated: false,
+        userRole: "",
+        userId: "",
+        username: "",
+      };
+    }
 
-      // If user exists and password matches
-      if (user && (await argon2.verify(user.password, password))) {
+    // Find user by username
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    // If user doesn't exist
+    if (!user) {
+      console.log(`User not found: ${username}`);
+      return {
+        isAuthenticated: false,
+        userRole: "",
+        userId: "",
+        username: "",
+      };
+    }
+
+    // Verify password
+    try {
+      const passwordMatches = await argon2.verify(user.password, password);
+
+      if (passwordMatches) {
+        console.log(`User authenticated successfully: ${username}`);
         return {
           isAuthenticated: true,
           userRole: user.role,
           userId: user.id,
           username: user.username,
         };
+      } else {
+        console.log(`Password verification failed for user: ${username}`);
+        return {
+          isAuthenticated: false,
+          userRole: "",
+          userId: "",
+          username: "",
+        };
       }
-    } catch (error) {
-      console.error("Database authentication error:", error);
-      // Fall back to mock authentication if database fails
+    } catch (verifyError) {
+      console.error(
+        `Password verification error for user ${username}:`,
+        verifyError
+      );
+      return {
+        isAuthenticated: false,
+        userRole: "",
+        userId: "",
+        username: "",
+      };
     }
-  } else if (USE_DATABASE && !prisma) {
-    console.warn(
-      "Database authentication is enabled but Prisma client is not available. Falling back to mock authentication."
-    );
-  }
-
-  // Fall back to mock authentication
-  // Check admin credentials
-  if (
-    username === mockCredentials.admin.username &&
-    password === mockCredentials.admin.password
-  ) {
+  } catch (error) {
+    console.error("Authentication error:", error);
     return {
-      isAuthenticated: true,
-      userRole: "ADMIN",
-      userId: "mock-admin-id",
-      username,
+      isAuthenticated: false,
+      userRole: "",
+      userId: "",
+      username: "",
     };
   }
-  // Check super admin credentials
-  else if (
-    username === mockCredentials.superadmin.username &&
-    password === mockCredentials.superadmin.password
-  ) {
-    return {
-      isAuthenticated: true,
-      userRole: "SUPER_ADMIN",
-      userId: "mock-superadmin-id",
-      username,
-    };
-  }
-  // Check driver credentials
-  else if (
-    username === mockCredentials.driver.username &&
-    password === mockCredentials.driver.password
-  ) {
-    return {
-      isAuthenticated: true,
-      userRole: "DRIVER",
-      userId: "mock-driver-id",
-      username,
-    };
-  }
-
-  // Authentication failed
-  return {
-    isAuthenticated: false,
-    userRole: "",
-    userId: "",
-    username: "",
-  };
 }
 
 // Function to generate a JWT token
 export function generateToken(payload: Record<string, unknown>) {
   const secret = process.env.JWT_SECRET || "fallback-secret-key";
-  return jwt.sign(payload, secret, { expiresIn: "8h" });
+  // Extend token expiration to 7 days for better user experience
+  return jwt.sign(payload, secret, { expiresIn: "7d" });
 }
 
 // Function to verify a JWT token
 export function verifyToken(token: string) {
+  if (!token || typeof token !== "string") {
+    console.error("Invalid token format:", token);
+    return null;
+  }
+
   const secret = process.env.JWT_SECRET || "fallback-secret-key";
   try {
     return jwt.verify(token, secret);
-  } catch {
+  } catch (error) {
+    // Check if the error is due to an expired token
+    if (error instanceof jwt.TokenExpiredError) {
+      console.warn("Token expired:", error.expiredAt);
+
+      // For development purposes, we can try to decode the token anyway
+      // This helps prevent disruptions during development
+      if (process.env.NODE_ENV === "development") {
+        try {
+          // Decode without verification to get the payload
+          const decoded = jwt.decode(token);
+          console.log("Using expired token in development mode:", decoded);
+          return decoded;
+        } catch (decodeError) {
+          console.error("Failed to decode expired token:", decodeError);
+        }
+      }
+    } else {
+      console.error("Token verification error:", error);
+    }
     return null;
   }
 }

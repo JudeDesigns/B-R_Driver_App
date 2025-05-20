@@ -48,12 +48,9 @@ This initial phase includes:
    DATABASE_URL="postgresql://username:password@localhost:5432/br_food_services"
    JWT_SECRET="your-secret-key-here"
    NEXT_PUBLIC_API_URL="http://localhost:3000/api"
-   USE_DATABASE="false"  # Set to "true" to use database authentication
    ```
 
    Replace the database credentials with your own.
-
-   Note: For Phase 1, you can set `USE_DATABASE="false"` to use mock authentication without a database connection.
 
 4. Set up the database:
 
@@ -77,38 +74,21 @@ This initial phase includes:
 
 ## Authentication
 
-The system supports two authentication methods:
+The system uses JWT-based authentication with database-stored credentials.
 
-1. **Mock Authentication**: Uses hardcoded credentials (default in Phase 1)
-2. **Database Authentication**: Uses credentials stored in the database
+### Default Administrator Account
 
-You can switch between these methods by setting the `USE_DATABASE` environment variable.
+After running the database seed script, the following administrator account will be available:
 
-### Default Login Credentials
-
-These credentials work with both authentication methods:
-
-#### Admin
-
-- Username: admin
-- Password: admin123
-
-#### Super Admin
-
-- Username: superadmin
-- Password: superadmin123
-
-#### Driver
-
-- Username: driver
-- Password: driver123
+- Username: Administrator
+- Password: Administrator
 
 ## Project Structure
 
 - `src/app`: Next.js App Router
   - `admin`: Admin Console pages
   - `driver`: Driver Portal pages
-  - `auth`: Authentication pages
+  - `login`: Authentication page
   - `api`: API endpoints
 - `src/components`: Reusable UI components
 - `src/lib`: Utility functions and shared code

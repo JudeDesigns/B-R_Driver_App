@@ -1,0 +1,502 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface Customer {
+  id: string;
+  name: string;
+  address: string;
+  contactInfo: string | null;
+  preferences: string | null;
+  groupCode: string | null;
+}
+
+interface Stop {
+  id: string;
+  sequence: number;
+  customerNameFromUpload: string | null;
+  driverNameFromUpload: string | null; // Added driver name from upload
+  orderNumberWeb: string | null;
+  quickbooksInvoiceNum: string | null;
+  initialDriverNotes: string | null;
+  status: string;
+  arrivalTime: string | null;
+  completionTime: string | null;
+  signedInvoicePdfUrl: string | null;
+  driverNotes: string | null;
+  isCOD: boolean;
+  paymentFlagCash: boolean;
+  paymentFlagCheck: boolean;
+  paymentFlagCC: boolean;
+  paymentFlagNotPaid: boolean;
+  returnFlagInitial: boolean;
+  driverRemarkInitial: string | null;
+  amount: number | null;
+  customer: Customer;
+}
+
+interface Driver {
+  id: string;
+  username: string;
+  fullName: string | null;
+}
+
+interface Route {
+  id: string;
+  routeNumber: string | null;
+  date: string;
+  status: string;
+  driver: Driver;
+  stops: Stop[];
+}
+
+export default function RouteDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const [route, setRoute] = useState<Route | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [token, setToken] = useState<string | null>(null);
+  const [groupByDriver, setGroupByDriver] = useState(true); // State to toggle grouping by driver
+  const router = useRouter();
+
+  useEffect(() => {
+    // Get the token from localStorage
+    const storedToken = localStorage.getItem("token");
+    if (storedToken) {
+      setToken(storedToken);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (token) {
+      fetchRouteDetails();
+    }
+  }, [token, params.id]);
+
+  const fetchRouteDetails = async () => {
+    if (!token) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/routes/${params.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch route details");
+      }
+
+      const data = await response.json();
+      setRoute(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+    });
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-800";
+      case "ON_THE_WAY":
+        return "bg-blue-100 text-blue-800";
+      case "ARRIVED":
+        return "bg-purple-100 text-purple-800";
+      case "COMPLETED":
+        return "bg-green-100 text-green-800";
+      case "CANCELLED":
+        return "bg-red-100 text-red-800";
+      case "FAILED":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getPaymentMethod = (stop: Stop) => {
+    if (stop.paymentFlagCash) return "Cash";
+    if (stop.paymentFlagCheck) return "Check";
+    if (stop.paymentFlagCC) return "Credit Card";
+    if (stop.paymentFlagNotPaid) return "Not Paid";
+    return "Unknown";
+  };
+  
+  // Function to group stops by driver
+  const getStopsGroupedByDriver = () => {
+    if (!route) return {};
+    
+    const grouped: Record<string, Stop[]> = {};
+    
+    route.stops.forEach((stop) => {
+      const driverName = stop.driverNameFromUpload || route.driver.username;
+      if (!grouped[driverName]) {
+        grouped[driverName] = [];
+      }
+      grouped[driverName].push(stop);
+    });
+    
+    // Sort stops within each driver group
+    Object.keys(grouped).forEach((driverName) => {
+      grouped[driverName].sort((a, b) => a.sequence - b.sequence);
+    });
+    
+    return grouped;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800">
+          Route Details {route?.routeNumber ? `- ${route.routeNumber}` : ""}
+        </h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => router.push("/admin/routes")}
+            className="text-blue-500 hover:text-blue-600 transition duration-200"
+          >
+            &larr; Back to Routes
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      ) : route ? (
+        <>
+          {/* Route Summary */}
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-700">Route Summary</h2>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Route Number</h3>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">
+                    {route.routeNumber || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Date</h3>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">
+                    {formatDate(route.date)}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Driver</h3>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">
+                    {route.driver.fullName || route.driver.username}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Status</h3>
+                  <p className="mt-1">
+                    <span
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(
+                        route.status
+                      )}`}
+                    >
+                      {route.status.replace("_", " ")}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stops List */}
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-700">
+                Stops ({route.stops.length})
+              </h2>
+              <div className="flex items-center">
+                <label className="inline-flex items-center cursor-pointer mr-4">
+                  <input
+                    type="checkbox"
+                    checked={groupByDriver}
+                    onChange={() => setGroupByDriver(!groupByDriver)}
+                    className="sr-only peer"
+                  />
+                  <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <span className="ml-3 text-sm font-medium text-gray-700">Group by Driver</span>
+                </label>
+              </div>
+            </div>
+            <div className="p-6">
+              {route.stops.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  No stops found for this route.
+                </div>
+              ) : groupByDriver ? (
+                // Grouped by driver view
+                <div className="space-y-8">
+                  {Object.entries(getStopsGroupedByDriver()).map(([driverName, stops]) => (
+                    <div key={driverName} className="overflow-hidden">
+                      <div className="bg-gray-100 px-6 py-3 border-l-4 border-blue-500 mb-4">
+                        <h3 className="text-md font-medium text-gray-800">
+                          Driver: {driverName} ({stops.length} stops)
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Seq
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Customer
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Invoice #
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Status
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Payment
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Amount
+                              </th>
+                              <th
+                                scope="col"
+                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                              >
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {stops.map((stop) => (
+                              <tr key={stop.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {stop.sequence}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {stop.customer.name}
+                                  {stop.customer.groupCode && (
+                                    <span className="ml-2 text-xs text-gray-400">
+                                      ({stop.customer.groupCode})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {stop.quickbooksInvoiceNum || "N/A"}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(
+                                      stop.status
+                                    )}`}
+                                  >
+                                    {stop.status.replace("_", " ")}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {getPaymentMethod(stop)}
+                                  {stop.isCOD && (
+                                    <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                      COD
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <button
+                                    onClick={() => router.push(`/admin/stops/${stop.id}`)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                  >
+                                    View
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Regular view (not grouped)
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Seq
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Driver
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Customer
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Invoice #
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Status
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Payment
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Amount
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {route.stops
+                        .sort((a, b) => a.sequence - b.sequence)
+                        .map((stop) => (
+                          <tr key={stop.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {stop.sequence}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {stop.driverNameFromUpload || route.driver.username}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {stop.customer.name}
+                              {stop.customer.groupCode && (
+                                <span className="ml-2 text-xs text-gray-400">
+                                  ({stop.customer.groupCode})
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {stop.quickbooksInvoiceNum || "N/A"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(
+                                  stop.status
+                                )}`}
+                              >
+                                {stop.status.replace("_", " ")}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {getPaymentMethod(stop)}
+                              {stop.isCOD && (
+                                <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                  COD
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <button
+                                onClick={() => router.push(`/admin/stops/${stop.id}`)}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          Route not found. It may have been deleted or you may not have permission to view it.
+        </div>
+      )}
+    </div>
+  );
+}

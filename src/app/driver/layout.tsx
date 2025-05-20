@@ -10,57 +10,104 @@ export default function DriverLayout({
   children: React.ReactNode;
 }) {
   const [username, setUsername] = useState("");
+  const [safetyCheckCompleted, setSafetyCheckCompleted] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     // Check if user is logged in and has driver role
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
-
-    if (!token || role !== "DRIVER") {
-      router.push("/login");
-      return;
-    }
-
-    // Decode token to get username
     try {
-      // For Phase 1, our token is just a base64 encoded JSON string
-      const payload = JSON.parse(atob(token));
-      setUsername(payload.username);
+      // Check both localStorage and sessionStorage, with preference for sessionStorage for drivers
+      let storedToken, userRole, storedUsername;
+
+      // First check sessionStorage (preferred for drivers)
+      storedToken = sessionStorage.getItem("token");
+      userRole = sessionStorage.getItem("userRole");
+      storedUsername = sessionStorage.getItem("username");
+
+      // If not found in sessionStorage, check localStorage
+      if (!storedToken) {
+        storedToken = localStorage.getItem("token");
+        userRole = localStorage.getItem("userRole");
+        storedUsername = localStorage.getItem("username");
+      }
+
+      if (!storedToken || userRole !== "DRIVER") {
+        router.push("/login");
+        return;
+      }
+
+      setToken(storedToken);
+
+      // Use the stored username directly instead of trying to decode the token
+      if (storedUsername) {
+        setUsername(storedUsername);
+      } else {
+        setUsername("Driver");
+      }
     } catch (error) {
-      console.error("Error decoding token:", error);
-      // Use a fallback username if token parsing fails
-      setUsername("Driver");
+      console.error("Error in auth check:", error);
+      router.push("/login");
     }
   }, [router]);
 
+  useEffect(() => {
+    if (token) {
+      checkSafetyStatus();
+    }
+  }, [token]);
+
+  const checkSafetyStatus = async () => {
+    if (!token) return;
+
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split("T")[0];
+
+      const response = await fetch(
+        `/api/driver/safety-check/status?date=${today}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSafetyCheckCompleted(data.hasCompletedChecks || false);
+      }
+    } catch (error) {
+      console.error("Error checking safety status:", error);
+    }
+  };
+
   const handleLogout = () => {
+    // Clear both localStorage and sessionStorage
     localStorage.removeItem("token");
-    localStorage.removeItem("role");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("username");
     localStorage.removeItem("userId");
+    localStorage.removeItem("storageType");
+
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("userRole");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("userId");
+    sessionStorage.removeItem("storageType");
+
+    console.log("Driver logged out successfully from layout");
     router.push("/login");
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Header */}
+      {/* Header - Simplified */}
       <header className="border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold uppercase tracking-tight">
-              B&R FOOD SERVICES
-            </h1>
-            <span className="ml-4 text-sm text-gray-500">Driver Portal</span>
-          </div>
-          <div className="flex items-center space-x-6">
-            <span className="text-sm">Welcome, {username}</span>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-black transition duration-200"
-            >
-              Sign out
-            </button>
-          </div>
+        <div className="container mx-auto px-6 py-4 flex justify-center items-center">
+          <h1 className="text-xl font-bold uppercase tracking-tight">
+            B&R FOOD SERVICES
+          </h1>
         </div>
       </header>
 
@@ -90,8 +137,9 @@ export default function DriverLayout({
             </svg>
             <span className="text-xs mt-1">Home</span>
           </Link>
+
           <Link
-            href="/driver/route"
+            href="/driver/stops"
             className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
           >
             <svg
@@ -105,31 +153,18 @@ export default function DriverLayout({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={1.5}
-                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
               />
-            </svg>
-            <span className="text-xs mt-1">Route</span>
-          </Link>
-          <Link
-            href="/driver/safety-check"
-            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={1.5}
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span className="text-xs mt-1">Safety</span>
+            <span className="text-xs mt-1">Stops</span>
           </Link>
+
           <Link
             href="/driver/end-route"
             className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
@@ -150,6 +185,28 @@ export default function DriverLayout({
             </svg>
             <span className="text-xs mt-1">End Route</span>
           </Link>
+
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            <span className="text-xs mt-1">Logout</span>
+          </button>
         </div>
       </nav>
     </div>

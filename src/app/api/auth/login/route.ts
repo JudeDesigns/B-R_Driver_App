@@ -3,7 +3,19 @@ import { authenticateUser, generateToken } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    // Parse the request body
+    let username, password;
+    try {
+      const body = await request.json();
+      username = body.username;
+      password = body.password;
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return NextResponse.json(
+        { message: "Invalid request format" },
+        { status: 400 }
+      );
+    }
 
     // Validate input
     if (!username || !password) {
