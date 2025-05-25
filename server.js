@@ -29,7 +29,7 @@ app.prepare().then(() => {
   initSocketIO(server);
 
   // Log WebSocket upgrade requests but don't interfere with Socket.IO's handling
-  server.on("upgrade", (request, socket, head) => {
+  server.on("upgrade", (request) => {
     const pathname = parse(request.url).pathname;
 
     // Just log the upgrade request without interfering with Socket.IO's handling

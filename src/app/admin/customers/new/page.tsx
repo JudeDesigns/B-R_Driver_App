@@ -9,6 +9,7 @@ export default function NewCustomerPage() {
     name: "",
     address: "",
     contactInfo: "",
+    email: "",
     preferences: "",
     groupCode: "",
   });
@@ -265,6 +266,23 @@ export default function NewCustomerPage() {
                   id="contactInfo"
                   name="contactInfo"
                   value={formData.contactInfo}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
                   onChange={handleChange}
                   className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                 />

@@ -40,9 +40,11 @@ export async function authenticateUser(username: string, password: string) {
 
       if (passwordMatches) {
         console.log(`User authenticated successfully: ${username}`);
+        // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
+        const userRole = user.role === "SUPER_ADMIN" ? "ADMIN" : user.role;
         return {
           isAuthenticated: true,
-          userRole: user.role,
+          userRole: userRole,
           userId: user.id,
           username: user.username,
         };
@@ -94,7 +96,12 @@ export function verifyToken(token: string) {
 
   const secret = process.env.JWT_SECRET || "fallback-secret-key";
   try {
-    return jwt.verify(token, secret);
+    const decoded = jwt.verify(token, secret) as any;
+    // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
+    if (decoded && decoded.role === "SUPER_ADMIN") {
+      decoded.role = "ADMIN";
+    }
+    return decoded;
   } catch (error) {
     // Check if the error is due to an expired token
     if (error instanceof jwt.TokenExpiredError) {
@@ -105,7 +112,11 @@ export function verifyToken(token: string) {
       if (process.env.NODE_ENV === "development") {
         try {
           // Decode without verification to get the payload
-          const decoded = jwt.decode(token);
+          const decoded = jwt.decode(token) as any;
+          // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
+          if (decoded && decoded.role === "SUPER_ADMIN") {
+            decoded.role = "ADMIN";
+          }
           console.log("Using expired token in development mode:", decoded);
           return decoded;
         } catch (decodeError) {

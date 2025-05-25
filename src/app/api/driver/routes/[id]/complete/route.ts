@@ -23,7 +23,8 @@ export async function POST(
     }
 
     // Get the route ID from the URL
-    const { id } = params;
+    const routeParams = await params;
+    const { id } = routeParams;
 
     // Check if the route exists and is assigned to the driver
     const route = await prisma.route.findFirst({

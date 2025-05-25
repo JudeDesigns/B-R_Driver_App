@@ -27,7 +27,8 @@ export async function GET(
     }
 
     // Get the user ID from the URL
-    const id = params.id;
+    const userParams = await params;
+    const id = userParams.id;
 
     // Get the user
     const user = await prisma.user.findUnique({

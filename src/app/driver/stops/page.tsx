@@ -920,7 +920,7 @@ export default function DriverStopsPage() {
               placeholder="Search stops..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-base"
+              className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent text-base mobile-input"
             />
             {searchTerm && (
               <button
@@ -1219,11 +1219,11 @@ export default function DriverStopsPage() {
         safetyCheckCompleted &&
         !loading &&
         stops.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredStops.map((stop) => (
               <div
                 key={stop.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden transform transition duration-300 hover:shadow-lg hover:-translate-y-1"
+                className="bg-white rounded-lg shadow-md overflow-hidden transform transition duration-300 hover:shadow-lg hover:-translate-y-1 mobile-card touch-manipulation"
               >
                 <div
                   className={`h-3 ${

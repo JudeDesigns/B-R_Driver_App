@@ -25,8 +25,9 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // In Next.js 14, params is accessed directly from context
-    const { id } = context.params;
+    // In Next.js 14, params is a Promise that needs to be awaited
+    const params = await context.params;
+    const { id } = params;
 
     // We already extracted the ID from context.params above
     // const { id } = await params;

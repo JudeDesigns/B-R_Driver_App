@@ -1,0 +1,152 @@
+// This is your Prisma schema file for products
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Product model
+model Product {
+  id                String   @id @default(uuid())
+  productName       String
+  productCode       String   @unique
+  unit              String?
+  description       String?
+  additionalSKUs    AdditionalSKU[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  isDeleted         Boolean  @default(false)
+  
+  // Relationships
+  inventory         Inventory?
+  orderItems        OrderItem[]
+  returnItems       ReturnItem[]
+}
+
+// Additional SKU model for storing alternative product codes
+model AdditionalSKU {
+  id                String   @id @default(uuid())
+  skuCode           String
+  description       String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         String
+}
+
+// Inventory model for tracking product stock
+model Inventory {
+  id                String   @id @default(uuid())
+  quantity          Float
+  unit              String
+  reorderLevel      Float?
+  lastRestockDate   DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         String   @unique
+}
+
+// Order model for tracking customer orders
+model Order {
+  id                String   @id @default(uuid())
+  orderNumber       String   @unique
+  orderDate         DateTime @default(now())
+  customerId        String
+  status            OrderStatus @default(PENDING)
+  totalAmount       Float
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  orderItems        OrderItem[]
+  returns           Return[]
+}
+
+// Order item model for tracking products in an order
+model OrderItem {
+  id                String   @id @default(uuid())
+  quantity          Float
+  unitPrice         Float
+  totalPrice        Float
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  order             Order    @relation(fields: [orderId], references: [id])
+  orderId           String
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         String
+}
+
+// Return model for tracking product returns
+model Return {
+  id                String   @id @default(uuid())
+  returnNumber      String   @unique
+  returnDate        DateTime @default(now())
+  warehouseLocation String?
+  vendorCreditNumber String?
+  status            ReturnStatus @default(PENDING)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  order             Order    @relation(fields: [orderId], references: [id])
+  orderId           String
+  returnItems       ReturnItem[]
+}
+
+// Return item model for tracking products in a return
+model ReturnItem {
+  id                String   @id @default(uuid())
+  quantity          Float
+  reason            String?
+  condition         ItemCondition @default(GOOD)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  return            Return   @relation(fields: [returnId], references: [id])
+  returnId          String
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         String
+}
+
+// Enums
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ReturnStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSED
+  COMPLETED
+}
+
+enum ItemCondition {
+  GOOD
+  DAMAGED
+  EXPIRED
+  INCORRECT
+  OTHER
+}

@@ -111,11 +111,46 @@ export async function POST(request: NextRequest) {
         throw new Error("Route not found");
       }
 
-      // Then create the safety check
+      // Extract enhanced safety check fields if they exist
+      const {
+        // Vehicle & Fuel Check fields
+        date,
+        mileage1,
+        mileage2,
+        dieselLevel,
+        palletsIn,
+        palletsOut,
+        dpfLevel,
+        dieselReceipt,
+        dollNumber,
+        truckJackNumber,
+        strapLevel,
+        palletJackNumber,
+        truckNumber,
+
+        // Fueling Details
+        dieselAmount,
+        creditCardNumber,
+        fuelCapKeyNumber,
+        creditCardCashAmount,
+        cashBackAmount,
+
+        // Photo/Video Upload Checklist
+        frontLightsPhoto,
+        electricityBoxPhoto,
+        palletsPhoto,
+        vehicleConditionVideo,
+        calledWarehouse,
+
+        // Additional fields
+        notes,
+      } = details || {};
+
+      // Then create the safety check with enhanced fields
       return await tx.safetyCheck.create({
         data: {
           type,
-          responses: details || {},
+          responses: details || {}, // Keep original responses for backward compatibility
           timestamp: new Date(),
           route: {
             connect: { id: routeId },
@@ -123,12 +158,53 @@ export async function POST(request: NextRequest) {
           driver: {
             connect: { id: decoded.id },
           },
+          // Add enhanced fields if they exist
+          date: date ? new Date(date) : undefined,
+          mileage1,
+          mileage2,
+          dieselLevel,
+          palletsIn:
+            palletsIn !== undefined
+              ? parseInt(palletsIn.toString())
+              : undefined,
+          palletsOut:
+            palletsOut !== undefined
+              ? parseInt(palletsOut.toString())
+              : undefined,
+          dpfLevel,
+          dieselReceipt,
+          dollNumber,
+          truckJackNumber,
+          strapLevel,
+          palletJackNumber,
+          truckNumber,
+          dieselAmount:
+            dieselAmount !== undefined
+              ? parseFloat(dieselAmount.toString())
+              : undefined,
+          creditCardNumber,
+          fuelCapKeyNumber,
+          creditCardCashAmount:
+            creditCardCashAmount !== undefined
+              ? parseFloat(creditCardCashAmount.toString())
+              : undefined,
+          cashBackAmount:
+            cashBackAmount !== undefined
+              ? parseFloat(cashBackAmount.toString())
+              : undefined,
+          frontLightsPhoto,
+          electricityBoxPhoto,
+          palletsPhoto,
+          vehicleConditionVideo,
+          calledWarehouse,
+          notes,
         },
       });
     });
 
-    // If this is a start of day safety check and the route is pending, update it to in progress
+    // Update route status based on safety check type
     if (type === "START_OF_DAY" && route.status === "PENDING") {
+      // If this is a start of day safety check and the route is pending, update it to in progress
       await prisma.route.update({
         where: {
           id: routeId,
@@ -137,6 +213,32 @@ export async function POST(request: NextRequest) {
           status: "IN_PROGRESS",
         },
       });
+    } else if (type === "END_OF_DAY" && route.status === "IN_PROGRESS") {
+      // If this is an end of day safety check and the route is in progress, update it to completed
+      // First check if all stops are completed
+      const stops = await prisma.stop.findMany({
+        where: {
+          routeId,
+          isDeleted: false,
+          driverNameFromUpload: driverName,
+        },
+      });
+
+      const allStopsCompleted = stops.every(
+        (stop) => stop.status === "COMPLETED"
+      );
+
+      // Only mark the route as completed if all stops are completed
+      if (allStopsCompleted || stops.length === 0) {
+        await prisma.route.update({
+          where: {
+            id: routeId,
+          },
+          data: {
+            status: "COMPLETED",
+          },
+        });
+      }
     }
 
     return NextResponse.json({

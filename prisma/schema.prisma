@@ -37,6 +37,7 @@ model Customer {
   name          String
   address       String
   contactInfo   String?
+  email         String?
   preferences   String?
   groupCode     String?
   createdAt     DateTime @default(now())
@@ -48,6 +49,7 @@ model Customer {
 
   @@map("customers")
   @@index([name])
+  @@index([email])
   @@index([groupCode])
   @@index([isDeleted])
 }
@@ -171,7 +173,39 @@ model SafetyCheck {
   driverId            String        // ID of the driver who submitted the safety check
   driver              User          @relation("DriverSafetyChecks", fields: [driverId], references: [id])
   type                ChecklistType
-  responses           Json
+  // Enhanced responses structure to match PRD requirements
+  // Vehicle & Fuel Check fields
+  date                DateTime?     // Date field
+  mileage1            String?       // MIL #1
+  mileage2            String?       // MIL #2
+  dieselLevel         String?       // Diesel Level (Dropdown)
+  palletsIn           Int?          // Pallets IN
+  palletsOut          Int?          // Pallets OUT
+  dpfLevel            String?       // DPF Level
+  dieselReceipt       Boolean?      // Diesel Receipt
+  dollNumber          String?       // Doll #
+  truckJackNumber     String?       // Truck Jack #
+  strapLevel          String?       // Strap Level (Stupl Heve in PRD)
+  palletJackNumber    String?       // Pallet Jack #
+  truckNumber         String?       // Truck #
+
+  // Fueling Details
+  dieselAmount        Float?        // Diesel Amount
+  creditCardNumber    String?       // Credit Card No.
+  fuelCapKeyNumber    String?       // Key for Fuel Cap #
+  creditCardCashAmount Float?       // Credit Card / Cash Receive Amount
+  cashBackAmount      Float?        // Cash Back Amount
+
+  // Photo/Video Upload Checklist
+  frontLightsPhoto    Boolean?      // Upload photo of front lights/tail lights
+  electricityBoxPhoto Boolean?      // Upload photo of electricity box (power off)
+  palletsPhoto        Boolean?      // Upload photo of pallets/dolly/pallet jack
+  vehicleConditionVideo Boolean?    // Upload video of vehicle condition
+  calledWarehouse     Boolean?      // Called warehouse before leaving
+
+  // Additional fields
+  notes               String?       // Additional notes
+  responses           Json          // Keep original responses for backward compatibility
   timestamp           DateTime      @default(now())
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -208,10 +242,49 @@ model RouteUpload {
   @@index([isDeleted])
 }
 
+// Product model
+model Product {
+  id                  String   @id @default(uuid())
+  name                String
+  sku                 String   @unique
+  description         String?
+  unit                String?  // e.g., "pound", "each", "case"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  @@map("products")
+  @@index([sku])
+  @@index([name])
+  @@index([isDeleted])
+}
+
+// CustomerEmail model for tracking email notifications
+model CustomerEmail {
+  id                  String   @id @default(uuid())
+  stopId              String   // Related stop ID
+  customerEmail       String   // Customer email address
+  subject             String   // Email subject
+  body                String   // Email body (can be HTML)
+  signedInvoiceUrl    String?  // URL to the signed invoice PDF
+  originalInvoiceUrl  String?  // URL to the original QuickBooks invoice PDF
+  status              EmailStatus @default(PENDING)
+  sentAt              DateTime?
+  error               String?  // Error message if sending failed
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+
+  @@map("customer_emails")
+  @@index([stopId])
+  @@index([status])
+  @@index([sentAt])
+  @@index([isDeleted])
+}
+
 // Enums
 enum Role {
   ADMIN
-  SUPER_ADMIN
   DRIVER
 }
 
@@ -240,5 +313,11 @@ enum UploadStatus {
   PENDING
   PROCESSING
   COMPLETED
+  FAILED
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
   FAILED
 }

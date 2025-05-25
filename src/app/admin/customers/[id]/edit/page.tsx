@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   address: string;
   contactInfo: string | null;
+  email: string | null;
   preferences: string | null;
   groupCode: string | null;
 }
@@ -27,6 +28,7 @@ export default function EditCustomerPage({
     name: "",
     address: "",
     contactInfo: "",
+    email: "",
     preferences: "",
     groupCode: "",
   });
@@ -64,6 +66,7 @@ export default function EditCustomerPage({
           name: data.customer.name || "",
           address: data.customer.address || "",
           contactInfo: data.customer.contactInfo || "",
+          email: data.customer.email || "",
           preferences: data.customer.preferences || "",
           groupCode: data.customer.groupCode || "",
         });
@@ -348,6 +351,23 @@ export default function EditCustomerPage({
                     id="contactInfo"
                     name="contactInfo"
                     value={formData.contactInfo}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                   />

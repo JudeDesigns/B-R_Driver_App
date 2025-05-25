@@ -291,7 +291,7 @@ export function useOptimizedRouteDetails(
 
   // Subscribe to route and stop status updates
   useEffect(() => {
-    if (!isConnected || !routeId || !route) return;
+    if (!isConnected || !routeId) return;
 
     console.log(
       `[useOptimizedRouteDetails] Subscribing to updates for route: ${routeId}`
@@ -310,13 +310,30 @@ export function useOptimizedRouteDetails(
           setRoute((prevRoute: any) => {
             if (!prevRoute || !prevRoute.stops) return prevRoute;
 
+            // Find the stop to update
+            const stopToUpdate = prevRoute.stops.find(
+              (stop: any) => stop.id === data.stopId
+            );
+
+            // Skip update if stop not found or status hasn't changed
+            if (!stopToUpdate || stopToUpdate.status === data.status) {
+              console.log(
+                `[useOptimizedRouteDetails] Stop not found or status unchanged, skipping update`
+              );
+              return prevRoute;
+            }
+
+            // Create a new stops array with the updated stop
+            const updatedStops = prevRoute.stops.map((stop: any) =>
+              stop.id === data.stopId ? { ...stop, status: data.status } : stop
+            );
+
+            // Create a completely new route object to ensure React detects the change
             return {
               ...prevRoute,
-              stops: prevRoute.stops.map((stop: any) =>
-                stop.id === data.stopId
-                  ? { ...stop, status: data.status }
-                  : stop
-              ),
+              stops: updatedStops,
+              // Force a timestamp update to ensure React detects the change
+              _lastUpdated: new Date().toISOString(),
             };
           });
         }
@@ -336,9 +353,20 @@ export function useOptimizedRouteDetails(
           setRoute((prevRoute: any) => {
             if (!prevRoute) return prevRoute;
 
+            // Skip update if status hasn't changed to prevent infinite loops
+            if (prevRoute.status === data.status) {
+              console.log(
+                `[useOptimizedRouteDetails] Status unchanged, skipping update`
+              );
+              return prevRoute;
+            }
+
+            // Create a completely new route object to ensure React detects the change
             return {
               ...prevRoute,
               status: data.status,
+              // Force a timestamp update to ensure React detects the change
+              _lastUpdated: new Date().toISOString(),
             };
           });
         }
@@ -352,7 +380,7 @@ export function useOptimizedRouteDetails(
       unsubscribeStopStatus();
       unsubscribeRouteStatus();
     };
-  }, [routeId, isConnected, subscribe, route]);
+  }, [routeId, isConnected, subscribe]); // Removed 'route' from dependencies
 
   return { route };
 }
@@ -393,13 +421,24 @@ export function useOptimizedAdminStopDetails(
           setStop((prevStop: any) => {
             if (!prevStop) return prevStop;
 
+            // Skip update if status hasn't changed to prevent infinite loops
+            if (prevStop.status === data.status) {
+              console.log(
+                `[useOptimizedAdminStopDetails] Status unchanged, skipping update`
+              );
+              return prevStop;
+            }
+
             console.log(
               `[useOptimizedAdminStopDetails] Updating stop status from ${prevStop.status} to ${data.status}`
             );
 
+            // Create a completely new stop object to ensure React detects the change
             return {
               ...prevStop,
               status: data.status,
+              // Force a timestamp update to ensure React detects the change
+              _lastUpdated: new Date().toISOString(),
             };
           });
         }
@@ -423,9 +462,12 @@ export function useOptimizedAdminStopDetails(
               `[useOptimizedAdminStopDetails] Adding new admin note to stop ${stopId}`
             );
 
+            // Create a completely new stop object with updated admin notes
             return {
               ...prevStop,
               adminNotes: [data, ...(prevStop.adminNotes || [])],
+              // Force a timestamp update to ensure React detects the change
+              _lastUpdated: new Date().toISOString(),
             };
           });
         }

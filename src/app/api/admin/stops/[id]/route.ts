@@ -25,8 +25,9 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // In Next.js 14, params is accessed directly from context
-    const { id } = context.params;
+    // In Next.js 14, params is a Promise that needs to be awaited
+    const params = await context.params;
+    const { id } = params;
 
     // We already extracted the ID from context.params above
     // const { id } = await params;
@@ -101,8 +102,9 @@ export async function PUT(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
-  // In Next.js 14, params is accessed directly from context
-  const { id } = context.params;
+  // In Next.js 14, params is a Promise that needs to be awaited
+  const params = await context.params;
+  const { id } = params;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");
@@ -306,8 +308,9 @@ export async function PATCH(
   request: NextRequest,
   context: { params: { id: string; noteId: string } }
 ) {
-  // In Next.js 14, params is accessed directly from context
-  const { id: stopId, noteId } = context.params;
+  // In Next.js 14, params is a Promise that needs to be awaited
+  const params = await context.params;
+  const { id: stopId, noteId } = params;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");

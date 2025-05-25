@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import EnhancedSafetyChecklist, {
+  SafetyCheckData,
+} from "@/components/driver/EnhancedSafetyChecklist";
 
 export default function SafetyCheckPage() {
   const [loading, setLoading] = useState(false);
@@ -11,13 +14,7 @@ export default function SafetyCheckPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  // Form state
-  const [vehicleChecked, setVehicleChecked] = useState(false);
-  const [lightsChecked, setLightsChecked] = useState(false);
-  const [tiresChecked, setTiresChecked] = useState(false);
-  const [fluidsChecked, setFluidsChecked] = useState(false);
-  const [safetyEquipmentChecked, setSafetyEquipmentChecked] = useState(false);
-  const [notes, setNotes] = useState("");
+  // We'll use the EnhancedSafetyChecklist component instead of individual form states
 
   useEffect(() => {
     // Check if user is logged in and has driver role
@@ -174,23 +171,9 @@ export default function SafetyCheckPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = async (safetyData: SafetyCheckData) => {
     if (!token || !selectedRouteId) {
       setError("Please select a route");
-      return;
-    }
-
-    // Validate form
-    if (
-      !vehicleChecked ||
-      !lightsChecked ||
-      !tiresChecked ||
-      !fluidsChecked ||
-      !safetyEquipmentChecked
-    ) {
-      setError("Please complete all safety checks before submitting");
       return;
     }
 
@@ -207,17 +190,7 @@ export default function SafetyCheckPage() {
         body: JSON.stringify({
           routeId: selectedRouteId,
           type: "START_OF_DAY",
-          details: {
-            checks: {
-              vehicleChecked,
-              lightsChecked,
-              tiresChecked,
-              fluidsChecked,
-              safetyEquipmentChecked,
-            },
-            notes,
-            timestamp: new Date().toISOString(),
-          },
+          details: safetyData,
         }),
       });
 
@@ -237,15 +210,15 @@ export default function SafetyCheckPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-8 pb-20">
-      <h1 className="text-2xl font-medium text-black text-center mt-6">
+    <div className="max-w-lg mx-auto space-y-6 pb-20 mobile-spacing prevent-pull-refresh">
+      <h1 className="text-xl font-medium text-black text-center mt-4 mobile-heading">
         Safety Checklist
       </h1>
 
-      <div className="border border-gray-200 rounded overflow-hidden">
-        <div className="p-6">
-          <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-6 bg-yellow-50">
-            <p className="text-sm text-gray-600">
+      <div className="border border-gray-200 rounded overflow-hidden mobile-card">
+        <div className="p-4 sm:p-6">
+          <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-4 bg-yellow-50">
+            <p className="text-sm text-gray-600 mobile-text">
               You must complete this safety checklist before starting your
               route. This helps ensure both your safety and the safety of
               others.
@@ -258,151 +231,43 @@ export default function SafetyCheckPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-6 mb-8">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                  Select Route
-                </h3>
-                <div className="space-y-4">
-                  {routes.length > 0 ? (
-                    <select
-                      value={selectedRouteId}
-                      onChange={(e) => setSelectedRouteId(e.target.value)}
-                      className="w-full p-3 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">-- Select a route --</option>
-                      {routes.map((route) => (
-                        <option key={route.id} value={route.id}>
-                          {route.routeNumber || "Route"} -{" "}
-                          {new Date(route.date).toLocaleDateString()}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-sm text-gray-500">
-                      No pending routes available.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                  Vehicle Safety Checks
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="vehicle-check"
-                      className="h-4 w-4 text-black border-gray-300 rounded"
-                      checked={vehicleChecked}
-                      onChange={(e) => setVehicleChecked(e.target.checked)}
-                      required
-                    />
-                    <label
-                      htmlFor="vehicle-check"
-                      className="ml-3 block text-sm text-gray-600"
-                    >
-                      I have inspected the vehicle for any visible damage or
-                      issues
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="lights-check"
-                      className="h-4 w-4 text-black border-gray-300 rounded"
-                      checked={lightsChecked}
-                      onChange={(e) => setLightsChecked(e.target.checked)}
-                      required
-                    />
-                    <label
-                      htmlFor="lights-check"
-                      className="ml-3 block text-sm text-gray-600"
-                    >
-                      All lights (headlights, brake lights, turn signals) are
-                      working properly
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="tires-check"
-                      className="h-4 w-4 text-black border-gray-300 rounded"
-                      checked={tiresChecked}
-                      onChange={(e) => setTiresChecked(e.target.checked)}
-                      required
-                    />
-                    <label
-                      htmlFor="tires-check"
-                      className="ml-3 block text-sm text-gray-600"
-                    >
-                      Tires are properly inflated and in good condition
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="fluids-check"
-                      className="h-4 w-4 text-black border-gray-300 rounded"
-                      checked={fluidsChecked}
-                      onChange={(e) => setFluidsChecked(e.target.checked)}
-                      required
-                    />
-                    <label
-                      htmlFor="fluids-check"
-                      className="ml-3 block text-sm text-gray-600"
-                    >
-                      Fluid levels (oil, coolant, washer fluid) are adequate
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="safety-equipment-check"
-                      className="h-4 w-4 text-black border-gray-300 rounded"
-                      checked={safetyEquipmentChecked}
-                      onChange={(e) =>
-                        setSafetyEquipmentChecked(e.target.checked)
-                      }
-                      required
-                    />
-                    <label
-                      htmlFor="safety-equipment-check"
-                      className="ml-3 block text-sm text-gray-600"
-                    >
-                      Safety equipment (first aid kit, fire extinguisher) is
-                      present and accessible
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                  Additional Notes
-                </h3>
-                <textarea
-                  className="w-full p-3 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  placeholder="Enter any additional notes or concerns here..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                ></textarea>
+          <div className="space-y-6 mb-8">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
+                Select Route
+              </h3>
+              <div className="space-y-4">
+                {routes.length > 0 ? (
+                  <select
+                    value={selectedRouteId}
+                    onChange={(e) => setSelectedRouteId(e.target.value)}
+                    className="w-full p-3 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
+                    required
+                  >
+                    <option value="">-- Select a route --</option>
+                    {routes.map((route) => (
+                      <option key={route.id} value={route.id}>
+                        {route.routeNumber || "Route"} -{" "}
+                        {new Date(route.date).toLocaleDateString()}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No pending routes available.
+                  </p>
+                )}
               </div>
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading || routes.length === 0}
-              className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Submitting..." : "Submit Safety Checklist"}
-            </button>
-          </form>
+          {selectedRouteId && (
+            <EnhancedSafetyChecklist
+              onSubmit={handleSubmit}
+              isSubmitting={loading}
+              checklistType="START_OF_DAY"
+            />
+          )}
         </div>
       </div>
     </div>

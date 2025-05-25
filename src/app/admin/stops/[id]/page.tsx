@@ -39,6 +39,7 @@ interface Customer {
   contactInfo: string | null;
   preferences: string | null;
   groupCode: string | null;
+  email: string | null;
 }
 
 interface Route {
@@ -104,6 +105,9 @@ export default function StopDetailPage({
     isCOD: false,
     amount: 0,
   });
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -117,7 +121,7 @@ export default function StopDetailPage({
   const router = useRouter();
 
   // Initialize socket connection
-  const { isConnected, joinRoom, socketError, reconnect } = useSocket();
+  const { isConnected, joinRoom, error: socketError, reconnect } = useSocket();
 
   // Define fetchStopDetails as a useCallback to avoid dependency issues
   const fetchStopDetails = useCallback(async () => {
@@ -215,12 +219,20 @@ export default function StopDetailPage({
 
   // Update the stop state when optimizedStop changes
   useEffect(() => {
-    if (optimizedStop) {
+    if (optimizedStop && optimizedStop !== stop) {
       console.log(
         `[AdminStopDetails] Received optimized stop update:`,
-        optimizedStop.status
+        optimizedStop.status,
+        optimizedStop._lastUpdated
       );
-      setStop(optimizedStop);
+
+      // Force a re-render by creating a new object
+      const updatedStop = {
+        ...optimizedStop,
+        _forceUpdate: Date.now(),
+      };
+
+      setStop(updatedStop);
 
       // Also update the form data if we're in edit mode
       if (editMode) {
@@ -230,7 +242,7 @@ export default function StopDetailPage({
         }));
       }
     }
-  }, [optimizedStop, editMode]);
+  }, [optimizedStop, editMode, stop]);
 
   // Set up WebSocket connection for room joining only
   useEffect(() => {
@@ -447,6 +459,47 @@ export default function StopDetailPage({
     }
   };
 
+  const handleSendEmail = async () => {
+    setSendingEmail(true);
+    setEmailSuccess("");
+    setEmailError("");
+
+    try {
+      // Check both localStorage and sessionStorage
+      let token = localStorage.getItem("token");
+
+      // If not found in localStorage, check sessionStorage
+      if (!token) {
+        token = sessionStorage.getItem("token");
+      }
+
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/admin/stops/${stopId}/send-email`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to send email");
+      }
+
+      await response.json(); // We don't need to use the data
+      setEmailSuccess("Email sent successfully!");
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "An error occurred");
+      console.error("Error sending email:", err);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -647,10 +700,22 @@ export default function StopDetailPage({
         </div>
       )}
 
-      {/* Error Message */}
+      {emailSuccess && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+          {emailSuccess}
+        </div>
+      )}
+
+      {/* Error Messages */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
+        </div>
+      )}
+
+      {emailError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {emailError}
         </div>
       )}
 
@@ -1274,13 +1339,82 @@ export default function StopDetailPage({
                 </div>
               )}
 
-              <div className="pt-4">
+              <div className="pt-4 space-y-3">
                 <Link
                   href={`/admin/customers/${stop.customer.id}`}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 w-full justify-center"
                 >
                   View Full Customer Details
                 </Link>
+
+                {stop.status === "COMPLETED" && stop.customer.email && (
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="h-4 w-4 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                          />
+                        </svg>
+                        Send Customer Email
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {stop.status === "COMPLETED" && !stop.customer.email && (
+                  <div className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md">
+                    <p>
+                      Customer email not available. Add an email to the customer
+                      profile to enable sending delivery confirmation emails.
+                    </p>
+                  </div>
+                )}
+
+                {stop.status !== "COMPLETED" && (
+                  <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                    <p>
+                      Delivery confirmation emails can only be sent after the
+                      delivery is completed.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -26,7 +26,8 @@ export async function GET(
     }
 
     // Get the customer ID from the URL
-    const id = params.id;
+    const customerParams = await params;
+    const id = customerParams.id;
 
     // Get the customer
     const customer = await prisma.customer.findUnique({
@@ -144,6 +145,7 @@ export async function PATCH(
         address: data.address !== undefined ? data.address : undefined,
         contactInfo:
           data.contactInfo !== undefined ? data.contactInfo : undefined,
+        email: data.email !== undefined ? data.email : undefined,
         preferences:
           data.preferences !== undefined ? data.preferences : undefined,
         groupCode: data.groupCode !== undefined ? data.groupCode : undefined,

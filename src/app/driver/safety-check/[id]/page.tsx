@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import EnhancedSafetyChecklist, {
+  SafetyCheckData,
+} from "@/components/driver/EnhancedSafetyChecklist";
 
 export default function RouteSpecificSafetyCheckPage({
   params,
@@ -16,13 +19,7 @@ export default function RouteSpecificSafetyCheckPage({
   const [error, setError] = useState("");
   const router = useRouter();
 
-  // Form state
-  const [vehicleChecked, setVehicleChecked] = useState(false);
-  const [lightsChecked, setLightsChecked] = useState(false);
-  const [tiresChecked, setTiresChecked] = useState(false);
-  const [fluidsChecked, setFluidsChecked] = useState(false);
-  const [safetyEquipmentChecked, setSafetyEquipmentChecked] = useState(false);
-  const [notes, setNotes] = useState("");
+  // We'll use the EnhancedSafetyChecklist component instead of individual form states
 
   useEffect(() => {
     // Check if user is logged in and has driver role
@@ -77,22 +74,8 @@ export default function RouteSpecificSafetyCheckPage({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSubmit = async (safetyData: SafetyCheckData) => {
     if (!token || !route) return;
-
-    // Validate form
-    if (
-      !vehicleChecked ||
-      !lightsChecked ||
-      !tiresChecked ||
-      !fluidsChecked ||
-      !safetyEquipmentChecked
-    ) {
-      setError("Please complete all safety checks before submitting");
-      return;
-    }
 
     setSubmitting(true);
     setError("");
@@ -107,17 +90,7 @@ export default function RouteSpecificSafetyCheckPage({
         body: JSON.stringify({
           routeId: params.id,
           type: "START_OF_DAY",
-          details: {
-            checks: {
-              vehicleChecked,
-              lightsChecked,
-              tiresChecked,
-              fluidsChecked,
-              safetyEquipmentChecked,
-            },
-            notes,
-            timestamp: new Date().toISOString(),
-          },
+          details: safetyData,
         }),
       });
 
@@ -186,118 +159,11 @@ export default function RouteSpecificSafetyCheckPage({
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit}>
-                <div className="space-y-6 mb-8">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                      Vehicle Safety Checks
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="vehicle-check"
-                          className="h-4 w-4 text-black border-gray-300 rounded"
-                          checked={vehicleChecked}
-                          onChange={(e) => setVehicleChecked(e.target.checked)}
-                        />
-                        <label
-                          htmlFor="vehicle-check"
-                          className="ml-3 block text-sm text-gray-600"
-                        >
-                          I have inspected the vehicle for any visible damage or
-                          issues
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="lights-check"
-                          className="h-4 w-4 text-black border-gray-300 rounded"
-                          checked={lightsChecked}
-                          onChange={(e) => setLightsChecked(e.target.checked)}
-                        />
-                        <label
-                          htmlFor="lights-check"
-                          className="ml-3 block text-sm text-gray-600"
-                        >
-                          All lights (headlights, brake lights, turn signals)
-                          are working properly
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="tires-check"
-                          className="h-4 w-4 text-black border-gray-300 rounded"
-                          checked={tiresChecked}
-                          onChange={(e) => setTiresChecked(e.target.checked)}
-                        />
-                        <label
-                          htmlFor="tires-check"
-                          className="ml-3 block text-sm text-gray-600"
-                        >
-                          Tires are properly inflated and in good condition
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="fluids-check"
-                          className="h-4 w-4 text-black border-gray-300 rounded"
-                          checked={fluidsChecked}
-                          onChange={(e) => setFluidsChecked(e.target.checked)}
-                        />
-                        <label
-                          htmlFor="fluids-check"
-                          className="ml-3 block text-sm text-gray-600"
-                        >
-                          Fluid levels (oil, coolant, washer fluid) are adequate
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="safety-equipment-check"
-                          className="h-4 w-4 text-black border-gray-300 rounded"
-                          checked={safetyEquipmentChecked}
-                          onChange={(e) =>
-                            setSafetyEquipmentChecked(e.target.checked)
-                          }
-                        />
-                        <label
-                          htmlFor="safety-equipment-check"
-                          className="ml-3 block text-sm text-gray-600"
-                        >
-                          Safety equipment (first aid kit, fire extinguisher) is
-                          present and accessible
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                      Additional Notes
-                    </h3>
-                    <textarea
-                      className="w-full p-3 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={3}
-                      placeholder="Enter any additional notes or concerns here..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    ></textarea>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? "Submitting..." : "Submit Safety Checklist"}
-                </button>
-              </form>
+              <EnhancedSafetyChecklist
+                onSubmit={handleSubmit}
+                isSubmitting={submitting}
+                checklistType="START_OF_DAY"
+              />
             </div>
           </div>
         </div>

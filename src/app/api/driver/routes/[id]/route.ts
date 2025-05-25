@@ -22,7 +22,8 @@ export async function GET(
     }
 
     // Get the route ID from the URL
-    const { id } = params;
+    const routeParams = await params;
+    const { id } = routeParams;
 
     // Get the driver's username
     const driver = await prisma.user.findUnique({

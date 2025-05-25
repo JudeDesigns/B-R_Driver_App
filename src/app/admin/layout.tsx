@@ -39,8 +39,11 @@ export default function AdminLayout({
         return;
       }
 
-      // Store the user role in state
-      setUserRole(userRole);
+      // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
+      const normalizedRole = userRole === "SUPER_ADMIN" ? "ADMIN" : userRole;
+
+      // Store the normalized user role in state
+      setUserRole(normalizedRole);
 
       // Use the stored username directly instead of trying to decode the token
       if (storedUsername) {
@@ -371,6 +374,61 @@ export default function AdminLayout({
               </li>
               <li>
                 <Link
+                  href="/admin/products"
+                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                    pathname === "/admin/products" ||
+                    pathname.startsWith("/admin/products/")
+                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                      : "hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  {(pathname === "/admin/products" ||
+                    pathname.startsWith("/admin/products/")) && (
+                    <span className="absolute left-0 top-0 h-full w-1 bg-yellow-500"></span>
+                  )}
+                  <span
+                    className={`absolute inset-0 w-1 bg-yellow-500 transition-all duration-300 ${
+                      pathname === "/admin/products" ||
+                      pathname.startsWith("/admin/products/")
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-5 w-5 mr-3 text-yellow-500 transition-transform duration-300 ${
+                      pathname === "/admin/products" ||
+                      pathname.startsWith("/admin/products/")
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                  <span
+                    className={`font-medium transition-all duration-300 ${
+                      pathname === "/admin/products" ||
+                      pathname.startsWith("/admin/products/")
+                        ? "text-white"
+                        : "group-hover:translate-x-1"
+                    }`}
+                  >
+                    Products
+                  </span>
+                </Link>
+              </li>
+
+              <li>
+                <Link
                   href="/admin/users"
                   className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
                     pathname === "/admin/users"
@@ -415,6 +473,56 @@ export default function AdminLayout({
                     }`}
                   >
                     Users
+                  </span>
+                </Link>
+              </li>
+
+              <li>
+                <Link
+                  href="/admin/safety-checks"
+                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                    pathname === "/admin/safety-checks"
+                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                      : "hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  {pathname === "/admin/safety-checks" && (
+                    <span className="absolute left-0 top-0 h-full w-1 bg-yellow-500"></span>
+                  )}
+                  <span
+                    className={`absolute inset-0 w-1 bg-yellow-500 transition-all duration-300 ${
+                      pathname === "/admin/safety-checks"
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-5 w-5 mr-3 text-yellow-400 transition-transform duration-300 ${
+                      pathname === "/admin/safety-checks"
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
+                  </svg>
+                  <span
+                    className={`font-medium transition-all duration-300 ${
+                      pathname === "/admin/safety-checks"
+                        ? "text-white"
+                        : "group-hover:translate-x-1"
+                    }`}
+                  >
+                    Safety Checks
                   </span>
                 </Link>
               </li>

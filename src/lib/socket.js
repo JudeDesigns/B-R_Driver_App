@@ -125,6 +125,9 @@ function initSocketIO(httpServer) {
       }
 
       // Handle room joining/leaving - optimized with validation
+      // Keep track of joined rooms to prevent duplicate logging
+      const joinedRooms = new Set();
+
       socket.on(SocketEvents.JOIN_ROUTE_ROOM, (routeId) => {
         if (!routeId) return;
 
@@ -136,10 +139,15 @@ function initSocketIO(httpServer) {
           }
         });
 
-        socket.join(`route:${routeId}`);
+        // Check if already joined to prevent duplicate logging
+        const roomKey = `route:${routeId}`;
+        if (!joinedRooms.has(roomKey)) {
+          socket.join(roomKey);
+          joinedRooms.add(roomKey);
 
-        if (process.env.NODE_ENV !== "production") {
-          console.log(`User joined route:${routeId} room`);
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`User joined route:${routeId} room`);
+          }
         }
       });
 
@@ -147,19 +155,44 @@ function initSocketIO(httpServer) {
         if (!driverId) return;
 
         if (["ADMIN", "SUPER_ADMIN"].includes(socket.data.user.role)) {
-          socket.join(`driver:${driverId}`);
+          // Check if already joined to prevent duplicate logging
+          const roomKey = `driver:${driverId}`;
+          if (!joinedRooms.has(roomKey)) {
+            socket.join(roomKey);
+            joinedRooms.add(roomKey);
+
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`User joined driver:${driverId} room`);
+            }
+          }
         }
       });
 
       socket.on(SocketEvents.JOIN_ADMIN_ROOM, () => {
         if (["ADMIN", "SUPER_ADMIN"].includes(socket.data.user.role)) {
-          socket.join("admin");
+          // Check if already joined to prevent duplicate logging
+          const roomKey = "admin";
+          if (!joinedRooms.has(roomKey)) {
+            socket.join(roomKey);
+            joinedRooms.add(roomKey);
+
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`User joined admin room`);
+            }
+          }
         }
       });
 
       socket.on(SocketEvents.LEAVE_ROOM, (room) => {
         if (!room) return;
         socket.leave(room);
+
+        // Remove from joined rooms set
+        joinedRooms.delete(room);
+
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`User left room: ${room}`);
+        }
       });
 
       // Handle disconnect - clean up resources
@@ -167,6 +200,9 @@ function initSocketIO(httpServer) {
         if (process.env.NODE_ENV !== "production") {
           console.log(`Socket ${socket.id} disconnected: ${reason}`);
         }
+
+        // Clear joined rooms set
+        joinedRooms.clear();
 
         // Clean up any custom event listeners to prevent memory leaks
         socket.removeAllListeners();

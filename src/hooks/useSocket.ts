@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { SocketEvents } from "@/lib/socketClient";
+import { optimizeSocketHandler } from "@/lib/performance";
 
 interface UseSocketOptions {
   autoConnect?: boolean;
@@ -68,7 +69,7 @@ export const useSocket = (
       console.log("Auth info:", { token: "***", userRole, userId, username });
     }
 
-    // Create an optimized Socket.IO connection
+    // Create an optimized Socket.IO connection with performance enhancements
     const socket = io(socketServerUrl, {
       path: "/socket.io",
       auth: {
@@ -77,22 +78,26 @@ export const useSocket = (
         id: userId,
         username: username,
       },
-      // Match server-side transport configuration (polling first, then websocket)
-      transports: ["polling", "websocket"],
-      // Optimize reconnection settings
+      // Optimize transport configuration for better performance
+      // Use WebSocket first for faster connection if available, fallback to polling
+      transports: ["websocket", "polling"],
+      // Optimize reconnection settings for better reliability
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 5, // Reduced to improve performance
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      randomizationFactor: 0.5,
-      // Optimize timeout settings
-      timeout: 20000,
+      reconnectionDelayMax: 3000, // Reduced for faster reconnection
+      randomizationFactor: 0.3, // Reduced for more predictable reconnection
+      // Optimize timeout settings for better performance
+      timeout: 10000, // Reduced for faster timeout detection
       // Enable auto-connect
       autoConnect: true,
-      // Optimize buffer size
+      // Optimize buffer size and memory usage
       rememberUpgrade: true,
-      // Force new connection to avoid reusing problematic connections
+      // Avoid reusing problematic connections
       forceNew: true,
+      // Additional performance optimizations
+      upgrade: true, // Enable transport upgrades
+      // Removed other options due to type compatibility issues
     });
 
     // Simple, focused event handlers for reliability
@@ -180,19 +185,36 @@ export const useSocket = (
     // Store socket reference
     socketRef.current = socket;
 
+    // Get a reference to the current joinedRoomsRef for cleanup
+    const currentJoinedRoomsRef = joinedRoomsRef;
+
     // Clean up on unmount
     return () => {
       if (socket) {
         socket.disconnect();
         socketRef.current = null;
+
+        // Clear joined rooms set on cleanup using the captured reference
+        currentJoinedRoomsRef.current.clear();
       }
     };
   }, [autoConnect, providedToken]);
+
+  // Keep track of joined rooms to prevent duplicate join events
+  const joinedRoomsRef = useRef<Set<string>>(new Set());
 
   // Join a room
   const joinRoom = useCallback(
     (room: string) => {
       if (!socketRef.current || !isConnected) return;
+
+      // Check if already joined to prevent duplicate join events
+      if (joinedRoomsRef.current.has(room)) {
+        return;
+      }
+
+      // Add to joined rooms set
+      joinedRoomsRef.current.add(room);
 
       if (room.startsWith("route:")) {
         socketRef.current.emit(
@@ -216,20 +238,27 @@ export const useSocket = (
     (room: string) => {
       if (!socketRef.current || !isConnected) return;
       socketRef.current.emit(SocketEvents.LEAVE_ROOM, room);
+
+      // Remove from joined rooms set
+      joinedRoomsRef.current.delete(room);
     },
     [isConnected]
   );
 
-  // Subscribe to an event
+  // Subscribe to an event with optimization to prevent unnecessary re-renders
   const subscribe = useCallback(
     <T>(event: string, callback: (data: T) => void) => {
       if (!socketRef.current) return () => {};
 
-      socketRef.current.on(event, callback);
+      // Optimize the callback to prevent unnecessary re-renders
+      const optimizedCallback = optimizeSocketHandler<T>(callback);
+
+      // Use the optimized callback for the socket event
+      socketRef.current.on(event, optimizedCallback);
 
       return () => {
         if (socketRef.current) {
-          socketRef.current.off(event, callback);
+          socketRef.current.off(event, optimizedCallback);
         }
       };
     },
@@ -247,6 +276,9 @@ export const useSocket = (
   const disconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
+
+      // Clear joined rooms set on disconnect
+      joinedRoomsRef.current.clear();
     }
   }, []);
 
@@ -261,6 +293,9 @@ export const useSocket = (
 
       // Reset connection state
       setIsConnected(false);
+
+      // Clear joined rooms set on reconnect
+      joinedRoomsRef.current.clear();
 
       // Use transport methods in the same order as server configuration
       if (socketRef.current.io && socketRef.current.io.opts) {

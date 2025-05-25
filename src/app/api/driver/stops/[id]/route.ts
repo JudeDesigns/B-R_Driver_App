@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { sendDeliveryConfirmationEmail } from "@/lib/email";
 import {
   emitStopStatusUpdate,
   emitRouteStatusUpdate,
@@ -255,6 +256,77 @@ export async function PATCH(
           customerName: updatedStop.customer.name,
           timestamp: new Date().toISOString(),
         });
+
+        // If status is COMPLETED, send email notification
+        if (data.status === "COMPLETED") {
+          try {
+            // Get the customer email
+            const customer = await prisma.customer.findUnique({
+              where: { id: updatedStop.customerId },
+              select: { email: true, name: true },
+            });
+
+            // Only send email if customer has an email address
+            if (customer && customer.email) {
+              // Get returns for this stop
+              const returns = await prisma.return.findMany({
+                where: {
+                  stopId: updatedStop.id,
+                  isDeleted: false,
+                },
+                select: {
+                  reason: true,
+                },
+              });
+
+              // Format delivery time
+              const deliveryTime = updatedStop.completionTime
+                ? new Date(updatedStop.completionTime).toLocaleString()
+                : new Date().toLocaleString();
+
+              // Get return reasons
+              const returnReasons = returns.map(
+                (returnItem) => returnItem.reason
+              );
+
+              // Get the signed invoice URL
+              const signedInvoiceUrl = updatedStop.signedInvoicePdfUrl || "";
+
+              // Get the original invoice URL (this would typically come from QuickBooks or another system)
+              // For now, we'll use a placeholder or the invoice number if available
+              const originalInvoiceUrl = updatedStop.quickbooksInvoiceNum
+                ? `https://example.com/invoices/${updatedStop.quickbooksInvoiceNum}.pdf`
+                : "";
+
+              // Send the email
+              await sendDeliveryConfirmationEmail(
+                updatedStop.id,
+                customer.email,
+                customer.name,
+                updatedStop.orderNumberWeb || "N/A",
+                deliveryTime,
+                returns.length > 0,
+                returnReasons,
+                signedInvoiceUrl,
+                originalInvoiceUrl
+              );
+
+              console.log(
+                `Delivery confirmation email sent to ${customer.email}`
+              );
+            } else {
+              console.log(
+                `Customer ${updatedStop.customerId} does not have an email address`
+              );
+            }
+          } catch (emailError) {
+            console.error(
+              "Error sending delivery confirmation email:",
+              emailError
+            );
+            // Continue execution even if email sending fails
+          }
+        }
       } catch (error) {
         console.error("Error emitting WebSocket event:", error);
         // Continue execution even if WebSocket emission fails

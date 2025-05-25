@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { use } from "react";
 
 export async function GET(
   request: Request,
@@ -9,7 +8,8 @@ export async function GET(
 ) {
   try {
     // In Next.js 14, params is a Promise that needs to be awaited
-    const { id } = context.params;
+    const params = await context.params;
+    const { id } = params;
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

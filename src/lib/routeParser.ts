@@ -9,6 +9,7 @@ export interface ParsedStop {
   customerName: string;
   driverName: string; // Added driver name to each stop
   customerGroupCode?: string;
+  customerEmail?: string; // Added customer email
   orderNumberWeb?: string;
   quickbooksInvoiceNum?: string;
   initialDriverNotes?: string;
@@ -155,6 +156,7 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       sequence: (headerMap.get("Driver") ?? -1) + 1, // The sequence is in the column after Driver
       customerName: headerMap.get("Customers") ?? -1,
       customerGroupCode: headerMap.get("Customer GROUP CODE") ?? -1,
+      customerEmail: headerMap.get("Customer Email") ?? -1,
       orderNumberWeb: headerMap.get("Order # (Web)") ?? -1,
       // Try multiple possible column names for invoice number
       quickbooksInvoiceNum:
@@ -263,6 +265,8 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           driverName: rawDriverName, // Capture driver for each stop
           customerGroupCode:
             row[columnIndices.customerGroupCode]?.toString() || undefined,
+          customerEmail:
+            row[columnIndices.customerEmail]?.toString() || undefined,
           orderNumberWeb: (() => {
             const rawValue = row[columnIndices.orderNumberWeb];
             return rawValue !== undefined && rawValue !== null
@@ -683,14 +687,19 @@ export async function saveRouteToDatabase(
       name: string;
       address: string;
       groupCode?: string;
+      email?: string;
     }[] = [];
-    const customersToUpdate: { id: string; groupCode: string }[] = [];
+    const customersToUpdate: {
+      id: string;
+      groupCode?: string;
+      email?: string;
+    }[] = [];
 
     // Identify customers that need to be created or updated
     for (const customerName of customerNames) {
       const customer = customerMap.get(customerName);
 
-      // Find the first stop with this customer to get the group code
+      // Find the first stop with this customer to get the group code and email
       const stopWithCustomer = parsedRoute.stops.find(
         (stop) => stop.customerName === customerName
       );
@@ -701,17 +710,28 @@ export async function saveRouteToDatabase(
           name: customerName,
           address: "", // This will need to be updated later
           groupCode: stopWithCustomer.customerGroupCode,
+          email: stopWithCustomer.customerEmail,
         });
       } else if (
         customer &&
-        stopWithCustomer?.customerGroupCode &&
-        !customer.groupCode
+        stopWithCustomer &&
+        ((stopWithCustomer.customerGroupCode && !customer.groupCode) ||
+          (stopWithCustomer.customerEmail && !customer.email))
       ) {
-        // Need to update this customer's group code
-        customersToUpdate.push({
+        // Need to update this customer's group code or email
+        const updateData: { id: string; groupCode?: string; email?: string } = {
           id: customer.id,
-          groupCode: stopWithCustomer.customerGroupCode,
-        });
+        };
+
+        if (stopWithCustomer.customerGroupCode && !customer.groupCode) {
+          updateData.groupCode = stopWithCustomer.customerGroupCode;
+        }
+
+        if (stopWithCustomer.customerEmail && !customer.email) {
+          updateData.email = stopWithCustomer.customerEmail;
+        }
+
+        customersToUpdate.push(updateData);
       }
     }
 
@@ -729,13 +749,16 @@ export async function saveRouteToDatabase(
       }
     }
 
-    // Batch update customers that need group code updates
+    // Batch update customers that need group code or email updates
     if (customersToUpdate.length > 0) {
       await Promise.all(
         customersToUpdate.map((update) =>
           tx.customer.update({
             where: { id: update.id },
-            data: { groupCode: update.groupCode },
+            data: {
+              groupCode: update.groupCode,
+              email: update.email,
+            },
           })
         )
       );
@@ -768,6 +791,21 @@ export async function saveRouteToDatabase(
         (existingInvoiceData ? existingInvoiceData.orderNumberWeb : "") ||
         "";
 
+      // If the customer has an email in the Excel file, update it in the database
+      if (
+        parsedStop.customerEmail &&
+        customer.email !== parsedStop.customerEmail
+      ) {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: { email: parsedStop.customerEmail },
+        });
+
+        console.log(
+          `Updated email for customer ${parsedStop.customerName}: ${parsedStop.customerEmail}`
+        );
+      }
+
       // Log the invoice numbers being used
       console.log(`Stop for ${parsedStop.customerName}:`, {
         isUpdate,
@@ -779,6 +817,7 @@ export async function saveRouteToDatabase(
         finalOrderNum: orderNumberWeb,
         invoiceNumType: typeof quickbooksInvoiceNum,
         orderNumType: typeof orderNumberWeb,
+        customerEmail: parsedStop.customerEmail,
       });
 
       // Log the data being used to create the stop

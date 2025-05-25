@@ -14,7 +14,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import StatusButton from "@/components/driver/StatusButton";
 import DriverNotes from "@/components/driver/DriverNotes";
 import InvoiceUpload from "@/components/driver/InvoiceUpload";
-import { ReturnData } from "@/components/driver/ReturnForm";
+import ReturnManagement from "@/components/driver/ReturnManagement";
 
 interface Customer {
   id: string;
@@ -75,78 +75,13 @@ export default function StopDetailPage({
   const [token, setToken] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [driverNotes, setDriverNotes] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [hasReturns, setHasReturns] = useState(false);
-  const [returns, setReturns] = useState<
-    Array<{
-      id: string;
-      orderItemIdentifier: string;
-      productDescription: string | null;
-      quantity: number;
-      reasonCode: string;
-    }>
-  >([]);
-  const [loadingReturns, setLoadingReturns] = useState(false);
-  const [addingReturn, setAddingReturn] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
-  const [hasNewAdminNotes, setHasNewAdminNotes] = useState(false);
-
-  // Return form state
-  const [returnItem, setReturnItem] = useState("");
-  const [returnDescription, setReturnDescription] = useState("");
-  const [returnQuantity, setReturnQuantity] = useState(1);
-  const [returnReason, setReturnReason] = useState("");
-  const [products, setProducts] = useState<
-    Array<{ id: string; name: string; sku: string; unit: string }>
-  >([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
   const [deliveryTimer, setDeliveryTimer] = useState<number | null>(null);
 
   const router = useRouter();
 
   // Initialize socket connection
-  const { isConnected, joinRoom, socketError, reconnect } = useSocket();
-
-  // Fetch returns for this stop - wrapped in useCallback
-  const fetchReturns = useCallback(async () => {
-    if (!token) return;
-
-    setLoadingReturns(true);
-
-    try {
-      const response = await fetch(
-        `/api/driver/stops/${unwrappedParams.id}/returns`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          // Add cache: 'no-store' to prevent caching
-          cache: "no-store",
-        }
-      );
-
-      if (!response.ok) {
-        // Handle non-JSON responses
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to fetch returns");
-        } else {
-          throw new Error(
-            `Server error: ${response.status} ${response.statusText}`
-          );
-        }
-      }
-
-      const data = await response.json();
-      setReturns(data);
-      setHasReturns(data.length > 0);
-    } catch (err) {
-      console.error("Error fetching returns:", err);
-    } finally {
-      setLoadingReturns(false);
-    }
-  }, [token, unwrappedParams.id]);
+  const { isConnected, joinRoom, error: socketError, reconnect } = useSocket();
 
   // Define fetchStopDetails as a useCallback to avoid dependency issues
   const fetchStopDetails = useCallback(async () => {
@@ -180,155 +115,13 @@ export default function StopDetailPage({
       const data = await response.json();
       setStop(data);
       setDriverNotes(data.driverNotes || "");
-
-      // After fetching stop details, fetch returns
-      fetchReturns();
     } catch (err) {
       console.error("Error fetching stop details:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
-  }, [token, unwrappedParams.id, fetchReturns]);
-
-  // Fetch products for returns - wrapped in useCallback
-  const fetchProducts = useCallback(async () => {
-    if (!token) return;
-
-    setLoadingProducts(true);
-
-    try {
-      // This would be a real API endpoint in production
-      // For now, we'll use mock data
-      // const response = await fetch('/api/products', {
-      //   headers: {
-      //     Authorization: `Bearer ${token}`,
-      //   },
-      // });
-
-      // if (!response.ok) {
-      //   throw new Error('Failed to fetch products');
-      // }
-
-      // const data = await response.json();
-      // setProducts(data);
-
-      // Mock data for now
-      setTimeout(() => {
-        setProducts([
-          { id: "P001", name: "Bread - White", sku: "BRD-W-001", unit: "loaf" },
-          { id: "P002", name: "Bread - Wheat", sku: "BRD-W-002", unit: "loaf" },
-          { id: "P003", name: "Milk - 2%", sku: "MLK-2-001", unit: "gallon" },
-          { id: "P004", name: "Eggs - Large", sku: "EGG-L-001", unit: "dozen" },
-          {
-            id: "P005",
-            name: "Butter - Unsalted",
-            sku: "BTR-U-001",
-            unit: "pound",
-          },
-          {
-            id: "P006",
-            name: "Cheese - Cheddar",
-            sku: "CHS-C-001",
-            unit: "pound",
-          },
-          {
-            id: "P007",
-            name: "Apples - Red Delicious",
-            sku: "APL-R-001",
-            unit: "pound",
-          },
-          { id: "P008", name: "Bananas", sku: "BNN-Y-001", unit: "bunch" },
-          {
-            id: "P009",
-            name: "Potatoes - Russet",
-            sku: "POT-R-001",
-            unit: "pound",
-          },
-          {
-            id: "P010",
-            name: "Onions - Yellow",
-            sku: "ONI-Y-001",
-            unit: "pound",
-          },
-        ]);
-        setLoadingProducts(false);
-      }, 500);
-    } catch (err) {
-      console.error("Error fetching products:", err);
-      setLoadingProducts(false);
-    }
-  }, [token]);
-
-  // Add a new return
-  const handleAddReturn = async (returnData: ReturnData) => {
-    if (!token) return;
-
-    setAddingReturn(true);
-
-    try {
-      const response = await fetch(
-        `/api/driver/stops/${unwrappedParams.id}/returns`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(returnData),
-        }
-      );
-
-      if (!response.ok) {
-        // Handle non-JSON responses
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to add return");
-        } else {
-          throw new Error(
-            `Server error: ${response.status} ${response.statusText}`
-          );
-        }
-      }
-
-      // Refresh returns list
-      fetchReturns();
-
-      // Reset form fields
-      setReturnItem("");
-      setReturnDescription("");
-      setReturnQuantity(1);
-      setReturnReason("");
-    } catch (err) {
-      console.error("Error adding return:", err);
-      throw err;
-    } finally {
-      setAddingReturn(false);
-    }
-  };
-
-  // Form submission handler for returns
-  const addReturn = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!returnItem || !returnReason) {
-      return;
-    }
-
-    try {
-      await handleAddReturn({
-        orderItemIdentifier: returnItem,
-        productDescription: returnDescription,
-        quantity: returnQuantity,
-        reasonCode: returnReason,
-        warehouseLocation: "",
-        vendorCreditNum: "",
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add return");
-    }
-  };
+  }, [token, unwrappedParams.id]);
 
   useEffect(() => {
     // This code only runs on the client side
@@ -369,9 +162,8 @@ export default function StopDetailPage({
   useEffect(() => {
     if (token) {
       fetchStopDetails();
-      fetchProducts();
     }
-  }, [token, fetchStopDetails, fetchProducts]);
+  }, [token, fetchStopDetails]);
 
   // Effect to handle delivery timer - calculate time from ON_THE_WAY to ARRIVED
   useEffect(() => {
@@ -448,13 +240,12 @@ export default function StopDetailPage({
   // Use optimized admin notes hook
   const { hasNewNotes } = useOptimizedAdminNotes(
     stop?.id || null,
-    stop?.adminNotes || [],
+    [], // We're not using the admin notes array directly
     (newNote) => {
       console.log(
         `[OptimizedSocket] Received new admin note without full refetch: "${newNote.note}"`
       );
       // Show notification
-      setHasNewAdminNotes(true);
       setNotificationVisible(true);
 
       // Auto-hide notification after 5 seconds
@@ -467,10 +258,8 @@ export default function StopDetailPage({
         console.log(
           `[OptimizedSocket] Updating admin notes for stop ${stop.id}`
         );
-        setStop({
-          ...stop,
-          adminNotes: [newNote, ...(stop.adminNotes || [])],
-        });
+        // Refresh stop details to get the updated admin notes
+        fetchStopDetails();
       }
     }
   );
@@ -595,7 +384,6 @@ export default function StopDetailPage({
   const handleSaveDriverNotes = async (notes: string) => {
     if (!token || !stop) return;
 
-    setSavingNotes(true);
     setError("");
 
     try {
@@ -629,8 +417,6 @@ export default function StopDetailPage({
       console.error("Error saving notes:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
       throw err;
-    } finally {
-      setSavingNotes(false);
     }
   };
 
@@ -684,7 +470,7 @@ export default function StopDetailPage({
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-24 px-4 sm:px-6">
+    <div className="max-w-2xl mx-auto pb-24 px-4 sm:px-6 mobile-spacing prevent-pull-refresh">
       {/* WebSocket Error Alert */}
       <WebSocketErrorAlert error={socketError} onReconnect={reconnect} />
 
@@ -702,7 +488,7 @@ export default function StopDetailPage({
         <div className="p-4 flex items-center justify-between">
           <button
             onClick={() => router.push("/driver/stops")}
-            className="flex items-center text-gray-600 hover:text-black transition-colors"
+            className="flex items-center text-gray-600 hover:text-black transition-colors touch-manipulation tap-target"
             aria-label="Back to stops list"
           >
             <svg
@@ -1073,7 +859,7 @@ export default function StopDetailPage({
                     isDisabled={isStatusButtonDisabled("ON_THE_WAY")}
                     onClick={() => updateStatus("ON_THE_WAY")}
                     label="Start Delivery"
-                    className="h-10 sm:h-12 text-sm sm:text-base"
+                    className="h-10 sm:h-12 text-sm sm:text-base touch-manipulation mobile-button"
                   />
                   <StatusButton
                     status={stop.status}
@@ -1083,7 +869,7 @@ export default function StopDetailPage({
                     isDisabled={isStatusButtonDisabled("ARRIVED")}
                     onClick={() => updateStatus("ARRIVED")}
                     label="Mark as Arrived"
-                    className="h-10 sm:h-12 text-sm sm:text-base"
+                    className="h-10 sm:h-12 text-sm sm:text-base touch-manipulation mobile-button"
                   />
                 </div>
                 {/* Complete Delivery button removed - now handled by the InvoiceUpload component */}
@@ -1160,332 +946,26 @@ export default function StopDetailPage({
             </div>
           </div>
 
-          {/* Returns - Mobile Optimized */}
+          {/* Returns - Enhanced with ReturnManagement Component */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-lg font-bold text-gray-900">
-                  Product Returns
-                </h2>
-                <div className="mt-2 sm:mt-0">
-                  <div className="inline-flex items-center bg-gray-100 rounded-full p-1">
-                    <button
-                      onClick={() => setHasReturns(false)}
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
-                        !hasReturns
-                          ? "bg-white shadow-sm text-gray-800"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      No Returns
-                    </button>
-                    <button
-                      onClick={() => setHasReturns(true)}
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
-                        hasReturns
-                          ? "bg-white shadow-sm text-gray-800"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Has Returns
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <h2 className="text-lg font-bold text-gray-900">
+                Product Returns
+              </h2>
             </div>
-
             <div className="p-4 sm:p-5">
-              {hasReturns ? (
-                <div className="space-y-5 sm:space-y-6">
-                  {/* Return Items List - Mobile Optimized */}
-                  {returns.length > 0 ? (
-                    <div>
-                      <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2 sm:mb-3">
-                        Returned Items
-                      </h3>
-                      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th
-                                  scope="col"
-                                  className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Item
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Qty
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                  Reason
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {returns.map((returnItem, index) => (
-                                <tr
-                                  key={returnItem.id}
-                                  className={
-                                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                  }
-                                >
-                                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">
-                                    <div className="font-medium text-gray-900 text-xs sm:text-sm">
-                                      {returnItem.orderItemIdentifier}
-                                    </div>
-                                    {returnItem.productDescription && (
-                                      <div className="text-gray-500 mt-1 text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
-                                        {returnItem.productDescription}
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-500">
-                                    {returnItem.quantity}
-                                  </td>
-                                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm">
-                                    <span
-                                      className={`inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full text-xs font-medium ${
-                                        returnItem.reasonCode === "DAMAGED"
-                                          ? "bg-red-100 text-red-800"
-                                          : returnItem.reasonCode === "EXPIRED"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : returnItem.reasonCode ===
-                                            "WRONG_ITEM"
-                                          ? "bg-blue-100 text-blue-800"
-                                          : returnItem.reasonCode ===
-                                            "CUSTOMER_REFUSED"
-                                          ? "bg-purple-100 text-purple-800"
-                                          : "bg-gray-100 text-gray-800"
-                                      }`}
-                                    >
-                                      {returnItem.reasonCode ===
-                                      "CUSTOMER_REFUSED"
-                                        ? "REFUSED"
-                                        : returnItem.reasonCode.replace(
-                                            /_/g,
-                                            " "
-                                          )}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-lg p-4 text-center">
-                      <p className="text-gray-500 text-sm">
-                        No return items added yet.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Add Return Form - Enhanced */}
-                  <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-700 mb-4">
-                      Add Return Item
-                    </h3>
-                    <form onSubmit={addReturn} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <label
-                            htmlFor="returnItem"
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Select Product *
-                          </label>
-                          <div className="relative">
-                            <select
-                              id="returnItem"
-                              value={returnItem}
-                              onChange={(e) => {
-                                setReturnItem(e.target.value);
-                                // Find the selected product and set its description
-                                const selectedProduct = products.find(
-                                  (p) => p.sku === e.target.value
-                                );
-                                if (selectedProduct) {
-                                  setReturnDescription(selectedProduct.name);
-                                }
-                              }}
-                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-colors appearance-none"
-                              required
-                            >
-                              <option value="">Select a product</option>
-                              {products.map((product) => (
-                                <option key={product.id} value={product.sku}>
-                                  {product.sku} - {product.name} ({product.unit}
-                                  )
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                              <svg
-                                className="fill-current h-4 w-4"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                              >
-                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                              </svg>
-                            </div>
-                          </div>
-                          {loadingProducts && (
-                            <div className="mt-2 flex items-center text-sm text-gray-500">
-                              <svg
-                                className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                ></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
-                              </svg>
-                              Loading products...
-                            </div>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <label
-                            htmlFor="returnDescription"
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Description
-                          </label>
-                          <input
-                            id="returnDescription"
-                            type="text"
-                            value={returnDescription}
-                            onChange={(e) =>
-                              setReturnDescription(e.target.value)
-                            }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
-                            placeholder="Product description"
-                            readOnly
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor="returnQuantity"
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Quantity *
-                          </label>
-                          <input
-                            id="returnQuantity"
-                            type="number"
-                            min="1"
-                            value={returnQuantity}
-                            onChange={(e) =>
-                              setReturnQuantity(parseInt(e.target.value))
-                            }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor="returnReason"
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Reason *
-                          </label>
-                          <select
-                            id="returnReason"
-                            value={returnReason}
-                            onChange={(e) => setReturnReason(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
-                            required
-                          >
-                            <option value="">Select reason</option>
-                            <option value="DAMAGED">Damaged</option>
-                            <option value="EXPIRED">Expired</option>
-                            <option value="WRONG_ITEM">Wrong Item</option>
-                            <option value="CUSTOMER_REFUSED">
-                              Customer Refused
-                            </option>
-                            <option value="OTHER">Other</option>
-                          </select>
-                        </div>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={addingReturn || !returnItem || !returnReason}
-                        className="w-full py-3 px-4 bg-black text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
-                      >
-                        {addingReturn ? (
-                          <span className="flex items-center justify-center">
-                            <svg
-                              className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            Adding Return Item...
-                          </span>
-                        ) : (
-                          "Add Return Item"
-                        )}
-                      </button>
-                    </form>
-                  </div>
-                </div>
+              {(stop.status === "ARRIVED" || stop.status === "COMPLETED") &&
+              token ? (
+                <ReturnManagement
+                  stopId={stop.id}
+                  routeId={stop.route.id}
+                  customerId={stop.customer.id}
+                  token={token}
+                />
               ) : (
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <svg
-                    className="mx-auto h-12 w-12 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">
-                    No Product Returns
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    This delivery has no products being returned to the
-                    warehouse.
-                  </p>
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+                  Returns can only be processed after arriving at the delivery
+                  location.
                 </div>
               )}
             </div>

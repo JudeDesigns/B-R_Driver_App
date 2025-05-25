@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
 import { SocketEvents, RouteStatusUpdateData } from "@/lib/socketClient";
+import { usePerformance } from "@/hooks/usePerformance";
+import { recordApiCall } from "@/lib/performanceMonitor";
 
 export default function DriverDashboard() {
+  // Initialize performance monitoring
+  const { isMobile, createThrottledFunction } =
+    usePerformance("DriverDashboard");
+
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState("");
@@ -52,11 +58,82 @@ export default function DriverDashboard() {
     }
   }, [router]);
 
+  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  const fetchAssignedRoutes = useCallback(async () => {
+    if (!token) return;
+
+    setLoading(true);
+
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split("T")[0];
+
+      // Record API call performance
+      const routesStartTime = performance.now();
+
+      // Fetch routes
+      const routesResponse = await fetch(
+        `/api/driver/assigned-routes?date=${today}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          // Add cache control for better performance
+          cache: isMobile ? "force-cache" : "default",
+        }
+      );
+
+      // Record API call performance
+      recordApiCall("/api/driver/assigned-routes", routesStartTime);
+
+      if (!routesResponse.ok) {
+        const errorData = await routesResponse.json();
+        throw new Error(errorData.message || "Failed to fetch routes");
+      }
+
+      const routesData = await routesResponse.json();
+      setRoutes(routesData.routes || []);
+
+      // If there's at least one route, set the first one as the current route
+      if (routesData.routes && routesData.routes.length > 0) {
+        setRoute(routesData.routes[0]);
+      }
+
+      // Record API call performance
+      const safetyStartTime = performance.now();
+
+      // Check if any safety checks are completed
+      const safetyChecksResponse = await fetch(
+        `/api/driver/safety-check/status?date=${today}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          // Add cache control for better performance
+          cache: isMobile ? "force-cache" : "default",
+        }
+      );
+
+      // Record API call performance
+      recordApiCall("/api/driver/safety-check/status", safetyStartTime);
+
+      if (safetyChecksResponse.ok) {
+        const safetyData = await safetyChecksResponse.json();
+        setSafetyCheckCompleted(safetyData.hasCompletedChecks || false);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, isMobile]); // Add dependencies
+
+  // Fetch routes when token is available
   useEffect(() => {
     if (token) {
       fetchAssignedRoutes();
     }
-  }, [token]);
+  }, [token, fetchAssignedRoutes]);
 
   // Set up WebSocket connection and event listeners
   useEffect(() => {
@@ -84,73 +161,33 @@ export default function DriverDashboard() {
       }
     }
 
-    // Subscribe to route status update events
+    // Create a throttled version of fetchAssignedRoutes to prevent excessive API calls
+    const throttledFetchRoutes = createThrottledFunction(() => {
+      console.log("Throttled fetch routes called");
+      fetchAssignedRoutes();
+    }, 2000); // Throttle to at most once every 2 seconds
+
+    // Subscribe to route status update events with throttling for better performance
     const unsubscribeRouteStatus = subscribe<RouteStatusUpdateData>(
       SocketEvents.ROUTE_STATUS_UPDATED,
       (data) => {
         console.log("Received route status update event:", data);
-        // Refresh routes when any route status changes
-        fetchAssignedRoutes();
+        // Use throttled function to refresh routes when any route status changes
+        throttledFetchRoutes();
       }
     );
 
     return () => {
       unsubscribeRouteStatus();
     };
-  }, [isConnected, token, joinRoom, subscribe]);
-
-  const fetchAssignedRoutes = async () => {
-    if (!token) return;
-
-    setLoading(true);
-
-    try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
-
-      // Fetch routes
-      const routesResponse = await fetch(
-        `/api/driver/assigned-routes?date=${today}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!routesResponse.ok) {
-        const errorData = await routesResponse.json();
-        throw new Error(errorData.message || "Failed to fetch routes");
-      }
-
-      const routesData = await routesResponse.json();
-      setRoutes(routesData.routes || []);
-
-      // If there's at least one route, set the first one as the current route
-      if (routesData.routes && routesData.routes.length > 0) {
-        setRoute(routesData.routes[0]);
-      }
-
-      // Check if any safety checks are completed
-      const safetyChecksResponse = await fetch(
-        `/api/driver/safety-check/status?date=${today}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (safetyChecksResponse.ok) {
-        const safetyData = await safetyChecksResponse.json();
-        setSafetyCheckCompleted(safetyData.hasCompletedChecks || false);
-      }
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [
+    isConnected,
+    token,
+    joinRoom,
+    subscribe,
+    fetchAssignedRoutes,
+    createThrottledFunction,
+  ]);
 
   const handleLogout = () => {
     // Clear both localStorage and sessionStorage
@@ -171,11 +208,13 @@ export default function DriverDashboard() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-8 pb-20">
-      <div className="flex justify-between items-center mt-6">
-        <h1 className="text-2xl font-medium text-black">Driver Dashboard</h1>
+    <div className="max-w-lg mx-auto space-y-6 pb-20 mobile-spacing">
+      <div className="flex justify-between items-center mt-4">
+        <h1 className="text-xl font-medium text-black mobile-heading">
+          Driver Dashboard
+        </h1>
         <div className="flex items-center">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-600 mobile-text">
             Welcome, {username || "Driver"}
           </span>
         </div>
@@ -183,7 +222,7 @@ export default function DriverDashboard() {
 
       {/* Menu buttons removed as requested */}
 
-      <h2 className="text-xl font-medium text-black mt-4">
+      <h2 className="text-lg font-medium text-black mt-3 mobile-heading">
         Today&apos;s Deliveries
       </h2>
 
@@ -198,26 +237,32 @@ export default function DriverDashboard() {
           {routes.map((route) => (
             <div
               key={route.id}
-              className="border border-gray-200 rounded overflow-hidden"
+              className="border border-gray-200 rounded overflow-hidden mobile-card"
             >
-              <div className="p-6">
+              <div className="p-4">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Route Number</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-gray-500 mobile-text">
+                      Route Number
+                    </span>
+                    <span className="text-sm font-medium mobile-text">
                       {route.routeNumber || "N/A"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Date</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-gray-500 mobile-text">
+                      Date
+                    </span>
+                    <span className="text-sm font-medium mobile-text">
                       {new Date(route.date).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Status</span>
+                    <span className="text-sm text-gray-500 mobile-text">
+                      Status
+                    </span>
                     <span
-                      className={`text-sm font-medium px-3 py-1 rounded-full ${
+                      className={`text-sm font-medium px-3 py-1 rounded-full mobile-status ${
                         route.status === "PENDING"
                           ? "bg-yellow-100 text-yellow-800"
                           : route.status === "IN_PROGRESS"
@@ -231,8 +276,10 @@ export default function DriverDashboard() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Total Stops</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-gray-500 mobile-text">
+                      Total Stops
+                    </span>
+                    <span className="text-sm font-medium mobile-text">
                       {route._count?.stops || 0}
                     </span>
                   </div>
@@ -240,15 +287,15 @@ export default function DriverDashboard() {
 
                 {route.status === "PENDING" ? (
                   <div className="mt-8">
-                    <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-6 bg-yellow-50">
-                      <p className="text-sm text-gray-600">
+                    <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-4 bg-yellow-50">
+                      <p className="text-sm text-gray-600 mobile-text">
                         You must complete the safety checklist before starting
                         this route.
                       </p>
                     </div>
                     <Link
                       href="/driver/safety-check"
-                      className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200"
+                      className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 touch-manipulation mobile-button"
                     >
                       Complete Safety Checklist
                     </Link>
@@ -256,7 +303,7 @@ export default function DriverDashboard() {
                 ) : (
                   <Link
                     href="/driver/stops"
-                    className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 mt-8"
+                    className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 mt-6 touch-manipulation mobile-button"
                   >
                     View Stop Details
                   </Link>

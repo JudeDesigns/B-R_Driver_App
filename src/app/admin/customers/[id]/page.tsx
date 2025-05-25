@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   address: string;
   contactInfo: string | null;
+  email: string | null;
   preferences: string | null;
   groupCode: string | null;
   createdAt: string;
@@ -355,6 +356,30 @@ export default function CustomerDetailPage({
                   </div>
                   <p className="text-xl font-bold text-gray-900">
                     {customer.contactInfo || "N/A"}
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <svg
+                      className="h-5 w-5 text-gray-500 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <h3 className="text-sm font-medium text-gray-500">
+                      Email Address
+                    </h3>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">
+                    {customer.email || "N/A"}
                   </p>
                 </div>
 

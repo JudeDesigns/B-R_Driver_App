@@ -42,6 +42,12 @@ export async function GET(request: NextRequest) {
                   mode: "insensitive" as const,
                 },
               },
+              {
+                email: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              },
               { groupCode: { contains: search, mode: "insensitive" as const } },
             ],
           }
@@ -114,6 +120,7 @@ export async function POST(request: NextRequest) {
         name: data.name,
         address: data.address,
         contactInfo: data.contactInfo || null,
+        email: data.email || null,
         preferences: data.preferences || null,
         groupCode: data.groupCode || null,
       },

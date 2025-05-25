@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React from 'react';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import React from "react";
+import LoadingSpinner from "../ui/LoadingSpinner";
 
 interface StatusButtonProps {
   status: string;
@@ -22,10 +22,11 @@ export default function StatusButton({
   isDisabled,
   onClick,
   label,
-  className = ''
+  className = "",
 }: StatusButtonProps) {
-  const baseClasses = "py-2 px-4 text-white rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition duration-200";
-  
+  const baseClasses =
+    "py-2 px-4 text-white rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 touch-manipulation";
+
   // Determine button color based on status
   let colorClasses = "";
   switch (targetStatus) {

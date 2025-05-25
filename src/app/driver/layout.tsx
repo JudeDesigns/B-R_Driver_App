@@ -101,25 +101,25 @@ export default function DriverLayout({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      {/* Header - Simplified */}
-      <header className="border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4 flex justify-center items-center">
+    <div className="min-h-screen flex flex-col bg-white prevent-pull-refresh">
+      {/* Header - Simplified and Mobile Optimized */}
+      <header className="border-b border-gray-200 mobile-header">
+        <div className="container mx-auto px-4 py-3 flex justify-center items-center">
           <h1 className="text-xl font-bold uppercase tracking-tight">
             B&R FOOD SERVICES
           </h1>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 pb-24">{children}</main>
+      {/* Main Content - Mobile Optimized */}
+      <main className="flex-1 p-4 pb-24 mobile-container">{children}</main>
 
-      {/* Mobile Navigation */}
-      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full">
+      {/* Mobile Navigation - Optimized */}
+      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full mobile-nav">
         <div className="flex justify-around">
           <Link
             href="/driver"
-            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
+            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black touch-manipulation tap-target"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -140,7 +140,7 @@ export default function DriverLayout({
 
           <Link
             href="/driver/stops"
-            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
+            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black touch-manipulation tap-target"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -166,8 +166,8 @@ export default function DriverLayout({
           </Link>
 
           <Link
-            href="/driver/end-route"
-            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black"
+            href="/driver/end-of-day"
+            className="flex flex-col items-center py-3 px-4 text-gray-600 hover:text-black touch-manipulation tap-target"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -180,10 +180,10 @@ export default function DriverLayout({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={1.5}
-                d="M5 13l4 4L19 7"
+                d="M20 12H4M4 12L10 6M4 12L10 18"
               />
             </svg>
-            <span className="text-xs mt-1">End Route</span>
+            <span className="text-xs mt-1">End of Day</span>
           </Link>
 
           {/* Logout button */}

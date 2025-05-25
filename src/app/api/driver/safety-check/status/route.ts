@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
 
     const routeIds = driverRoutes.map((route) => route.id);
 
-    // Get all safety checks for the driver's routes
-    const safetyChecks = await prisma.safetyCheck.findMany({
+    // Get all START_OF_DAY safety checks for the driver's routes
+    const startOfDayChecks = await prisma.safetyCheck.findMany({
       where: {
         routeId: {
           in: routeIds,
@@ -113,23 +113,51 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Create a set of route IDs that have completed safety checks
+    // Get all END_OF_DAY safety checks for the driver's routes
+    const endOfDayChecks = await prisma.safetyCheck.findMany({
+      where: {
+        routeId: {
+          in: routeIds,
+        },
+        driverId: decoded.id,
+        type: "END_OF_DAY",
+        isDeleted: false,
+      },
+      select: {
+        routeId: true,
+      },
+    });
+
+    // Create a set of route IDs that have completed start-of-day checks
     const completedRouteIds = new Set(
-      safetyChecks.map((check) => check.routeId)
+      startOfDayChecks.map((check) => check.routeId)
     );
 
-    // Create a list of routes that need safety checks
-    const routesNeedingChecks = routeIds.filter(
+    // Create a set of route IDs that have completed end-of-day checks
+    const completedEndOfDayRouteIds = new Set(
+      endOfDayChecks.map((check) => check.routeId)
+    );
+
+    // Create a list of routes that need start-of-day safety checks
+    const routesNeedingStartChecks = routeIds.filter(
       (routeId) => !completedRouteIds.has(routeId)
     );
 
-    // Get details for routes needing checks
-    const routesDetails =
-      routesNeedingChecks.length > 0
+    // Create a list of routes that need end-of-day safety checks
+    // These are routes that have start-of-day checks but not end-of-day checks
+    const routesNeedingEndChecks = routeIds.filter(
+      (routeId) =>
+        completedRouteIds.has(routeId) &&
+        !completedEndOfDayRouteIds.has(routeId)
+    );
+
+    // Get details for routes needing start-of-day checks
+    const routesNeedingStartDetails =
+      routesNeedingStartChecks.length > 0
         ? await prisma.route.findMany({
             where: {
               id: {
-                in: routesNeedingChecks,
+                in: routesNeedingStartChecks,
               },
               isDeleted: false,
             },
@@ -141,10 +169,40 @@ export async function GET(request: NextRequest) {
           })
         : [];
 
+    // Get details for routes needing end-of-day checks
+    const routesNeedingEndDetails =
+      routesNeedingEndChecks.length > 0
+        ? await prisma.route.findMany({
+            where: {
+              id: {
+                in: routesNeedingEndChecks,
+              },
+              isDeleted: false,
+            },
+            select: {
+              id: true,
+              routeNumber: true,
+              date: true,
+              status: true,
+            },
+          })
+        : [];
+
+    // Log detailed information for debugging
+    console.log("Safety check status API response:", {
+      allRouteIds: routeIds,
+      completedStartOfDayIds: Array.from(completedRouteIds),
+      completedEndOfDayIds: Array.from(completedEndOfDayRouteIds),
+      routesNeedingStartChecks: routesNeedingStartChecks,
+      routesNeedingEndChecks: routesNeedingEndChecks,
+    });
+
     return NextResponse.json({
-      hasCompletedChecks: routesNeedingChecks.length === 0,
+      hasCompletedChecks: routesNeedingStartChecks.length === 0,
       completedRouteIds: Array.from(completedRouteIds),
-      routesNeedingChecks: routesDetails,
+      completedEndOfDayRouteIds: Array.from(completedEndOfDayRouteIds),
+      routesNeedingChecks: routesNeedingStartDetails,
+      routesNeedingEndOfDayChecks: routesNeedingEndDetails,
       allRouteIds: routeIds,
     });
   } catch (error) {

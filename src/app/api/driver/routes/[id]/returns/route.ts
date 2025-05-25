@@ -17,32 +17,39 @@ export async function GET(
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
 
-    if (!decoded || !decoded.id || !["ADMIN", "SUPER_ADMIN", "DRIVER"].includes(decoded.role)) {
+    if (
+      !decoded ||
+      !decoded.id ||
+      !["ADMIN", "SUPER_ADMIN", "DRIVER"].includes(decoded.role)
+    ) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     // Get the route ID from the URL
-    const { id } = params;
+    const routeParams = await params;
+    const { id } = routeParams;
 
     // Check if the route exists and is assigned to the driver (if driver role)
     const route = await prisma.route.findFirst({
       where: {
         id,
         isDeleted: false,
-        ...(decoded.role === "DRIVER" ? {
-          OR: [
-            { driverId: decoded.id },
-            {
-              stops: {
-                some: {
-                  driverNameFromUpload: {
-                    equals: decoded.username,
+        ...(decoded.role === "DRIVER"
+          ? {
+              OR: [
+                { driverId: decoded.id },
+                {
+                  stops: {
+                    some: {
+                      driverNameFromUpload: {
+                        equals: decoded.username,
+                      },
+                    },
                   },
                 },
-              },
-            },
-          ],
-        } : {}),
+              ],
+            }
+          : {}),
       },
       include: {
         stops: {
@@ -73,7 +80,7 @@ export async function GET(
 
     // Get all returns for the route's stops
     const stopIds = route.stops.map((stop) => stop.id);
-    
+
     const returns = await prisma.return.findMany({
       where: {
         stopId: {
