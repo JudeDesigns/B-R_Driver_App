@@ -501,10 +501,10 @@ export default function AdminDashboard() {
             ) : error ? (
               <div className="text-primary-red text-center">{error}</div>
             ) : routes.length === 0 ? (
-              <div className="text-mono-500 text-center py-10">
+              <div className="text-gray-700 text-center py-10">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-12 w-12 mx-auto text-mono-300 mb-4"
+                  className="h-12 w-12 mx-auto text-gray-400 mb-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -516,11 +516,11 @@ export default function AdminDashboard() {
                     d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
                   />
                 </svg>
-                <p>No active routes found.</p>
-                <p className="mt-2">
+                <p className="text-gray-900 font-medium">No active routes found.</p>
+                <p className="mt-2 text-gray-600">
                   <Link
                     href="/admin/routes/upload"
-                    className="text-primary-blue hover:text-blue-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium underline"
                   >
                     Upload a route
                   </Link>{" "}
@@ -530,26 +530,26 @@ export default function AdminDashboard() {
             ) : (
               <table className="min-w-full">
                 <thead>
-                  <tr className="border-b border-mono-200">
-                    <th className="px-6 py-3 text-left text-xs font-medium text-mono-500 uppercase tracking-wider">
+                  <tr className="border-b border-gray-200">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       Route
                     </th>
                     {/* Driver column removed as requested */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-mono-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-mono-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       Stops
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-mono-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {routes.map((route) => (
-                    <tr key={route.id} className="hover:bg-mono-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mono-800">
+                    <tr key={route.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {route.routeNumber || "N/A"}
                       </td>
                       {/* Driver cell removed as requested */}
@@ -557,22 +557,22 @@ export default function AdminDashboard() {
                         <span
                           className={`px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${
                             route.status === "PENDING"
-                              ? "bg-primary-orange bg-opacity-10 text-primary-orange"
+                              ? "bg-yellow-100 text-yellow-800"
                               : route.status === "IN_PROGRESS"
-                              ? "bg-primary-blue bg-opacity-10 text-primary-blue"
+                              ? "bg-blue-100 text-blue-800"
                               : route.status === "COMPLETED"
-                              ? "bg-primary-green bg-opacity-10 text-primary-green"
-                              : "bg-mono-200 text-mono-700"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {route.status.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-mono-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {route._count.stops}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-primary-blue">
-                        <Link href={`/admin/routes/${route.id}`}>View</Link>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                        <Link href={`/admin/routes/${route.id}`} className="font-medium">View</Link>
                       </td>
                     </tr>
                   ))}

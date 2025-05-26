@@ -281,11 +281,13 @@ export function useOptimizedRouteDetails(
 ) {
   const [route, setRoute] = useState<any | null>(initialRoute);
   const { subscribe, isConnected } = useSocket();
+  const initializedRef = useRef(false);
 
-  // Update route if initialRoute changes
+  // Update route if initialRoute changes (only once when first provided)
   useEffect(() => {
-    if (initialRoute) {
+    if (initialRoute && !initializedRef.current) {
       setRoute(initialRoute);
+      initializedRef.current = true;
     }
   }, [initialRoute]);
 
@@ -392,11 +394,13 @@ export function useOptimizedAdminStopDetails(
 ) {
   const [stop, setStop] = useState<any | null>(initialStop);
   const { subscribe, isConnected } = useSocket();
+  const initializedRef = useRef(false);
 
-  // Update stop if initialStop changes
+  // Update stop if initialStop changes (only once when first provided)
   useEffect(() => {
-    if (initialStop) {
+    if (initialStop && !initializedRef.current) {
       setStop(initialStop);
+      initializedRef.current = true;
     }
   }, [initialStop]);
 

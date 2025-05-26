@@ -122,14 +122,20 @@ export default function RouteDetailPage({
 
   // Update the route state when optimizedRoute changes
   useEffect(() => {
-    if (optimizedRoute && optimizedRoute !== route) {
-      console.log(
-        "[AdminRouteDetails] Received optimized route update:",
-        optimizedRoute._lastUpdated
-      );
-      setRoute(optimizedRoute);
+    if (optimizedRoute && optimizedRoute._lastUpdated) {
+      // Use _lastUpdated timestamp to determine if this is actually a new update
+      const currentLastUpdated = route?._lastUpdated;
+      const newLastUpdated = optimizedRoute._lastUpdated;
+
+      if (newLastUpdated !== currentLastUpdated) {
+        console.log(
+          "[AdminRouteDetails] Received optimized route update:",
+          optimizedRoute._lastUpdated
+        );
+        setRoute(optimizedRoute);
+      }
     }
-  }, [optimizedRoute, route]);
+  }, [optimizedRoute]); // Removed 'route' from dependencies to prevent infinite loop
 
   // Set up WebSocket connection for room joining only
   useEffect(() => {

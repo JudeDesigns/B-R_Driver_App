@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
 import { SocketEvents, RouteStatusUpdateData } from "@/lib/socketClient";
-import { usePerformance } from "@/hooks/usePerformance";
-import { recordApiCall } from "@/lib/performanceMonitor";
+// Performance monitoring removed for cleaner codebase
 
 export default function DriverDashboard() {
-  // Initialize performance monitoring
-  const { isMobile, createThrottledFunction } =
-    usePerformance("DriverDashboard");
+  // Simple mobile detection
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,9 +66,6 @@ export default function DriverDashboard() {
       // Get today's date in YYYY-MM-DD format
       const today = new Date().toISOString().split("T")[0];
 
-      // Record API call performance
-      const routesStartTime = performance.now();
-
       // Fetch routes
       const routesResponse = await fetch(
         `/api/driver/assigned-routes?date=${today}`,
@@ -82,9 +77,6 @@ export default function DriverDashboard() {
           cache: isMobile ? "force-cache" : "default",
         }
       );
-
-      // Record API call performance
-      recordApiCall("/api/driver/assigned-routes", routesStartTime);
 
       if (!routesResponse.ok) {
         const errorData = await routesResponse.json();
@@ -99,9 +91,6 @@ export default function DriverDashboard() {
         setRoute(routesData.routes[0]);
       }
 
-      // Record API call performance
-      const safetyStartTime = performance.now();
-
       // Check if any safety checks are completed
       const safetyChecksResponse = await fetch(
         `/api/driver/safety-check/status?date=${today}`,
@@ -113,9 +102,6 @@ export default function DriverDashboard() {
           cache: isMobile ? "force-cache" : "default",
         }
       );
-
-      // Record API call performance
-      recordApiCall("/api/driver/safety-check/status", safetyStartTime);
 
       if (safetyChecksResponse.ok) {
         const safetyData = await safetyChecksResponse.json();
@@ -161,11 +147,16 @@ export default function DriverDashboard() {
       }
     }
 
-    // Create a throttled version of fetchAssignedRoutes to prevent excessive API calls
-    const throttledFetchRoutes = createThrottledFunction(() => {
-      console.log("Throttled fetch routes called");
-      fetchAssignedRoutes();
-    }, 2000); // Throttle to at most once every 2 seconds
+    // Simple throttling to prevent excessive API calls
+    let lastFetchTime = 0;
+    const throttledFetchRoutes = () => {
+      const now = Date.now();
+      if (now - lastFetchTime > 2000) { // Throttle to at most once every 2 seconds
+        lastFetchTime = now;
+        console.log("Throttled fetch routes called");
+        fetchAssignedRoutes();
+      }
+    };
 
     // Subscribe to route status update events with throttling for better performance
     const unsubscribeRouteStatus = subscribe<RouteStatusUpdateData>(
@@ -186,7 +177,6 @@ export default function DriverDashboard() {
     joinRoom,
     subscribe,
     fetchAssignedRoutes,
-    createThrottledFunction,
   ]);
 
   const handleLogout = () => {

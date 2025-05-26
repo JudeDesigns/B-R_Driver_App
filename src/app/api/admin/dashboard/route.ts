@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
-import apiCache, { TTL } from "@/lib/cache";
+// Cache removed for cleaner codebase
 
 // GET /api/admin/dashboard - Get dashboard data including today's routes
 export async function GET(request: NextRequest) {
@@ -52,26 +52,142 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Generate a cache key based on the date
-    const todayDateString = today.toISOString().split("T")[0];
-    const cacheKeyPrefix = `dashboard:${todayDateString}:${userId}`;
+    // Get today's routes
+    const todaysRoutes = await prisma.route.findMany({
+      where: {
+        date: {
+          gte: today,
+          lt: tomorrow,
+        },
+        isDeleted: false,
+      },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+          },
+        },
+        _count: {
+          select: {
+            stops: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5, // Limit to 5 most recent routes
+    });
 
-    // Get today's routes with caching
-    const todaysRoutes = await apiCache.getOrSet(
-      `${cacheKeyPrefix}:todaysRoutes`,
-      async () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Cache miss for today's routes, fetching from database");
-        }
-        return prisma.route.findMany({
-          where: {
+    // Get route statistics
+    const routeStats = await prisma.$transaction([
+      // Total routes
+      prisma.route.count({
+        where: {
+          isDeleted: false,
+        },
+      }),
+      // Today's routes
+      prisma.route.count({
+        where: {
+          isDeleted: false,
+          date: {
+            gte: today,
+            lt: tomorrow,
+          },
+        },
+      }),
+      // Routes by status
+      prisma.route.groupBy({
+        by: ["status"],
+        where: {
+          isDeleted: false,
+        },
+        _count: {
+          id: true,
+        },
+      }),
+      // Today's routes by status
+      prisma.route.groupBy({
+        by: ["status"],
+        where: {
+          isDeleted: false,
+          date: {
+            gte: today,
+            lt: tomorrow,
+          },
+        },
+        _count: {
+          id: true,
+        },
+      }),
+    ]);
+
+    // Get stop statistics
+    const stopStats = await prisma.$transaction([
+      // Total stops
+      prisma.stop.count({
+        where: {
+          isDeleted: false,
+        },
+      }),
+      // Today's stops
+      prisma.stop.count({
+        where: {
+          isDeleted: false,
+          route: {
             date: {
               gte: today,
               lt: tomorrow,
             },
-            isDeleted: false,
           },
-          include: {
+        },
+      }),
+      // Stops by status
+      prisma.stop.groupBy({
+        by: ["status"],
+        where: {
+          isDeleted: false,
+        },
+        _count: {
+          id: true,
+        },
+      }),
+      // Today's stops by status
+      prisma.stop.groupBy({
+        by: ["status"],
+        where: {
+          isDeleted: false,
+          route: {
+            date: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+        },
+        _count: {
+          id: true,
+        },
+      }),
+    ]);
+
+    // Get active drivers (those who have submitted safety checks today)
+    const todaysSafetyChecks = await prisma.safetyCheck.findMany({
+      where: {
+        timestamp: {
+          gte: today,
+          lt: tomorrow,
+        },
+        type: "START_OF_DAY",
+        isDeleted: false,
+      },
+      select: {
+        routeId: true,
+        route: {
+          select: {
+            driverId: true,
             driver: {
               select: {
                 id: true,
@@ -79,286 +195,98 @@ export async function GET(request: NextRequest) {
                 fullName: true,
               },
             },
-            _count: {
-              select: {
-                stops: true,
-              },
-            },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 5, // Limit to 5 most recent routes
-        });
-      },
-      TTL.SHORT // Cache for 30 seconds
-    );
-
-    // Get route statistics with caching
-    const routeStats = await apiCache.getOrSet(
-      `${cacheKeyPrefix}:routeStats`,
-      async () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Cache miss for route stats, fetching from database");
-        }
-        return prisma.$transaction([
-          // Total routes
-          prisma.route.count({
-            where: {
-              isDeleted: false,
-            },
-          }),
-          // Today's routes
-          prisma.route.count({
-            where: {
-              isDeleted: false,
-              date: {
-                gte: today,
-                lt: tomorrow,
-              },
-            },
-          }),
-          // Routes by status
-          prisma.route.groupBy({
-            by: ["status"],
-            where: {
-              isDeleted: false,
-            },
-            _count: {
-              id: true,
-            },
-          }),
-          // Today's routes by status
-          prisma.route.groupBy({
-            by: ["status"],
-            where: {
-              isDeleted: false,
-              date: {
-                gte: today,
-                lt: tomorrow,
-              },
-            },
-            _count: {
-              id: true,
-            },
-          }),
-        ]);
-      },
-      TTL.SHORT // Cache for 30 seconds
-    );
-
-    // Get stop statistics with caching
-    const stopStats = await apiCache.getOrSet(
-      `${cacheKeyPrefix}:stopStats`,
-      async () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Cache miss for stop stats, fetching from database");
-        }
-        return prisma.$transaction([
-          // Total stops
-          prisma.stop.count({
-            where: {
-              isDeleted: false,
-            },
-          }),
-          // Today's stops
-          prisma.stop.count({
-            where: {
-              isDeleted: false,
-              route: {
-                date: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-            },
-          }),
-          // Stops by status
-          prisma.stop.groupBy({
-            by: ["status"],
-            where: {
-              isDeleted: false,
-            },
-            _count: {
-              id: true,
-            },
-          }),
-          // Today's stops by status
-          prisma.stop.groupBy({
-            by: ["status"],
-            where: {
-              isDeleted: false,
-              route: {
-                date: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-            },
-            _count: {
-              id: true,
-            },
-          }),
-        ]);
-      },
-      TTL.SHORT // Cache for 30 seconds
-    );
-
-    // Get active drivers with caching
-    const { activeDrivers, uniqueDrivers } = await apiCache.getOrSet(
-      `${cacheKeyPrefix}:activeDrivers`,
-      async () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Cache miss for active drivers, fetching from database");
-        }
-
-        // Get active drivers (those who have submitted safety checks today)
-        const todaysSafetyChecks = await prisma.safetyCheck.findMany({
-          where: {
-            timestamp: {
-              gte: today,
-              lt: tomorrow,
-            },
-            type: "START_OF_DAY",
-            isDeleted: false,
-          },
-          select: {
-            routeId: true,
-            route: {
-              select: {
-                driverId: true,
-                driver: {
-                  select: {
-                    id: true,
-                    username: true,
-                    fullName: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        // Then count unique routeIds
-        const uniqueRouteIds = new Set(
-          todaysSafetyChecks.map((check) => check.routeId)
-        );
-        const activeDrivers = uniqueRouteIds.size;
-
-        // Get unique drivers
-        const uniqueDrivers = Array.from(
-          new Map(
-            todaysSafetyChecks
-              .filter((check) => check.route && check.route.driver) // Filter out any null values
-              .map((check) => [check.route.driverId, check.route.driver])
-          ).values()
-        );
-
-        return { activeDrivers, uniqueDrivers };
-      },
-      TTL.SHORT // Cache for 30 seconds
-    );
-
-    // Get delivery stats with caching
-    const { ongoingDeliveries, completedStops, activeRoutes } =
-      await apiCache.getOrSet(
-        `${cacheKeyPrefix}:deliveryStats`,
-        async () => {
-          if (process.env.NODE_ENV !== "production") {
-            console.log(
-              "Cache miss for delivery stats, fetching from database"
-            );
-          }
-
-          // Count ongoing deliveries (stops that are in progress)
-          const ongoingDeliveries = await prisma.stop.count({
-            where: {
-              status: {
-                in: ["ON_THE_WAY", "ARRIVED"],
-              },
-              route: {
-                date: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-              isDeleted: false,
-            },
-          });
-
-          // Count completed stops
-          const completedStops = await prisma.stop.count({
-            where: {
-              status: "COMPLETED",
-              route: {
-                date: {
-                  gte: today,
-                  lt: tomorrow,
-                },
-              },
-              isDeleted: false,
-            },
-          });
-
-          // Count active routes
-          const activeRoutes = await prisma.route.count({
-            where: {
-              status: "IN_PROGRESS",
-              date: {
-                gte: today,
-                lt: tomorrow,
-              },
-              isDeleted: false,
-            },
-          });
-
-          return { ongoingDeliveries, completedStops, activeRoutes };
         },
-        TTL.SHORT // Cache for 30 seconds
-      );
-
-    // Get email statistics with caching
-    const emailStats = await apiCache.getOrSet(
-      `${cacheKeyPrefix}:emailStats`,
-      async () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Cache miss for email stats, fetching from database");
-        }
-
-        const emailCounts = await prisma.customerEmail.groupBy({
-          by: ["status"],
-          where: {
-            createdAt: {
-              gte: today,
-              lt: tomorrow,
-            },
-            isDeleted: false,
-          },
-          _count: {
-            status: true,
-          },
-        });
-
-        const stats = {
-          sent: 0,
-          pending: 0,
-          failed: 0,
-        };
-
-        emailCounts.forEach((count) => {
-          if (count.status === "SENT") {
-            stats.sent = count._count.status;
-          } else if (count.status === "PENDING") {
-            stats.pending = count._count.status;
-          } else if (count.status === "FAILED") {
-            stats.failed = count._count.status;
-          }
-        });
-
-        return stats;
       },
-      TTL.SHORT // Cache for 30 seconds
+    });
+
+    // Then count unique routeIds
+    const uniqueRouteIds = new Set(
+      todaysSafetyChecks.map((check) => check.routeId)
     );
+    const activeDrivers = uniqueRouteIds.size;
+
+    // Get unique drivers
+    const uniqueDrivers = Array.from(
+      new Map(
+        todaysSafetyChecks
+          .filter((check) => check.route && check.route.driver) // Filter out any null values
+          .map((check) => [check.route.driverId, check.route.driver])
+      ).values()
+    );
+
+    // Count ongoing deliveries (stops that are in progress)
+    const ongoingDeliveries = await prisma.stop.count({
+      where: {
+        status: {
+          in: ["ON_THE_WAY", "ARRIVED"],
+        },
+        route: {
+          date: {
+            gte: today,
+            lt: tomorrow,
+          },
+        },
+        isDeleted: false,
+      },
+    });
+
+    // Count completed stops
+    const completedStops = await prisma.stop.count({
+      where: {
+        status: "COMPLETED",
+        route: {
+          date: {
+            gte: today,
+            lt: tomorrow,
+          },
+        },
+        isDeleted: false,
+      },
+    });
+
+    // Count active routes
+    const activeRoutes = await prisma.route.count({
+      where: {
+        status: "IN_PROGRESS",
+        date: {
+          gte: today,
+          lt: tomorrow,
+        },
+        isDeleted: false,
+      },
+    });
+
+    // Get email statistics
+    const emailCounts = await prisma.customerEmail.groupBy({
+      by: ["status"],
+      where: {
+        createdAt: {
+          gte: today,
+          lt: tomorrow,
+        },
+        isDeleted: false,
+      },
+      _count: {
+        status: true,
+      },
+    });
+
+    const emailStats = {
+      sent: 0,
+      pending: 0,
+      failed: 0,
+    };
+
+    emailCounts.forEach((count) => {
+      if (count.status === "SENT") {
+        emailStats.sent = count._count.status;
+      } else if (count.status === "PENDING") {
+        emailStats.pending = count._count.status;
+      } else if (count.status === "FAILED") {
+        emailStats.failed = count._count.status;
+      }
+    });
 
     // Only log in development mode
     if (process.env.NODE_ENV !== "production") {

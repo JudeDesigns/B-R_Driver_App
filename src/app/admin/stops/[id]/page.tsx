@@ -219,30 +219,31 @@ export default function StopDetailPage({
 
   // Update the stop state when optimizedStop changes
   useEffect(() => {
-    if (optimizedStop && optimizedStop !== stop) {
-      console.log(
-        `[AdminStopDetails] Received optimized stop update:`,
-        optimizedStop.status,
-        optimizedStop._lastUpdated
-      );
+    if (optimizedStop && optimizedStop._lastUpdated) {
+      // Use _lastUpdated timestamp to determine if this is actually a new update
+      const currentLastUpdated = stop?._lastUpdated;
+      const newLastUpdated = optimizedStop._lastUpdated;
 
-      // Force a re-render by creating a new object
-      const updatedStop = {
-        ...optimizedStop,
-        _forceUpdate: Date.now(),
-      };
+      if (newLastUpdated !== currentLastUpdated) {
+        console.log(
+          `[AdminStopDetails] Received optimized stop update:`,
+          optimizedStop.status,
+          optimizedStop._lastUpdated
+        );
 
-      setStop(updatedStop);
+        // Update with the optimized stop data (no need for _forceUpdate hack)
+        setStop(optimizedStop);
 
-      // Also update the form data if we're in edit mode
-      if (editMode) {
-        setFormData((prevFormData) => ({
-          ...prevFormData,
-          status: optimizedStop.status,
-        }));
+        // Also update the form data if we're in edit mode
+        if (editMode) {
+          setFormData((prevFormData) => ({
+            ...prevFormData,
+            status: optimizedStop.status,
+          }));
+        }
       }
     }
-  }, [optimizedStop, editMode, stop]);
+  }, [optimizedStop, editMode]); // Removed 'stop' from dependencies to prevent infinite loop
 
   // Set up WebSocket connection for room joining only
   useEffect(() => {

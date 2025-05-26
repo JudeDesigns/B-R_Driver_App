@@ -112,10 +112,10 @@ export default function NewCustomerPage() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-              <span className="font-medium text-gray-700">New Customer</span>
+              <span className="font-medium text-gray-700">Create Customer</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Add New Customer
+              Create New Customer
             </h1>
           </div>
           <div>

@@ -361,20 +361,20 @@ export default function AdminLayout({
               </li>
               <li>
                 <Link
-                  href="/admin/customers/add"
+                  href="/admin/customers/create"
                   className={`flex items-center py-2.5 px-4 pl-12 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
-                    pathname === "/admin/customers/add"
+                    pathname === "/admin/customers/create"
                       ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
                       : "hover:bg-gray-800"
                   }`}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  {pathname === "/admin/customers/add" && (
+                  {pathname === "/admin/customers/create" && (
                     <span className="absolute left-0 top-0 h-full w-1 bg-orange-500"></span>
                   )}
                   <span
                     className={`absolute inset-0 w-1 bg-orange-500 transition-all duration-300 ${
-                      pathname === "/admin/customers/add"
+                      pathname === "/admin/customers/create"
                         ? "opacity-100"
                         : "opacity-0 group-hover:opacity-100"
                     }`}
@@ -382,7 +382,7 @@ export default function AdminLayout({
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-4 w-4 mr-3 text-primary-orange transition-transform duration-300 ${
-                      pathname === "/admin/customers/add"
+                      pathname === "/admin/customers/create"
                         ? "scale-110"
                         : "group-hover:scale-110"
                     }`}
@@ -399,7 +399,7 @@ export default function AdminLayout({
                   </svg>
                   <span
                     className={`font-medium text-sm transition-all duration-300 ${
-                      pathname === "/admin/customers/add"
+                      pathname === "/admin/customers/create"
                         ? "text-white"
                         : "group-hover:translate-x-1"
                     }`}

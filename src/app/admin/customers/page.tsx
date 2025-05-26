@@ -348,7 +348,7 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-medium text-gray-900">Customers</h1>
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              href="/admin/customers/new"
+              href="/admin/customers/create"
               className="bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-center"
             >
               Add Customer
@@ -497,7 +497,7 @@ export default function CustomersPage() {
                       </svg>
                       No customers found. Try adjusting your search or{" "}
                       <Link
-                        href="/admin/customers/new"
+                        href="/admin/customers/create"
                         className="text-primary-blue hover:text-blue-700 font-medium"
                       >
                         add a new customer
