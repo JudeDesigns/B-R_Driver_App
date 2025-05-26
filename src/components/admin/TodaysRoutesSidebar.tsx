@@ -99,7 +99,7 @@ export default function TodaysRoutesSidebar() {
         <div className="flex items-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-3 text-green-500"
+            className="h-5 w-5 mr-3 text-primary-green"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

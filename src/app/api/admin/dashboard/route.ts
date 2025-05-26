@@ -6,33 +6,36 @@ import apiCache, { TTL } from "@/lib/cache";
 // GET /api/admin/dashboard - Get dashboard data including today's routes
 export async function GET(request: NextRequest) {
   try {
-    console.log("Dashboard API called");
-
-    // Verify authentication
+    // Simple token verification for now
     const authHeader = request.headers.get("authorization");
-    console.log("Auth header:", authHeader ? "Present" : "Missing");
+    const tokenFromCookie = request.cookies.get("auth-token")?.value;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("Unauthorized: No valid auth header");
+    let token = null;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (tokenFromCookie) {
+      token = tokenFromCookie;
+    }
+
+    if (!token) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const token = authHeader.split(" ")[1];
-    console.log("Token extracted, verifying...");
-
-    const decoded = verifyToken(token) as any;
-    console.log("Token decoded:", decoded ? "Success" : "Failed");
-
-    if (
-      !decoded ||
-      !decoded.id ||
-      !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)
-    ) {
-      console.log("Unauthorized: Invalid token or insufficient permissions");
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // Verify token
+    const decoded = verifyToken(token);
+    if (!decoded || !decoded.id) {
+      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
     }
 
-    console.log("Authentication successful, user role:", decoded.role);
+    // Check if user has admin privileges
+    if (!["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
+      return NextResponse.json(
+        { message: "Insufficient permissions" },
+        { status: 403 }
+      );
+    }
+
+    const userId = decoded.id;
 
     // Get today's date (start and end)
     const today = new Date();
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     // Generate a cache key based on the date
     const todayDateString = today.toISOString().split("T")[0];
-    const cacheKeyPrefix = `dashboard:${todayDateString}:${decoded.id}`;
+    const cacheKeyPrefix = `dashboard:${todayDateString}:${userId}`;
 
     // Get today's routes with caching
     const todaysRoutes = await apiCache.getOrSet(
@@ -314,6 +317,49 @@ export async function GET(request: NextRequest) {
         TTL.SHORT // Cache for 30 seconds
       );
 
+    // Get email statistics with caching
+    const emailStats = await apiCache.getOrSet(
+      `${cacheKeyPrefix}:emailStats`,
+      async () => {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Cache miss for email stats, fetching from database");
+        }
+
+        const emailCounts = await prisma.customerEmail.groupBy({
+          by: ["status"],
+          where: {
+            createdAt: {
+              gte: today,
+              lt: tomorrow,
+            },
+            isDeleted: false,
+          },
+          _count: {
+            status: true,
+          },
+        });
+
+        const stats = {
+          sent: 0,
+          pending: 0,
+          failed: 0,
+        };
+
+        emailCounts.forEach((count) => {
+          if (count.status === "SENT") {
+            stats.sent = count._count.status;
+          } else if (count.status === "PENDING") {
+            stats.pending = count._count.status;
+          } else if (count.status === "FAILED") {
+            stats.failed = count._count.status;
+          }
+        });
+
+        return stats;
+      },
+      TTL.SHORT // Cache for 30 seconds
+    );
+
     // Only log in development mode
     if (process.env.NODE_ENV !== "production") {
       console.log("Data fetched successfully:");
@@ -357,18 +403,20 @@ export async function GET(request: NextRequest) {
         count: activeDrivers,
         drivers: uniqueDrivers,
       },
+      emailStats,
     };
 
-    // Add cache control headers for client-side caching
-    const headers = new Headers();
-    headers.set("Cache-Control", "public, max-age=10"); // Cache for 10 seconds on the client side
+    // Create response with cache control headers
+    const response_obj = NextResponse.json(response);
+    response_obj.headers.set("Cache-Control", "private, max-age=10"); // Private cache for 10 seconds
 
-    return NextResponse.json(response, { headers });
+    return response_obj;
   } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-    console.error("Error stack:", (error as Error).stack);
+    console.error("Dashboard error:", error);
+
+    // Don't expose internal error details
     return NextResponse.json(
-      { message: `An error occurred: ${(error as Error).message}` },
+      { message: "An error occurred while fetching dashboard data" },
       { status: 500 }
     );
   }

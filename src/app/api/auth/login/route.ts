@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { authenticateUser, generateToken } from "@/lib/auth";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     // Parse the request body
     let username, password;
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       username = body.username;
       password = body.password;
     } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
+      console.error("JSON parse error:", parseError);
       return NextResponse.json(
         { message: "Invalid request format" },
         { status: 400 }
@@ -19,13 +19,17 @@ export async function POST(request: Request) {
 
     // Validate input
     if (!username || !password) {
+      console.log("Missing credentials:", {
+        username: !!username,
+        password: !!password,
+      });
       return NextResponse.json(
         { message: "Username and password are required" },
         { status: 400 }
       );
     }
 
-    // Authenticate user (will try database first, then fall back to mock data)
+    // Authenticate user
     const {
       isAuthenticated,
       userRole,

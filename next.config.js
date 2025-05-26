@@ -35,6 +35,17 @@ const nextConfig = {
     // Add support for WebSockets
     config.externals = [...(config.externals || [])];
 
+    // Fix for node: imports in client-side code
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        crypto: false,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+
     // Performance optimizations for production builds
     if (!dev) {
       // Enable terser optimizations

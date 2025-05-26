@@ -26,7 +26,7 @@ export default function Table<T>({
 }: TableProps<T>) {
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-full divide-y divide-gray-200 table-fixed">
         <thead className={stickyHeader ? "sticky top-0 bg-white z-10" : ""}>
           <tr>
             {columns.map((column, index) => (
@@ -40,7 +40,11 @@ export default function Table<T>({
                     ? "text-right"
                     : "text-left"
                 } text-gray-500 uppercase`}
-                style={column.width ? { width: column.width } : undefined}
+                style={
+                  column.width
+                    ? { width: column.width, maxWidth: column.width }
+                    : undefined
+                }
               >
                 {column.header}
               </th>
@@ -59,13 +63,22 @@ export default function Table<T>({
               {columns.map((column, colIndex) => (
                 <td
                   key={colIndex}
-                  className={`px-6 py-4 whitespace-nowrap text-sm ${
+                  className={`px-6 py-4 text-sm ${
                     column.align === "center"
                       ? "text-center"
                       : column.align === "right"
                       ? "text-right"
                       : "text-left"
-                  } ${colIndex === 0 ? "font-medium text-gray-900" : "text-gray-500"}`}
+                  } ${
+                    colIndex === 0
+                      ? "font-medium text-gray-900"
+                      : "text-gray-500"
+                  }`}
+                  style={
+                    column.width
+                      ? { width: column.width, maxWidth: column.width }
+                      : undefined
+                  }
                 >
                   {typeof column.accessor === "function"
                     ? column.accessor(item)

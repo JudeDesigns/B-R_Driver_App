@@ -280,6 +280,24 @@ export default function AdminLayout({
                           : "opacity-0 group-hover:opacity-100"
                       }`}
                     ></span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-4 w-4 mr-3 text-primary-green transition-transform duration-300 ${
+                        pathname === "/admin/routes/upload"
+                          ? "scale-110"
+                          : "group-hover:scale-110"
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
                     <span
                       className={`font-medium text-sm transition-all duration-300 ${
                         pathname === "/admin/routes/upload"
@@ -361,6 +379,24 @@ export default function AdminLayout({
                         : "opacity-0 group-hover:opacity-100"
                     }`}
                   ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-4 w-4 mr-3 text-primary-orange transition-transform duration-300 ${
+                      pathname === "/admin/customers/add"
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                    />
+                  </svg>
                   <span
                     className={`font-medium text-sm transition-all duration-300 ${
                       pathname === "/admin/customers/add"
@@ -488,10 +524,10 @@ export default function AdminLayout({
                   onClick={() => setSidebarOpen(false)}
                 >
                   {pathname === "/admin/safety-checks" && (
-                    <span className="absolute left-0 top-0 h-full w-1 bg-yellow-500"></span>
+                    <span className="absolute left-0 top-0 h-full w-1 bg-cyan-500"></span>
                   )}
                   <span
-                    className={`absolute inset-0 w-1 bg-yellow-500 transition-all duration-300 ${
+                    className={`absolute inset-0 w-1 bg-cyan-500 transition-all duration-300 ${
                       pathname === "/admin/safety-checks"
                         ? "opacity-100"
                         : "opacity-0 group-hover:opacity-100"
@@ -499,7 +535,7 @@ export default function AdminLayout({
                   ></span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 mr-3 text-yellow-400 transition-transform duration-300 ${
+                    className={`h-5 w-5 mr-3 text-primary-cyan transition-transform duration-300 ${
                       pathname === "/admin/safety-checks"
                         ? "scale-110"
                         : "group-hover:scale-110"

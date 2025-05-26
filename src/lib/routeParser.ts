@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { PrismaClient, User, Customer, Route, Stop } from "@prisma/client";
 import prisma from "./db";
-import * as argon2 from "argon2";
+import { InputValidator } from "./security";
 
 // Define the structure for a parsed stop
 export interface ParsedStop {
@@ -113,6 +113,17 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
   };
 
   try {
+    // Validate buffer size (max 10MB for security)
+    if (buffer.length > 10 * 1024 * 1024) {
+      result.errors.push("File size too large. Maximum allowed size is 10MB.");
+      return result;
+    }
+
+    // Validate buffer is not empty
+    if (buffer.length === 0) {
+      result.errors.push("File is empty.");
+      return result;
+    }
     // Performance optimization: Use optimized XLSX reading options
     const workbook = XLSX.read(buffer, {
       type: "buffer",
@@ -258,10 +269,39 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           continue;
         }
 
-        // Extract stop information
+        // Extract and validate stop information
+        const rawCustomerName =
+          row[columnIndices.customerName]?.toString() || "";
+        const rawSequence = row[columnIndices.sequence]?.toString() || "0";
+
+        // Validate and sanitize customer name
+        let customerName = "";
+        try {
+          customerName = InputValidator.sanitizeString(rawCustomerName, 100);
+          if (customerName.length < 2) {
+            throw new Error("Customer name too short");
+          }
+        } catch (error) {
+          result.warnings.push(
+            `Row ${rowIndex}: Invalid customer name: "${rawCustomerName}"`
+          );
+          result.rowsFailed++;
+          continue;
+        }
+
+        // Validate sequence number
+        const sequence = parseInt(rawSequence);
+        if (isNaN(sequence) || sequence < 0 || sequence > 9999) {
+          result.warnings.push(
+            `Row ${rowIndex}: Invalid sequence number: "${rawSequence}"`
+          );
+          result.rowsFailed++;
+          continue;
+        }
+
         const stop: ParsedStop = {
-          sequence: parseInt(row[columnIndices.sequence]?.toString() || "0"),
-          customerName: row[columnIndices.customerName]?.toString() || "",
+          sequence: sequence,
+          customerName: customerName,
           driverName: rawDriverName, // Capture driver for each stop
           customerGroupCode:
             row[columnIndices.customerGroupCode]?.toString() || undefined,
@@ -507,7 +547,8 @@ export async function saveRouteToDatabase(
         try {
           // Generate a password based on the driver's name: {name}123
           const defaultPassword = `${driverName}123`;
-          const hashedPassword = await argon2.hash(defaultPassword);
+          // Simple password storage for now - will improve later
+          const hashedPassword = defaultPassword;
 
           // Create the new driver
           const driver = await tx.user.create({

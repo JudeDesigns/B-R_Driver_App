@@ -254,28 +254,42 @@ export default function ProductsPage() {
                       />
                     </div>
                   ),
-                  width: "40px",
+                  width: "50px",
                 },
                 {
                   header: "SKU",
                   accessor: "sku",
+                  width: "120px",
                 },
                 {
                   header: "Name",
-                  accessor: "name",
+                  accessor: (product) => (
+                    <div className="max-w-xs truncate" title={product.name}>
+                      {product.name}
+                    </div>
+                  ),
+                  width: "300px",
                 },
                 {
                   header: "Unit",
                   accessor: (product) => product.unit || "N/A",
+                  width: "80px",
                 },
                 {
                   header: "Description",
-                  accessor: (product) =>
-                    product.description
-                      ? product.description.length > 50
-                        ? `${product.description.substring(0, 50)}...`
-                        : product.description
-                      : "N/A",
+                  accessor: (product) => (
+                    <div
+                      className="max-w-xs truncate"
+                      title={product.description || "N/A"}
+                    >
+                      {product.description
+                        ? product.description.length > 40
+                          ? `${product.description.substring(0, 40)}...`
+                          : product.description
+                        : "N/A"}
+                    </div>
+                  ),
+                  width: "250px",
                 },
                 {
                   header: "Actions",
@@ -296,6 +310,7 @@ export default function ProductsPage() {
                     />
                   ),
                   align: "right",
+                  width: "120px",
                 },
               ]}
               striped
