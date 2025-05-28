@@ -33,6 +33,30 @@ export default function TodaysRoutesSidebar() {
     fetchTodaysRoutes();
   }, []);
 
+  // Refresh routes when pathname changes (when navigating to different routes)
+  useEffect(() => {
+    if (pathname.includes('/admin/routes/')) {
+      fetchTodaysRoutes();
+    }
+  }, [pathname]);
+
+  // Listen for route updates via custom events
+  useEffect(() => {
+    const handleRouteUpdate = () => {
+      console.log('Route updated, refreshing sidebar...');
+      fetchTodaysRoutes();
+    };
+
+    // Listen for custom route update events
+    window.addEventListener('routeUpdated', handleRouteUpdate);
+    window.addEventListener('routeUploaded', handleRouteUpdate);
+
+    return () => {
+      window.removeEventListener('routeUpdated', handleRouteUpdate);
+      window.removeEventListener('routeUploaded', handleRouteUpdate);
+    };
+  }, []);
+
   const fetchTodaysRoutes = async () => {
     setLoading(true);
     setError("");

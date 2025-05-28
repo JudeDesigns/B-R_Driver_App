@@ -200,6 +200,15 @@ export default function RouteUploadPage() {
 
       setSuccess(true);
       setResult(data);
+
+      // Dispatch custom event to notify sidebar to refresh
+      window.dispatchEvent(new CustomEvent('routeUploaded', {
+        detail: {
+          routeId: data.routeId,
+          routeNumber: data.routeNumber,
+          isUpdate: data.isUpdate
+        }
+      }));
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred during upload";

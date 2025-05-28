@@ -164,7 +164,7 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     const columnIndices = {
       routeNumber: headerMap.get("Route #") ?? -1,
       driver: headerMap.get("Driver") ?? -1,
-      sequence: (headerMap.get("Driver") ?? -1) + 1, // The sequence is in the column after Driver
+      sequence: 3, // Column D (index 3) contains the delivery sequence numbers (1,2,3,4...)
       customerName: headerMap.get("Customers") ?? -1,
       customerGroupCode: headerMap.get("Customer GROUP CODE") ?? -1,
       customerEmail: headerMap.get("Customer Email") ?? -1,
@@ -693,6 +693,62 @@ export async function saveRouteToDatabase(
         const timestamp = Date.now().toString().slice(-6);
         parsedRoute.routeNumber = `${parsedRoute.routeNumber}-${timestamp}`;
         console.log(`Creating new route with modified number: ${parsedRoute.routeNumber}`);
+      } else if (existingRoute) {
+        // Default behavior: update existing route instead of creating with timestamp
+        route = await tx.route.update({
+          where: { id: existingRoute.id },
+          data: {
+            date: parsedRoute.date,
+            uploadedBy: uploadedBy,
+            sourceFile: fileName,
+            // Don't change the status if it's already in progress or completed
+            status: ["IN_PROGRESS", "COMPLETED"].includes(existingRoute.status)
+              ? existingRoute.status
+              : "PENDING",
+          },
+        });
+
+        // Handle existing stops deletion and customer invoice mapping (same as above)
+        const existingStops = await tx.stop.findMany({
+          where: { routeId: route.id },
+          select: { id: true },
+        });
+
+        if (existingStops.length > 0) {
+          await tx.adminNote.deleteMany({
+            where: {
+              stopId: {
+                in: existingStops.map((stop) => stop.id),
+              },
+            },
+          });
+        }
+
+        const existingStopsWithData = await tx.stop.findMany({
+          where: { routeId: route.id },
+          select: {
+            id: true,
+            customerNameFromUpload: true,
+            quickbooksInvoiceNum: true,
+            orderNumberWeb: true,
+          },
+        });
+
+        for (const stop of existingStopsWithData) {
+          if (stop.customerNameFromUpload) {
+            customerInvoiceMap.set(stop.customerNameFromUpload, {
+              quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
+              orderNumberWeb: stop.orderNumberWeb,
+            });
+          }
+        }
+
+        await tx.stop.deleteMany({
+          where: { routeId: route.id },
+        });
+
+        isUpdate = true;
+        console.log(`Updating existing route: ${parsedRoute.routeNumber}`);
       }
     }
 
