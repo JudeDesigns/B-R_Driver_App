@@ -135,10 +135,7 @@ export default function RouteUploadPage() {
       });
       setShowPreview(true);
 
-      // If there's a conflict, show the confirmation dialog
-      if (conflictData.hasConflict) {
-        setShowConfirmDialog(true);
-      }
+      // Don't automatically show the dialog - let user click "Resolve Conflict" button
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred during preview";
@@ -166,6 +163,61 @@ export default function RouteUploadPage() {
     if (fileExtension !== "xlsx" && fileExtension !== "xls") {
       setError("Please upload a valid Excel file (.xlsx or .xls)");
       return;
+    }
+
+    // If no action is specified (direct upload), check for conflicts first
+    if (!action) {
+      setLoading(true);
+      setError("");
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Check for conflicts first
+        const conflictResponse = await fetch("/api/admin/routes/check-conflict", {
+          method: "POST",
+          body: formData,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const conflictData = await conflictResponse.json();
+
+        if (!conflictResponse.ok) {
+          throw new Error(
+            conflictData.message ||
+              (conflictData.errors && conflictData.errors.length > 0
+                ? conflictData.errors.join("; ")
+                : "Failed to check for conflicts")
+          );
+        }
+
+        // If there's a conflict, show the dialog and stop here
+        if (conflictData.hasConflict) {
+          setConflictDetected(true);
+          setExistingRoute(conflictData.existingRoute);
+          setPreview({
+            ...conflictData.newRoute,
+            ...conflictData.parseResult,
+            hasConflict: conflictData.hasConflict,
+            existingRoute: conflictData.existingRoute,
+          });
+          setShowPreview(true);
+          setShowConfirmDialog(true);
+          setLoading(false);
+          return;
+        }
+
+        // No conflict, proceed with upload
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : "An error occurred during conflict check";
+        setError(errorMessage);
+        setLoading(false);
+        return;
+      }
     }
 
     setLoading(true);
@@ -788,7 +840,7 @@ export default function RouteUploadPage() {
               <div className="mb-6">
                 <p className="text-gray-700 mb-4">
                   A route with the number <strong>{existingRoute.routeNumber}</strong> already exists.
-                  What would you like to do?
+                  Choose how to handle this conflict:
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -851,8 +903,8 @@ export default function RouteUploadPage() {
               </div>
 
               <div className="mt-4 text-sm text-gray-600">
-                <p><strong>Update Existing Route:</strong> Replaces all stops in the existing route with the new data.</p>
-                <p><strong>Create New Route:</strong> Creates a new route with a modified route number.</p>
+                <p><strong>Update Existing Route:</strong> Intelligently merges new data with existing stops. Updates existing stops and adds new ones while preserving completed deliveries.</p>
+                <p><strong>Create New Route:</strong> Deletes the old route completely and creates a fresh one with the same route number.</p>
               </div>
             </div>
           </div>

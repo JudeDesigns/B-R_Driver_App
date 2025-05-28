@@ -619,136 +619,143 @@ export async function saveRouteToDatabase(
         },
       });
 
-      // Determine whether to update based on action parameter
-      const shouldUpdate = action === 'update' || (action !== 'create' && existingRoute);
+      if (existingRoute) {
+        console.log(`Existing route found. Action: ${action || 'default'}`);
 
-      if (existingRoute && shouldUpdate) {
-        // Update the existing route
-        route = await tx.route.update({
-          where: { id: existingRoute.id },
-          data: {
-            date: parsedRoute.date,
-            uploadedBy: uploadedBy,
-            sourceFile: fileName,
-            // Don't change the status if it's already in progress or completed
-            status: ["IN_PROGRESS", "COMPLETED"].includes(existingRoute.status)
-              ? existingRoute.status
-              : "PENDING",
-          },
-        });
+        if (action === 'create') {
+          // Delete the existing route completely and create a fresh one
+          console.log(`Deleting existing route ${existingRoute.routeNumber} to create fresh one`);
 
-        // First, get all stops for this route
-        const existingStops = await tx.stop.findMany({
-          where: { routeId: route.id },
-          select: { id: true },
-        });
-
-        // Delete all admin notes associated with these stops
-        if (existingStops.length > 0) {
-          await tx.adminNote.deleteMany({
-            where: {
-              stopId: {
-                in: existingStops.map((stop) => stop.id),
-              },
-            },
+          // First, get all stops for this route to delete admin notes
+          const existingStops = await tx.stop.findMany({
+            where: { routeId: existingRoute.id },
+            select: { id: true },
           });
-        }
 
-        // Get all existing stops with their data before deleting
-        const existingStopsWithData = await tx.stop.findMany({
-          where: { routeId: route.id },
-          select: {
-            id: true,
-            customerNameFromUpload: true,
-            quickbooksInvoiceNum: true,
-            orderNumberWeb: true,
-          },
-        });
-
-        // Populate the customerInvoiceMap with data from existing stops
-        for (const stop of existingStopsWithData) {
-          if (stop.customerNameFromUpload) {
-            customerInvoiceMap.set(stop.customerNameFromUpload, {
-              quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
-              orderNumberWeb: stop.orderNumberWeb,
+          // Delete all admin notes associated with these stops
+          if (existingStops.length > 0) {
+            await tx.adminNote.deleteMany({
+              where: {
+                stopId: {
+                  in: existingStops.map((stop) => stop.id),
+                },
+              },
             });
           }
-        }
 
-        // Now delete all existing stops for this route
-        await tx.stop.deleteMany({
-          where: { routeId: route.id },
-        });
+          // Delete all stops for this route
+          await tx.stop.deleteMany({
+            where: { routeId: existingRoute.id },
+          });
 
-        // Log the customer invoice map for debugging
-        console.log(
-          "Customer invoice map:",
-          Object.fromEntries(customerInvoiceMap)
-        );
+          // Delete all safety checks for this route
+          await tx.safetyCheck.deleteMany({
+            where: { routeId: existingRoute.id },
+          });
 
-        isUpdate = true;
-        console.log(`Updating existing route: ${parsedRoute.routeNumber}`);
-      } else if (existingRoute && action === 'create') {
-        // Force create a new route with a modified route number
-        const timestamp = Date.now().toString().slice(-6);
-        parsedRoute.routeNumber = `${parsedRoute.routeNumber}-${timestamp}`;
-        console.log(`Creating new route with modified number: ${parsedRoute.routeNumber}`);
-      } else if (existingRoute) {
-        // Default behavior: update existing route instead of creating with timestamp
-        route = await tx.route.update({
-          where: { id: existingRoute.id },
-          data: {
-            date: parsedRoute.date,
-            uploadedBy: uploadedBy,
-            sourceFile: fileName,
-            // Don't change the status if it's already in progress or completed
-            status: ["IN_PROGRESS", "COMPLETED"].includes(existingRoute.status)
-              ? existingRoute.status
-              : "PENDING",
-          },
-        });
+          // Delete the route itself
+          await tx.route.delete({
+            where: { id: existingRoute.id },
+          });
 
-        // Handle existing stops deletion and customer invoice mapping (same as above)
-        const existingStops = await tx.stop.findMany({
-          where: { routeId: route.id },
-          select: { id: true },
-        });
-
-        if (existingStops.length > 0) {
-          await tx.adminNote.deleteMany({
-            where: {
-              stopId: {
-                in: existingStops.map((stop) => stop.id),
-              },
+          console.log(`Deleted existing route ${existingRoute.routeNumber} completely`);
+          // Route will be created fresh below with same route number
+        } else {
+          // Smart update: merge new data with existing route
+          console.log(`Performing smart update for route ${existingRoute.routeNumber}`);
+          route = await tx.route.update({
+            where: { id: existingRoute.id },
+            data: {
+              date: parsedRoute.date,
+              uploadedBy: uploadedBy,
+              sourceFile: fileName,
+              // Don't change the status if it's already in progress or completed
+              status: ["IN_PROGRESS", "COMPLETED"].includes(existingRoute.status)
+                ? existingRoute.status
+                : "PENDING",
             },
           });
-        }
 
-        const existingStopsWithData = await tx.stop.findMany({
-          where: { routeId: route.id },
-          select: {
-            id: true,
-            customerNameFromUpload: true,
-            quickbooksInvoiceNum: true,
-            orderNumberWeb: true,
-          },
-        });
+          // Get all existing stops with full data for intelligent merging
+          const existingStopsWithData = await tx.stop.findMany({
+            where: { routeId: route.id },
+            include: {
+              customer: true,
+            },
+          });
 
-        for (const stop of existingStopsWithData) {
-          if (stop.customerNameFromUpload) {
-            customerInvoiceMap.set(stop.customerNameFromUpload, {
-              quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
-              orderNumberWeb: stop.orderNumberWeb,
-            });
+          // Create maps for quick lookup
+          const existingStopsByCustomer = new Map<string, any>();
+          const existingStopsBySequence = new Map<number, any>();
+
+          for (const stop of existingStopsWithData) {
+            const customerKey = stop.customerNameFromUpload || stop.customer.name;
+            existingStopsByCustomer.set(customerKey, stop);
+            existingStopsBySequence.set(stop.sequence, stop);
           }
+
+          // Track which existing stops we've matched
+          const matchedStopIds = new Set<string>();
+
+          // Process each new stop for intelligent merging
+          const newStopsToProcess: ParsedStop[] = [];
+
+          for (const newStop of parsedRoute.stops) {
+            // Try to find existing stop by customer name first
+            let existingStop = existingStopsByCustomer.get(newStop.customerName);
+
+            // If not found by customer, try by sequence number
+            if (!existingStop) {
+              existingStop = existingStopsBySequence.get(newStop.sequence);
+            }
+
+            if (existingStop) {
+              // Update existing stop with new information
+              console.log(`Updating existing stop for ${newStop.customerName} (sequence ${newStop.sequence})`);
+
+              await tx.stop.update({
+                where: { id: existingStop.id },
+                data: {
+                  sequence: newStop.sequence,
+                  customerNameFromUpload: newStop.customerName,
+                  driverNameFromUpload: newStop.driverName,
+                  // Update invoice numbers only if they're provided and different
+                  quickbooksInvoiceNum: newStop.quickbooksInvoiceNum || existingStop.quickbooksInvoiceNum,
+                  orderNumberWeb: newStop.orderNumberWeb || existingStop.orderNumberWeb,
+                  initialDriverNotes: newStop.initialDriverNotes || existingStop.initialDriverNotes,
+                  isCOD: newStop.isCOD,
+                  paymentFlagCash: newStop.paymentFlagCash,
+                  paymentFlagCheck: newStop.paymentFlagCheck,
+                  paymentFlagCC: newStop.paymentFlagCC,
+                  paymentFlagNotPaid: newStop.paymentFlagNotPaid,
+                  returnFlagInitial: newStop.returnFlagInitial,
+                  driverRemarkInitial: newStop.driverRemarkInitial,
+                  amount: newStop.amount !== undefined ? newStop.amount : existingStop.amount,
+                },
+              });
+
+              matchedStopIds.add(existingStop.id);
+
+              // Preserve existing invoice data in the map for any new stops
+              customerInvoiceMap.set(newStop.customerName, {
+                quickbooksInvoiceNum: existingStop.quickbooksInvoiceNum,
+                orderNumberWeb: existingStop.orderNumberWeb,
+              });
+            } else {
+              // This is a new stop, add it to the list to be created
+              newStopsToProcess.push(newStop);
+              console.log(`New stop detected for ${newStop.customerName} (sequence ${newStop.sequence})`);
+            }
+          }
+
+          // Update parsedRoute.stops to only contain the new stops that need to be created
+          parsedRoute.stops = newStopsToProcess;
+
+          isUpdate = true;
+          console.log(`Smart update completed for route: ${parsedRoute.routeNumber}`);
+          console.log(`- Updated ${matchedStopIds.size} existing stops`);
+          console.log(`- Will create ${newStopsToProcess.length} new stops`);
         }
-
-        await tx.stop.deleteMany({
-          where: { routeId: route.id },
-        });
-
-        isUpdate = true;
-        console.log(`Updating existing route: ${parsedRoute.routeNumber}`);
       }
     }
 
@@ -767,12 +774,14 @@ export async function saveRouteToDatabase(
     }
 
     // Performance optimization: Batch process customers
-    // First, get all unique customer names
+    // First, get all unique customer names (only for new stops if this is an update)
     const customerNamesSet = new Set<string>();
     for (const stop of parsedRoute.stops) {
       customerNamesSet.add(stop.customerName);
     }
     const customerNames = Array.from(customerNamesSet);
+
+    console.log(`Processing ${parsedRoute.stops.length} stops for customer creation/updates`);
 
     // Batch query existing customers
     const existingCustomers = await tx.customer.findMany({
@@ -872,7 +881,7 @@ export async function saveRouteToDatabase(
       );
     }
 
-    // Process each stop
+    // Process each stop (only new stops if this is an update)
     for (const parsedStop of parsedRoute.stops) {
       // Get the customer for this stop
       const customer = customerMap.get(parsedStop.customerName);
@@ -946,7 +955,7 @@ export async function saveRouteToDatabase(
         returnFlagInitial: parsedStop.returnFlagInitial,
         driverRemarkInitial: parsedStop.driverRemarkInitial,
         amount: parsedStop.amount,
-        status: "PENDING",
+        status: "PENDING" as const,
         // Store the driver name for reference
         driverNameFromUpload: parsedStop.driverName,
       };
