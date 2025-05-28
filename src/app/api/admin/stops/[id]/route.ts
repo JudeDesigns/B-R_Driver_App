@@ -79,13 +79,15 @@ export async function GET(
       return NextResponse.json({ message: "Stop not found" }, { status: 404 });
     }
 
-    // Log the stop details for debugging
-    console.log("Admin stop details:", {
-      id: stop.id,
-      customerName: stop.customer.name,
-      quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
-      orderNumberWeb: stop.orderNumberWeb,
-    });
+    // Log the stop details for debugging in development only
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Admin stop details:", {
+        id: stop.id,
+        customerName: stop.customer.name,
+        quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
+        orderNumberWeb: stop.orderNumberWeb,
+      });
+    }
 
     return NextResponse.json(stop);
   } catch (error) {

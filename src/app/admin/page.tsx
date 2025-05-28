@@ -128,7 +128,9 @@ export default function AdminDashboard() {
         throw new Error(data.message || "Failed to fetch dashboard data");
       }
 
-      console.log("Parsed data:", data);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Parsed data:", data);
+      }
       setRoutes(data.todaysRoutes || []);
       setStats(
         data.stats || {

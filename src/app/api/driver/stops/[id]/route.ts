@@ -80,13 +80,15 @@ export async function GET(
       },
     });
 
-    // Log the stop details for debugging
-    console.log("Driver stop details:", {
-      id: stop?.id,
-      customerName: stop?.customer?.name,
-      quickbooksInvoiceNum: stop?.quickbooksInvoiceNum,
-      orderNumberWeb: stop?.orderNumberWeb,
-    });
+    // Log the stop details for debugging in development only
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Driver stop details:", {
+        id: stop?.id,
+        customerName: stop?.customer?.name,
+        quickbooksInvoiceNum: stop?.quickbooksInvoiceNum,
+        orderNumberWeb: stop?.orderNumberWeb,
+      });
+    }
 
     if (!stop) {
       return NextResponse.json({ message: "Stop not found" }, { status: 404 });
@@ -523,13 +525,17 @@ export async function PATCH(
                 timestamp: new Date().toISOString(),
               });
 
-              console.log(
-                `Automatically updated next stop ${updatedNextStop.id} to ON_THE_WAY for driver ${decoded.username}`
-              );
+              if (process.env.NODE_ENV !== "production") {
+                console.log(
+                  `Automatically updated next stop ${updatedNextStop.id} to ON_THE_WAY for driver ${decoded.username}`
+                );
+              }
             } else {
-              console.log(
-                `Next stop ${nextPendingStop.id} not found or not in PENDING status. Current status: ${checkStop?.status}`
-              );
+              if (process.env.NODE_ENV !== "production") {
+                console.log(
+                  `Next stop ${nextPendingStop.id} not found or not in PENDING status. Current status: ${checkStop?.status}`
+                );
+              }
             }
           } catch (error) {
             console.error("Error updating next stop:", error);

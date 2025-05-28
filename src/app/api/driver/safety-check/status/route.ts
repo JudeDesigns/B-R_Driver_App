@@ -188,14 +188,16 @@ export async function GET(request: NextRequest) {
           })
         : [];
 
-    // Log detailed information for debugging
-    console.log("Safety check status API response:", {
-      allRouteIds: routeIds,
-      completedStartOfDayIds: Array.from(completedRouteIds),
-      completedEndOfDayIds: Array.from(completedEndOfDayRouteIds),
-      routesNeedingStartChecks: routesNeedingStartChecks,
-      routesNeedingEndChecks: routesNeedingEndChecks,
-    });
+    // Log detailed information for debugging in development only
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Safety check status API response:", {
+        allRouteIds: routeIds,
+        completedStartOfDayIds: Array.from(completedRouteIds),
+        completedEndOfDayIds: Array.from(completedEndOfDayRouteIds),
+        routesNeedingStartChecks: routesNeedingStartChecks,
+        routesNeedingEndChecks: routesNeedingEndChecks,
+      });
+    }
 
     return NextResponse.json({
       hasCompletedChecks: routesNeedingStartChecks.length === 0,

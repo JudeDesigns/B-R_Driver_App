@@ -19,10 +19,12 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     if (!username || !password) {
-      console.log("Missing credentials:", {
-        username: !!username,
-        password: !!password,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Missing credentials:", {
+          username: !!username,
+          password: !!password,
+        });
+      }
       return NextResponse.json(
         { message: "Username and password are required" },
         { status: 400 }

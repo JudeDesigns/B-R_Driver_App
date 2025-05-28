@@ -242,9 +242,11 @@ export default function StopDetailPage({
     stop?.id || null,
     [], // We're not using the admin notes array directly
     (newNote) => {
-      console.log(
-        `[OptimizedSocket] Received new admin note without full refetch: "${newNote.note}"`
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          `[OptimizedSocket] Received new admin note without full refetch: "${newNote.note}"`
+        );
+      }
       // Show notification
       setNotificationVisible(true);
 
@@ -255,9 +257,11 @@ export default function StopDetailPage({
 
       // Update the admin notes in the local state without a full refetch
       if (stop) {
-        console.log(
-          `[OptimizedSocket] Updating admin notes for stop ${stop.id}`
-        );
+        if (process.env.NODE_ENV !== "production") {
+          console.log(
+            `[OptimizedSocket] Updating admin notes for stop ${stop.id}`
+          );
+        }
         // Refresh stop details to get the updated admin notes
         fetchStopDetails();
       }

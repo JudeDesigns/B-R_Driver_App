@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 
 // Import prisma client
 import prisma from "./db";
+import { getJwtSecret } from "./env";
 
 // Function to authenticate a user
 export async function authenticateUser(username: string, password: string) {
@@ -103,10 +104,7 @@ export async function authenticateUser(username: string, password: string) {
 
 // Function to generate a JWT token
 export function generateToken(payload: Record<string, unknown>) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET environment variable is required");
-  }
+  const secret = getJwtSecret();
   // Reduced token expiration to 24 hours for better security
   return jwt.sign(payload, secret, {
     expiresIn: "24h",
@@ -121,10 +119,7 @@ export function verifyToken(token: string) {
     return null;
   }
 
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET environment variable is required");
-  }
+  const secret = getJwtSecret();
 
   try {
     const decoded = jwt.verify(token, secret, {

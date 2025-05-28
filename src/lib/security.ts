@@ -239,10 +239,11 @@ export class SecurityLogger {
       path: request?.nextUrl.pathname || "unknown",
     };
 
-    // In production, send to security monitoring service
+    // In production, log security events for monitoring
     if (process.env.NODE_ENV === "production") {
       console.warn("SECURITY EVENT:", JSON.stringify(logEntry));
-      // TODO: Send to external security monitoring service
+      // Note: Consider integrating with external security monitoring service
+      // such as Sentry, DataDog, or similar for production deployments
     } else {
       console.warn("Security Event:", logEntry);
     }

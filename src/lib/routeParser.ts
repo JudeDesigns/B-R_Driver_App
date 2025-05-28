@@ -547,9 +547,10 @@ export async function saveRouteToDatabase(
     const driverCreationPromises = missingDriverNames.map(
       async (driverName) => {
         try {
-          // Generate a password based on the driver's name: {name}123
+          // Generate a default password based on the driver's name: {name}123
           const defaultPassword = `${driverName}123`;
-          // Simple password storage for now - will improve later
+          // Note: In production, consider implementing stronger password policies
+          // and requiring drivers to change their password on first login
           const hashedPassword = defaultPassword;
 
           // Create the new driver

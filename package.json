@@ -7,19 +7,23 @@
     "build": "prisma generate && next build",
     "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:prod": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:migrate": "node scripts/migrate-db.js",
     "db:seed": "node scripts/seed-db.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
-
-    "deploy:setup": "npm ci && npm run build && npm run db:setup",
+    "db:setup:prod": "npm run prisma:migrate:prod && npm run db:seed",
+    "deploy:setup": "npm ci && npm run build && npm run db:setup:prod",
     "deploy:start": "pm2 start ecosystem.config.js --env production",
     "deploy:restart": "pm2 restart br-driver-app",
     "deploy:stop": "pm2 stop br-driver-app",
-    "deploy:logs": "pm2 logs br-driver-app"
+    "deploy:logs": "pm2 logs br-driver-app",
+    "docker:build": "docker build -t br-driver-app .",
+    "docker:run": "docker run -d --name br-driver-app -p 3000:3000 --env-file .env.production br-driver-app"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",

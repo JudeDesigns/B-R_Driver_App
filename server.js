@@ -3,6 +3,14 @@ const { parse } = require("url");
 const next = require("next");
 const { initSocketIO } = require("./src/lib/socket");
 
+// Validate environment variables on startup
+try {
+  require("./src/lib/env").validateEnvironment();
+} catch (error) {
+  console.error("Environment validation failed:", error.message);
+  process.exit(1);
+}
+
 // Environment configuration
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
