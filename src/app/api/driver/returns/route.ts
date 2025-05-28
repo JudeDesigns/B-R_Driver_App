@@ -52,18 +52,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get the driver's information first
+    const driver = await prisma.user.findUnique({
+      where: {
+        id: decoded.id,
+      },
+      select: {
+        username: true,
+        fullName: true,
+      },
+    });
+
+    if (!driver) {
+      return NextResponse.json(
+        { message: "Driver not found" },
+        { status: 404 }
+      );
+    }
+
+    const driverName = driver.fullName || driver.username;
+
     // Check if stop exists and belongs to the driver
     const stop = await prisma.stop.findUnique({
       where: {
         id: stopId,
-        route: {
-          id: routeId,
-        },
+        isDeleted: false,
       },
       include: {
         route: {
-          include: {
-            drivers: true,
+          select: {
+            id: true,
+            driverId: true,
+            status: true,
           },
         },
       },
@@ -71,15 +91,27 @@ export async function POST(request: NextRequest) {
 
     if (!stop) {
       return NextResponse.json(
-        { message: "Stop not found or does not belong to the specified route" },
+        { message: "Stop not found" },
         { status: 404 }
       );
     }
 
-    // Check if the driver is assigned to the route
-    const isDriverAssigned = stop.route.drivers.some(
-      (driver) => driver.id === decoded.id
-    );
+    // Check if the route ID matches
+    if (stop.route.id !== routeId) {
+      return NextResponse.json(
+        { message: "Stop does not belong to the specified route" },
+        { status: 400 }
+      );
+    }
+
+    // Check if the driver is assigned to this specific stop or route
+    // Driver can be assigned in two ways:
+    // 1. Direct route assignment (route.driverId)
+    // 2. Stop-specific assignment (stop.driverNameFromUpload)
+    const isDriverAssigned =
+      stop.route.driverId === decoded.id ||
+      stop.driverNameFromUpload === driverName ||
+      stop.driverNameFromUpload === driver.username;
 
     if (!isDriverAssigned && decoded.role !== "ADMIN") {
       return NextResponse.json(
@@ -88,51 +120,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create a new return record
-    const returnNumber = `RET-${Date.now().toString().slice(-6)}`;
+    // Create return records for each item (using the actual schema)
+    const createdReturns = [];
 
-    const newReturn = await prisma.return.create({
-      data: {
-        returnNumber,
-        returnDate: new Date(),
-        notes,
-        status: "PENDING",
-        order: {
-          connect: { id: stopId }, // Using stopId as orderId for now
+    for (const item of returnItems) {
+      const newReturn = await prisma.return.create({
+        data: {
+          stopId: stopId,
+          orderItemIdentifier: item.productId, // Keep for backward compatibility
+          productDescription: `${item.productName || 'Product'} (${item.productCode || 'N/A'})`, // Keep for backward compatibility
+          productId: item.productId, // Add this line to use the relation
+          quantity: item.quantity,
+          reasonCode: item.reason || "Driver return",
+          warehouseLocation: null,
+          vendorCreditNum: null,
         },
-        returnItems: {
-          create: returnItems.map((item) => ({
-            quantity: item.quantity,
-            reason: item.reason || null,
-            condition: "GOOD", // Default condition
-            notes: null, // No notes needed
-            product: {
-              connect: { id: item.productId },
-            },
-          })),
-        },
-      },
-      include: {
-        returnItems: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
-
-    // Update the stop status to include return information
-    await prisma.stop.update({
-      where: { id: stopId },
-      data: {
-        hasReturns: true,
-        returnNotes: notes || "Return submitted",
-      },
-    });
+      });
+      createdReturns.push(newReturn);
+    }
 
     return NextResponse.json({
-      message: "Return created successfully",
-      return: newReturn,
+      message: "Returns created successfully",
+      returns: createdReturns,
+      count: createdReturns.length,
     });
   } catch (error) {
     console.error("Error creating return:", error);

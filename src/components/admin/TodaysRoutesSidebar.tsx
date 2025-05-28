@@ -172,9 +172,7 @@ export default function TodaysRoutesSidebar() {
                         : "group-hover:translate-x-1"
                     }`}
                   >
-                    {route.routeNumber
-                      ? `Route ${route.routeNumber}`
-                      : `Route #${route.id.substring(0, 8)}`}
+                    {route.routeNumber || `Route #${route.id.substring(0, 8)}`}
                   </span>
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded-full ${
@@ -192,11 +190,11 @@ export default function TodaysRoutesSidebar() {
                   <span className="text-xs text-gray-400">
                     {route.completedStops}/{route.totalStops} stops
                   </span>
-                  <span className="text-xs text-gray-400">
-                    {route.driver?.fullName ||
-                      route.driver?.username ||
-                      "No driver"}
-                  </span>
+                  {(route.driver?.fullName || route.driver?.username) && (
+                    <span className="text-xs text-gray-400">
+                      {route.driver.fullName || route.driver.username}
+                    </span>
+                  )}
                 </div>
               </Link>
             ))

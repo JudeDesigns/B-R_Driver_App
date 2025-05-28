@@ -51,6 +51,80 @@ async function main() {
     });
     console.log("Created customer:", customer2.name);
 
+    // Create sample products for testing returns functionality
+    const sampleProducts = [
+      {
+        name: "Fresh Tomatoes",
+        sku: "TOMATO-001",
+        description: "Fresh red tomatoes, 25 lb case",
+        unit: "case",
+      },
+      {
+        name: "Ground Beef",
+        sku: "BEEF-001",
+        description: "80/20 Ground beef, 10 lb package",
+        unit: "package",
+      },
+      {
+        name: "Chicken Breast",
+        sku: "CHICKEN-001",
+        description: "Boneless chicken breast, 5 lb package",
+        unit: "package",
+      },
+      {
+        name: "White Onions",
+        sku: "ONION-001",
+        description: "White onions, 50 lb bag",
+        unit: "bag",
+      },
+      {
+        name: "Lettuce",
+        sku: "LETTUCE-001",
+        description: "Iceberg lettuce, 24 count case",
+        unit: "case",
+      },
+      {
+        name: "Cheddar Cheese",
+        sku: "CHEESE-001",
+        description: "Sharp cheddar cheese, 5 lb block",
+        unit: "block",
+      },
+      {
+        name: "Bread Rolls",
+        sku: "BREAD-001",
+        description: "Hamburger buns, 8 count package",
+        unit: "package",
+      },
+      {
+        name: "Olive Oil",
+        sku: "OIL-001",
+        description: "Extra virgin olive oil, 1 gallon",
+        unit: "gallon",
+      },
+      {
+        name: "Salt",
+        sku: "SALT-001",
+        description: "Table salt, 26 oz container",
+        unit: "container",
+      },
+      {
+        name: "Black Pepper",
+        sku: "PEPPER-001",
+        description: "Ground black pepper, 16 oz container",
+        unit: "container",
+      },
+    ];
+
+    console.log("Creating sample products...");
+    for (const productData of sampleProducts) {
+      const product = await prisma.product.upsert({
+        where: { sku: productData.sku },
+        update: {},
+        create: productData,
+      });
+      console.log(`Created product: ${product.name} (${product.sku})`);
+    }
+
     console.log("Database seeding completed successfully!");
   } catch (error) {
     console.error("Error seeding database:", error);

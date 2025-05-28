@@ -472,12 +472,14 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
  * @param parsedRoute The parsed route data
  * @param uploadedBy ID of the admin who uploaded the route
  * @param fileName Name of the uploaded file
+ * @param action Action to take: 'create', 'update', or null for auto-detect
  * @returns The created or updated route with stops
  */
 export async function saveRouteToDatabase(
   parsedRoute: ParsedRoute,
   uploadedBy: string,
-  fileName: string
+  fileName: string,
+  action?: string | null
 ): Promise<{ route: Route; isUpdate: boolean }> {
   // Performance optimization: Use a more efficient transaction with optimized batch operations
   return await prisma.$transaction(async (tx) => {
@@ -616,7 +618,10 @@ export async function saveRouteToDatabase(
         },
       });
 
-      if (existingRoute) {
+      // Determine whether to update based on action parameter
+      const shouldUpdate = action === 'update' || (action !== 'create' && existingRoute);
+
+      if (existingRoute && shouldUpdate) {
         // Update the existing route
         route = await tx.route.update({
           where: { id: existingRoute.id },
@@ -682,6 +687,11 @@ export async function saveRouteToDatabase(
 
         isUpdate = true;
         console.log(`Updating existing route: ${parsedRoute.routeNumber}`);
+      } else if (existingRoute && action === 'create') {
+        // Force create a new route with a modified route number
+        const timestamp = Date.now().toString().slice(-6);
+        parsedRoute.routeNumber = `${parsedRoute.routeNumber}-${timestamp}`;
+        console.log(`Creating new route with modified number: ${parsedRoute.routeNumber}`);
       }
     }
 

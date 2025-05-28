@@ -467,12 +467,15 @@ export async function PATCH(
         // Find the current stop's index
         const currentStopIndex = routeStops.findIndex((s) => s.id === id);
 
-        // Find the next stop that's PENDING
+        // Find the next stop that's PENDING and assigned to the same driver
         const nextPendingStop = routeStops.find(
-          (s, index) => index > currentStopIndex && s.status === "PENDING"
+          (s, index) =>
+            index > currentStopIndex &&
+            s.status === "PENDING" &&
+            s.driverNameFromUpload === decoded.username
         );
 
-        // If there's a next pending stop, update it to ON_THE_WAY
+        // If there's a next pending stop for the same driver, update it to ON_THE_WAY
         if (nextPendingStop) {
           try {
             // First check if the stop still exists and is still PENDING
@@ -521,7 +524,7 @@ export async function PATCH(
               });
 
               console.log(
-                `Automatically updated next stop ${updatedNextStop.id} to ON_THE_WAY`
+                `Automatically updated next stop ${updatedNextStop.id} to ON_THE_WAY for driver ${decoded.username}`
               );
             } else {
               console.log(

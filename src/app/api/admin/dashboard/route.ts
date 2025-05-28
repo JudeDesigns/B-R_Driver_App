@@ -184,6 +184,14 @@ export async function GET(request: NextRequest) {
         isDeleted: false,
       },
       select: {
+        driverId: true,
+        driver: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+          },
+        },
         routeId: true,
         route: {
           select: {
@@ -200,20 +208,22 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Then count unique routeIds
-    const uniqueRouteIds = new Set(
-      todaysSafetyChecks.map((check) => check.routeId)
-    );
-    const activeDrivers = uniqueRouteIds.size;
+    // Get unique drivers from safety checks (using driverId from safety check, not route)
+    const uniqueDriversMap = new Map();
 
-    // Get unique drivers
-    const uniqueDrivers = Array.from(
-      new Map(
-        todaysSafetyChecks
-          .filter((check) => check.route && check.route.driver) // Filter out any null values
-          .map((check) => [check.route.driverId, check.route.driver])
-      ).values()
-    );
+    todaysSafetyChecks.forEach((check) => {
+      // Prefer driver info from the safety check itself
+      if (check.driver) {
+        uniqueDriversMap.set(check.driverId, check.driver);
+      }
+      // Fallback to route driver info if safety check driver is null
+      else if (check.route && check.route.driver) {
+        uniqueDriversMap.set(check.route.driverId, check.route.driver);
+      }
+    });
+
+    const uniqueDrivers = Array.from(uniqueDriversMap.values());
+    const activeDrivers = uniqueDrivers.length;
 
     // Count ongoing deliveries (stops that are in progress)
     const ongoingDeliveries = await prisma.stop.count({

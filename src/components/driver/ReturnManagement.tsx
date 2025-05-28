@@ -99,8 +99,8 @@ export default function ReturnManagement({
     const newItem: ReturnItem = {
       id: `temp-${Date.now()}`, // Temporary ID until saved to database
       productId: selectedProduct.id,
-      productName: selectedProduct.productName,
-      productCode: selectedProduct.productCode,
+      productName: selectedProduct.name,
+      productCode: selectedProduct.sku,
       quantity,
       reason,
     };
@@ -146,6 +146,8 @@ export default function ReturnManagement({
           notes,
           returnItems: returnItems.map((item) => ({
             productId: item.productId,
+            productName: item.productName,
+            productCode: item.productCode,
             quantity: item.quantity,
             reason: item.reason,
           })),
@@ -284,14 +286,14 @@ export default function ReturnManagement({
                     key={product.id}
                     onClick={() => {
                       setSelectedProduct(product);
-                      setSearchTerm(product.productName);
+                      setSearchTerm(product.name);
                       setSearchResults([]);
                     }}
                     className="p-2 hover:bg-gray-100 cursor-pointer"
                   >
-                    <div className="font-medium">{product.productName}</div>
+                    <div className="font-medium">{product.name}</div>
                     <div className="text-sm text-gray-500">
-                      Code: {product.productCode} | Unit:{" "}
+                      Code: {product.sku} | Unit:{" "}
                       {product.unit || "N/A"}
                     </div>
                   </div>
@@ -301,9 +303,9 @@ export default function ReturnManagement({
 
             {selectedProduct && (
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                <div className="font-medium">{selectedProduct.productName}</div>
+                <div className="font-medium">{selectedProduct.name}</div>
                 <div className="text-sm">
-                  Code: {selectedProduct.productCode} | Unit:{" "}
+                  Code: {selectedProduct.sku} | Unit:{" "}
                   {selectedProduct.unit || "N/A"}
                 </div>
               </div>

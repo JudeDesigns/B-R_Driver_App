@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the uploaded file
+    // Get the uploaded file and action
     const formData = await request.formData();
     const file = formData.get("file") as File;
+    const action = formData.get("action") as string; // 'create', 'update', or null for auto-detect
 
     if (!file) {
       return NextResponse.json(
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
     const result = await saveRouteToDatabase(
       parseResult.route!,
       decoded.id,
-      uploadRecord.fileName
+      uploadRecord.fileName,
+      action
     );
 
     const { route, isUpdate } = result;

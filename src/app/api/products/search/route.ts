@@ -38,21 +38,20 @@ export async function GET(request: NextRequest) {
     const products = await prisma.product.findMany({
       where: {
         OR: [
-          { productName: { contains: term, mode: "insensitive" } },
-          { productCode: { contains: term, mode: "insensitive" } },
-          {
-            additionalSKUs: {
-              some: {
-                skuCode: { contains: term, mode: "insensitive" },
-              },
-            },
-          },
+          { name: { contains: term, mode: "insensitive" } },
+          { sku: { contains: term, mode: "insensitive" } },
+          { description: { contains: term, mode: "insensitive" } },
         ],
         isDeleted: false,
       },
-      include: {
-        inventory: true,
-        additionalSKUs: true,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        description: true,
+        unit: true,
+        createdAt: true,
+        updatedAt: true,
       },
       take: 20, // Limit results to 20 products
     });

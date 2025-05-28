@@ -17,6 +17,10 @@ interface Stop {
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
   initialDriverNotes: string | null;
+  arrivalTime: string | null;
+  completionTime: string | null;
+  signedInvoicePdfUrl: string | null;
+  driverNotes: string | null;
   isCOD: boolean;
   paymentFlagCash: boolean;
   paymentFlagCheck: boolean;
@@ -917,6 +921,29 @@ export default function StopDetailPage({
                     </p>
                   </div>
 
+                  {/* Delivery Times */}
+                  {(stop.arrivalTime || stop.completionTime) && (
+                    <div className="col-span-2">
+                      <h3 className="text-sm font-medium text-gray-500">
+                        Delivery Times
+                      </h3>
+                      <div className="mt-1 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500">Arrival</p>
+                          <p className="text-sm text-gray-900">
+                            {stop.arrivalTime ? formatDate(stop.arrivalTime) : "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Completion</p>
+                          <p className="text-sm text-gray-900">
+                            {stop.completionTime ? formatDate(stop.completionTime) : "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">
                       Payment Type
@@ -982,16 +1009,34 @@ export default function StopDetailPage({
                   </div>
                 </div>
 
-                {stop.initialDriverNotes && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">
-                      Driver Notes
-                    </h3>
-                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-900">
-                        {stop.initialDriverNotes}
-                      </p>
-                    </div>
+                {/* Driver Notes */}
+                {(stop.initialDriverNotes || stop.driverNotes) && (
+                  <div className="space-y-4">
+                    {stop.initialDriverNotes && (
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">
+                          Initial Driver Notes
+                        </h3>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-900">
+                            {stop.initialDriverNotes}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {stop.driverNotes && (
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">
+                          Completion Notes
+                        </h3>
+                        <div className="mt-1 p-3 bg-blue-50 rounded-lg">
+                          <p className="text-sm text-gray-900">
+                            {stop.driverNotes}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1088,6 +1133,121 @@ export default function StopDetailPage({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Signed Invoice PDF */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden mt-6">
+            <div className="px-6 py-4 border-b border-mono-200">
+              <h2 className="text-lg font-medium text-mono-800">Signed Invoice</h2>
+            </div>
+            <div className="p-6">
+              {stop.signedInvoicePdfUrl ? (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
+                    <svg
+                      className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-green-700 font-medium">
+                        Invoice photo uploaded and converted to PDF
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Driver has completed the invoice upload process
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <a
+                      href={stop.signedInvoicePdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition duration-200"
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      View PDF
+                    </a>
+
+                    <a
+                      href={stop.signedInvoicePdfUrl}
+                      download={`invoice-${stop.quickbooksInvoiceNum || stop.id}.pdf`}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition duration-200"
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3M4 16l4 4m0 0l4-4m-4 4V4"
+                        />
+                      </svg>
+                      Download PDF
+                    </a>
+                  </div>
+
+                  {/* PDF Preview */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                      <h3 className="text-sm font-medium text-gray-700">PDF Preview</h3>
+                    </div>
+                    <div className="p-4">
+                      <iframe
+                        src={stop.signedInvoicePdfUrl}
+                        className="w-full h-96 border-0"
+                        title="Signed Invoice PDF"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-300"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <p className="mt-2">No signed invoice uploaded yet</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    The driver will upload the signed invoice when completing the delivery
+                  </p>
                 </div>
               )}
             </div>

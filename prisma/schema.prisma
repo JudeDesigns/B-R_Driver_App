@@ -22,108 +22,108 @@ model User {
   isDeleted Boolean  @default(false)
 
   // Relations
-  routes        Route[]       @relation("DriverRoutes")
-  adminNotes    AdminNote[]   @relation("AdminNotes")
-  safetyChecks  SafetyCheck[] @relation("DriverSafetyChecks")
+  routes       Route[]       @relation("DriverRoutes")
+  adminNotes   AdminNote[]   @relation("AdminNotes")
+  safetyChecks SafetyCheck[] @relation("DriverSafetyChecks")
 
-  @@map("users")
   @@index([role])
   @@index([isDeleted])
+  @@map("users")
 }
 
 // Customer model
 model Customer {
-  id            String   @id @default(uuid())
-  name          String
-  address       String
-  contactInfo   String?
-  email         String?
-  preferences   String?
-  groupCode     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  isDeleted     Boolean  @default(false)
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  contactInfo String?
+  email       String?
+  preferences String?
+  groupCode   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
 
   // Relations
-  stops         Stop[]
+  stops Stop[]
 
-  @@map("customers")
   @@index([name])
   @@index([email])
   @@index([groupCode])
   @@index([isDeleted])
+  @@map("customers")
 }
 
 // Route model
 model Route {
-  id            String      @id @default(uuid())
-  routeNumber   String?
-  date          DateTime    @default(now())
-  status        RouteStatus @default(PENDING)
-  driverId      String?     // Made optional since routes can have multiple drivers
-  driver        User?       @relation("DriverRoutes", fields: [driverId], references: [id])
-  uploadedBy    String?     // ID of the admin who uploaded the route
-  uploadedAt    DateTime    @default(now())
-  sourceFile    String?     // Name of the uploaded file
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  isDeleted     Boolean     @default(false)
+  id          String      @id @default(uuid())
+  routeNumber String?
+  date        DateTime    @default(now())
+  status      RouteStatus @default(PENDING)
+  driverId    String? // Made optional since routes can have multiple drivers
+  driver      User?       @relation("DriverRoutes", fields: [driverId], references: [id])
+  uploadedBy  String? // ID of the admin who uploaded the route
+  uploadedAt  DateTime    @default(now())
+  sourceFile  String? // Name of the uploaded file
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  isDeleted   Boolean     @default(false)
 
   // Relations
-  stops         Stop[]
-  safetyChecks  SafetyCheck[]
+  stops        Stop[]
+  safetyChecks SafetyCheck[]
 
-  @@map("routes")
   @@index([routeNumber])
   @@index([date])
   @@index([status])
   @@index([driverId])
   @@index([isDeleted])
+  @@map("routes")
 }
 
 // Stop model
 model Stop {
-  id                  String      @id @default(uuid())
-  routeId             String
-  route               Route       @relation(fields: [routeId], references: [id])
-  customerId          String
-  customer            Customer    @relation(fields: [customerId], references: [id])
-  sequence            Int
-  address             String
-  customerNameFromUpload String?   // Original customer name from the upload
-  driverNameFromUpload  String?    // Original driver name from the upload
-  orderNumberWeb      String?     // Order # (Web) from the upload
-  quickbooksInvoiceNum String?    // Invoice # from the upload
-  initialDriverNotes  String?     // Notes to be updated at top of the INVOICE
-  status              StopStatus  @default(PENDING)
-  onTheWayTime        DateTime?   // Time when driver started the delivery (status changed to ON_THE_WAY)
-  arrivalTime         DateTime?   // Time when driver arrived at the stop (status changed to ARRIVED)
-  completionTime      DateTime?   // Time when delivery was completed (status changed to COMPLETED)
-  signedInvoicePdfUrl String?
-  driverNotes         String?     // Notes added by driver during delivery
-  isCOD               Boolean     @default(false)  // COD Account flag
-  paymentFlagCash     Boolean     @default(false)  // Cash payment flag
-  paymentFlagCheck    Boolean     @default(false)  // Check payment flag
-  paymentFlagCC       Boolean     @default(false)  // Credit Card payment flag
-  paymentFlagNotPaid  Boolean     @default(false)  // Not paid flag
-  returnFlagInitial   Boolean     @default(false)  // Return flag from upload
-  driverRemarkInitial String?     // Other Remarks from upload
-  amount              Float?      // Amount from the upload
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-  isDeleted           Boolean     @default(false)
+  id                     String     @id @default(uuid())
+  routeId                String
+  route                  Route      @relation(fields: [routeId], references: [id])
+  customerId             String
+  customer               Customer   @relation(fields: [customerId], references: [id])
+  sequence               Int
+  address                String
+  customerNameFromUpload String? // Original customer name from the upload
+  driverNameFromUpload   String? // Original driver name from the upload
+  orderNumberWeb         String? // Order # (Web) from the upload
+  quickbooksInvoiceNum   String? // Invoice # from the upload
+  initialDriverNotes     String? // Notes to be updated at top of the INVOICE
+  status                 StopStatus @default(PENDING)
+  onTheWayTime           DateTime? // Time when driver started the delivery (status changed to ON_THE_WAY)
+  arrivalTime            DateTime? // Time when driver arrived at the stop (status changed to ARRIVED)
+  completionTime         DateTime? // Time when delivery was completed (status changed to COMPLETED)
+  signedInvoicePdfUrl    String?
+  driverNotes            String? // Notes added by driver during delivery
+  isCOD                  Boolean    @default(false) // COD Account flag
+  paymentFlagCash        Boolean    @default(false) // Cash payment flag
+  paymentFlagCheck       Boolean    @default(false) // Check payment flag
+  paymentFlagCC          Boolean    @default(false) // Credit Card payment flag
+  paymentFlagNotPaid     Boolean    @default(false) // Not paid flag
+  returnFlagInitial      Boolean    @default(false) // Return flag from upload
+  driverRemarkInitial    String? // Other Remarks from upload
+  amount                 Float? // Amount from the upload
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  isDeleted              Boolean    @default(false)
 
   // Relations
-  returns             Return[]
-  adminNotes          AdminNote[]
+  returns    Return[]
+  adminNotes AdminNote[]
 
-  @@map("stops")
   @@index([routeId])
   @@index([customerId])
   @@index([status])
   @@index([driverNameFromUpload])
   @@index([isDeleted])
   @@index([sequence])
+  @@map("stops")
 }
 
 // Return model
@@ -131,8 +131,10 @@ model Return {
   id                  String   @id @default(uuid())
   stopId              String
   stop                Stop     @relation(fields: [stopId], references: [id])
-  orderItemIdentifier String   // Product ID or identifier
-  productDescription  String?  // Description of the returned product
+  orderItemIdentifier String // Product ID or identifier
+  productDescription  String? // Description of the returned product
+  productId           String? // Add this field
+  product             Product? @relation(fields: [productId], references: [id]) // Add this relation
   quantity            Int
   reasonCode          String
   warehouseLocation   String?
@@ -146,140 +148,141 @@ model Return {
 
 // AdminNote model
 model AdminNote {
-  id                  String   @id @default(uuid())
-  stopId              String
-  stop                Stop     @relation(fields: [stopId], references: [id])
-  adminId             String
-  admin               User     @relation("AdminNotes", fields: [adminId], references: [id])
-  note                String
-  readByDriver        Boolean  @default(false)
-  readByDriverAt      DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  isDeleted           Boolean  @default(false)
+  id             String    @id @default(uuid())
+  stopId         String
+  stop           Stop      @relation(fields: [stopId], references: [id])
+  adminId        String
+  admin          User      @relation("AdminNotes", fields: [adminId], references: [id])
+  note           String
+  readByDriver   Boolean   @default(false)
+  readByDriverAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isDeleted      Boolean   @default(false)
 
-  @@map("admin_notes")
   @@index([stopId])
   @@index([adminId])
   @@index([readByDriver])
   @@index([isDeleted])
+  @@map("admin_notes")
 }
 
 // SafetyCheck model
 model SafetyCheck {
-  id                  String        @id @default(uuid())
-  routeId             String
-  route               Route         @relation(fields: [routeId], references: [id])
-  driverId            String        // ID of the driver who submitted the safety check
-  driver              User          @relation("DriverSafetyChecks", fields: [driverId], references: [id])
-  type                ChecklistType
+  id               String        @id @default(uuid())
+  routeId          String
+  route            Route         @relation(fields: [routeId], references: [id])
+  driverId         String // ID of the driver who submitted the safety check
+  driver           User          @relation("DriverSafetyChecks", fields: [driverId], references: [id])
+  type             ChecklistType
   // Enhanced responses structure to match PRD requirements
   // Vehicle & Fuel Check fields
-  date                DateTime?     // Date field
-  mileage1            String?       // MIL #1
-  mileage2            String?       // MIL #2
-  dieselLevel         String?       // Diesel Level (Dropdown)
-  palletsIn           Int?          // Pallets IN
-  palletsOut          Int?          // Pallets OUT
-  dpfLevel            String?       // DPF Level
-  dieselReceipt       Boolean?      // Diesel Receipt
-  dollNumber          String?       // Doll #
-  truckJackNumber     String?       // Truck Jack #
-  strapLevel          String?       // Strap Level (Stupl Heve in PRD)
-  palletJackNumber    String?       // Pallet Jack #
-  truckNumber         String?       // Truck #
+  date             DateTime? // Date field
+  mileage1         String? // MIL #1
+  mileage2         String? // MIL #2
+  dieselLevel      String? // Diesel Level (Dropdown)
+  palletsIn        Int? // Pallets IN
+  palletsOut       Int? // Pallets OUT
+  dpfLevel         String? // DPF Level
+  dieselReceipt    Boolean? // Diesel Receipt
+  dollNumber       String? // Doll #
+  truckJackNumber  String? // Truck Jack #
+  strapLevel       String? // Strap Level (Stupl Heve in PRD)
+  palletJackNumber String? // Pallet Jack #
+  truckNumber      String? // Truck #
 
   // Fueling Details
-  dieselAmount        Float?        // Diesel Amount
-  creditCardNumber    String?       // Credit Card No.
-  fuelCapKeyNumber    String?       // Key for Fuel Cap #
-  creditCardCashAmount Float?       // Credit Card / Cash Receive Amount
-  cashBackAmount      Float?        // Cash Back Amount
+  dieselAmount         Float? // Diesel Amount
+  creditCardNumber     String? // Credit Card No.
+  fuelCapKeyNumber     String? // Key for Fuel Cap #
+  creditCardCashAmount Float? // Credit Card / Cash Receive Amount
+  cashBackAmount       Float? // Cash Back Amount
 
   // Photo/Video Upload Checklist
-  frontLightsPhoto    Boolean?      // Upload photo of front lights/tail lights
-  electricityBoxPhoto Boolean?      // Upload photo of electricity box (power off)
-  palletsPhoto        Boolean?      // Upload photo of pallets/dolly/pallet jack
-  vehicleConditionVideo Boolean?    // Upload video of vehicle condition
-  calledWarehouse     Boolean?      // Called warehouse before leaving
+  frontLightsPhoto      Boolean? // Upload photo of front lights/tail lights
+  electricityBoxPhoto   Boolean? // Upload photo of electricity box (power off)
+  palletsPhoto          Boolean? // Upload photo of pallets/dolly/pallet jack
+  vehicleConditionVideo Boolean? // Upload video of vehicle condition
+  calledWarehouse       Boolean? // Called warehouse before leaving
 
   // Additional fields
-  notes               String?       // Additional notes
-  responses           Json          // Keep original responses for backward compatibility
-  timestamp           DateTime      @default(now())
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  isDeleted           Boolean       @default(false)
+  notes     String? // Additional notes
+  responses Json // Keep original responses for backward compatibility
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
 
-  @@map("safety_checks")
   @@index([routeId])
   @@index([driverId])
   @@index([type])
   @@index([isDeleted])
+  @@map("safety_checks")
 }
 
 // RouteUpload model to track uploaded files
 model RouteUpload {
-  id                  String        @id @default(uuid())
-  fileName            String
-  originalFileName    String
-  uploadedBy          String        // ID of the admin who uploaded the file
-  uploadedAt          DateTime      @default(now())
-  processedAt         DateTime?
-  status              UploadStatus  @default(PENDING)
-  errorMessage        String?
-  rowsProcessed       Int           @default(0)
-  rowsSucceeded       Int           @default(0)
-  rowsFailed          Int           @default(0)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  isDeleted           Boolean       @default(false)
+  id               String       @id @default(uuid())
+  fileName         String
+  originalFileName String
+  uploadedBy       String // ID of the admin who uploaded the file
+  uploadedAt       DateTime     @default(now())
+  processedAt      DateTime?
+  status           UploadStatus @default(PENDING)
+  errorMessage     String?
+  rowsProcessed    Int          @default(0)
+  rowsSucceeded    Int          @default(0)
+  rowsFailed       Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  isDeleted        Boolean      @default(false)
 
-  @@map("route_uploads")
   @@index([uploadedBy])
   @@index([status])
   @@index([uploadedAt])
   @@index([isDeleted])
+  @@map("route_uploads")
 }
 
 // Product model
 model Product {
-  id                  String   @id @default(uuid())
-  name                String
-  sku                 String   @unique
-  description         String?
-  unit                String?  // e.g., "pound", "each", "case"
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  isDeleted           Boolean  @default(false)
+  id          String   @id @default(uuid())
+  name        String
+  sku         String   @unique
+  description String?
+  unit        String? // e.g., "pound", "each", "case"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  Return      Return[]
 
-  @@map("products")
   @@index([sku])
   @@index([name])
   @@index([isDeleted])
+  @@map("products")
 }
 
 // CustomerEmail model for tracking email notifications
 model CustomerEmail {
-  id                  String   @id @default(uuid())
-  stopId              String   // Related stop ID
-  customerEmail       String   // Customer email address
-  subject             String   // Email subject
-  body                String   // Email body (can be HTML)
-  signedInvoiceUrl    String?  // URL to the signed invoice PDF
-  originalInvoiceUrl  String?  // URL to the original QuickBooks invoice PDF
-  status              EmailStatus @default(PENDING)
-  sentAt              DateTime?
-  error               String?  // Error message if sending failed
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  isDeleted           Boolean  @default(false)
+  id                 String      @id @default(uuid())
+  stopId             String // Related stop ID
+  customerEmail      String // Customer email address
+  subject            String // Email subject
+  body               String // Email body (can be HTML)
+  signedInvoiceUrl   String? // URL to the signed invoice PDF
+  originalInvoiceUrl String? // URL to the original QuickBooks invoice PDF
+  status             EmailStatus @default(PENDING)
+  sentAt             DateTime?
+  error              String? // Error message if sending failed
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  isDeleted          Boolean     @default(false)
 
-  @@map("customer_emails")
   @@index([stopId])
   @@index([status])
   @@index([sentAt])
   @@index([isDeleted])
+  @@map("customer_emails")
 }
 
 // Enums

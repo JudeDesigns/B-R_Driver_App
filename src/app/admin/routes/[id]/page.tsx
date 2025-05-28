@@ -266,9 +266,7 @@ export default function RouteDetailPage({
               <span className="font-medium text-gray-700">Route Details</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {route?.routeNumber
-                ? `Route ${route.routeNumber}`
-                : "Route Details"}
+              {route?.routeNumber || "Route Details"}
             </h1>
           </div>
           <div className="flex space-x-3">

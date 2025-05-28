@@ -41,6 +41,10 @@ export default function RouteUploadPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [conflictDetected, setConflictDetected] = useState(false);
+  const [existingRoute, setExistingRoute] = useState<any>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [uploadAction, setUploadAction] = useState<'create' | 'update' | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -65,6 +69,11 @@ export default function RouteUploadPage() {
       setError("");
       setPreview(null);
       setShowPreview(false);
+      // Reset conflict state when new file is selected
+      setConflictDetected(false);
+      setExistingRoute(null);
+      setShowConfirmDialog(false);
+      setUploadAction(null);
     }
   };
 
@@ -93,7 +102,8 @@ export default function RouteUploadPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/admin/routes/preview", {
+      // Check for conflicts first
+      const conflictResponse = await fetch("/api/admin/routes/check-conflict", {
         method: "POST",
         body: formData,
         headers: {
@@ -101,19 +111,34 @@ export default function RouteUploadPage() {
         },
       });
 
-      const data = await response.json();
+      const conflictData = await conflictResponse.json();
 
-      if (!response.ok) {
+      if (!conflictResponse.ok) {
         throw new Error(
-          data.message ||
-            (data.errors && data.errors.length > 0
-              ? data.errors.join("; ")
-              : "Failed to preview route")
+          conflictData.message ||
+            (conflictData.errors && conflictData.errors.length > 0
+              ? conflictData.errors.join("; ")
+              : "Failed to check for conflicts")
         );
       }
 
-      setPreview(data);
+      // Set conflict information
+      setConflictDetected(conflictData.hasConflict);
+      setExistingRoute(conflictData.existingRoute);
+
+      // Set preview data
+      setPreview({
+        ...conflictData.newRoute,
+        ...conflictData.parseResult,
+        hasConflict: conflictData.hasConflict,
+        existingRoute: conflictData.existingRoute,
+      });
       setShowPreview(true);
+
+      // If there's a conflict, show the confirmation dialog
+      if (conflictData.hasConflict) {
+        setShowConfirmDialog(true);
+      }
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred during preview";
@@ -123,8 +148,8 @@ export default function RouteUploadPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, action?: string) => {
+    if (e) e.preventDefault();
 
     if (!file) {
       setError("Please select an Excel file to upload");
@@ -145,10 +170,14 @@ export default function RouteUploadPage() {
 
     setLoading(true);
     setError("");
+    setShowConfirmDialog(false);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (action) {
+        formData.append("action", action);
+      }
 
       const response = await fetch("/api/admin/routes/upload", {
         method: "POST",
@@ -452,8 +481,8 @@ export default function RouteUploadPage() {
                       </li>
                       <li>
                         If you upload a file with the same route number as an
-                        existing route, the existing route will be updated
-                        instead of creating a new one.
+                        existing route, you'll be asked to choose whether to update
+                        the existing route or create a new one.
                       </li>
                     </ul>
                   </div>
@@ -466,6 +495,32 @@ export default function RouteUploadPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Route Preview
                   </h3>
+
+                  {/* Conflict Warning */}
+                  {conflictDetected && existingRoute && (
+                    <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center mb-2">
+                        <svg
+                          className="h-5 w-5 text-yellow-500 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
+                        </svg>
+                        <h4 className="font-medium text-yellow-800">Route Conflict Detected</h4>
+                      </div>
+                      <p className="text-sm text-yellow-700">
+                        A route with number <strong>{existingRoute.routeNumber}</strong> already exists.
+                        You'll need to choose whether to update the existing route or create a new one.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="bg-white p-3 rounded-md shadow-sm">
@@ -639,51 +694,161 @@ export default function RouteUploadPage() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Previewing...
+                      Checking for conflicts...
                     </div>
                   ) : (
-                    "Preview Route"
+                    "Preview & Check Conflicts"
                   )}
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={loading || !file}
-                  className="flex-1 bg-black hover:bg-mono-800 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Uploading...
-                    </div>
-                  ) : (
-                    "Upload Route"
-                  )}
-                </button>
+{!conflictDetected && (
+                  <button
+                    type="submit"
+                    disabled={loading || !file}
+                    className="flex-1 bg-black hover:bg-mono-800 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <div className="flex items-center justify-center">
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Uploading...
+                      </div>
+                    ) : (
+                      "Upload Route"
+                    )}
+                  </button>
+                )}
+
+                {conflictDetected && (
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmDialog(true)}
+                    className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-30 transition duration-200"
+                  >
+                    Resolve Conflict
+                  </button>
+                )}
               </div>
             </form>
           )}
         </div>
       </div>
+
+      {/* Conflict Resolution Dialog */}
+      {showConfirmDialog && conflictDetected && existingRoute && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <svg
+                  className="h-8 w-8 text-yellow-500 mr-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Route Conflict Detected
+                </h3>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  A route with the number <strong>{existingRoute.routeNumber}</strong> already exists.
+                  What would you like to do?
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Existing Route</h4>
+                    <div className="text-sm text-blue-800 space-y-1">
+                      <p><strong>Route:</strong> {existingRoute.routeNumber}</p>
+                      <p><strong>Date:</strong> {new Date(existingRoute.date).toLocaleDateString()}</p>
+                      <p><strong>Status:</strong> {existingRoute.status}</p>
+                      <p><strong>Stops:</strong> {existingRoute.stopCount}</p>
+                      <p><strong>Created:</strong> {new Date(existingRoute.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="font-medium text-green-900 mb-2">New Route</h4>
+                    <div className="text-sm text-green-800 space-y-1">
+                      <p><strong>Route:</strong> {preview?.routeNumber}</p>
+                      <p><strong>Date:</strong> {preview?.date ? new Date(preview.date).toLocaleDateString() : 'N/A'}</p>
+                      <p><strong>Stops:</strong> {preview?.stopCount || 0}</p>
+                      {preview?.driverSummary && (
+                        <div>
+                          <p><strong>Drivers:</strong></p>
+                          <ul className="ml-4 list-disc">
+                            {Object.entries(preview.driverSummary).map(([driver, count]) => (
+                              <li key={driver}>{driver}: {count} stops</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => handleSubmit(undefined, 'update')}
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+                >
+                  {loading ? 'Updating...' : 'Update Existing Route'}
+                </button>
+
+                <button
+                  onClick={() => handleSubmit(undefined, 'create')}
+                  disabled={loading}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+                >
+                  {loading ? 'Creating...' : 'Create New Route'}
+                </button>
+
+                <button
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={loading}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div className="mt-4 text-sm text-gray-600">
+                <p><strong>Update Existing Route:</strong> Replaces all stops in the existing route with the new data.</p>
+                <p><strong>Create New Route:</strong> Creates a new route with a modified route number.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
