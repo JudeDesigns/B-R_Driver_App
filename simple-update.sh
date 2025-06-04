@@ -72,7 +72,7 @@ npm run build
 
 # Run database migrations
 print_status "Running database migrations..."
-npm run prisma:migrate:prod || print_warning "No migrations to run or migration failed"
+npx prisma db push || print_warning "Database push failed"
 
 # Restore preserved files
 print_status "Restoring uploads and environment files..."

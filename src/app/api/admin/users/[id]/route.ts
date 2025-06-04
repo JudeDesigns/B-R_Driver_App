@@ -53,9 +53,20 @@ export async function GET(
     // Get routes assigned to this user (if they're a driver)
     let assignedRoutes = [];
     if (user.role === "DRIVER") {
+      // Look for routes where this driver has assigned stops
       assignedRoutes = await prisma.route.findMany({
         where: {
-          driverId: id,
+          OR: [
+            { driverId: id }, // Direct route assignment
+            {
+              stops: {
+                some: {
+                  driverNameFromUpload: user.username,
+                  isDeleted: false,
+                },
+              },
+            }, // Stop-level assignment
+          ],
           isDeleted: false,
         },
         orderBy: {
@@ -69,7 +80,15 @@ export async function GET(
           status: true,
           _count: {
             select: {
-              stops: true,
+              stops: {
+                where: {
+                  OR: [
+                    { driverNameFromUpload: user.username },
+                    { route: { driverId: id } },
+                  ],
+                  isDeleted: false,
+                },
+              },
             },
           },
         },
