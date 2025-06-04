@@ -164,8 +164,8 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     // Find column indices based on headers - optimized with Map for O(1) lookups
     const columnIndices = {
       routeNumber: headerMap.get("Route #") ?? -1,
-      driver: 1, // Always use column B (index 1) for driver names as specified
-      sequence: 3, // Column D (index 3) contains the delivery sequence numbers (1,2,3,4...)
+      driver: headerMap.get("Driver") ?? -1, // Use the Driver column from headers
+      sequence: headerMap.get("S No") ?? 0, // Use S No column for sequence numbers
       customerName: headerMap.get("Customers") ?? -1,
       customerGroupCode: headerMap.get("Customer GROUP CODE") ?? -1,
       customerEmail: headerMap.get("Customer Email") ?? -1,
