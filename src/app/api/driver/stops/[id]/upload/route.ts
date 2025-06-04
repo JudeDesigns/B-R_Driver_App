@@ -631,9 +631,11 @@ export async function POST(
     if (embeddedImages.length > 0) {
 
       let currentImageIndex = 0;
+      let pageCount = 0; // Safety counter to prevent infinite loops
 
       // Add images to pages
-      while (currentImageIndex < embeddedImages.length) {
+      while (currentImageIndex < embeddedImages.length && pageCount < 10) { // Max 10 pages safety limit
+        pageCount++;
         const isFirstPage = currentImageIndex === 0;
         const currentPage = isFirstPage ? firstPage : pdfDoc.addPage([612, 792]);
 
@@ -682,17 +684,26 @@ export async function POST(
           );
         }
 
-        console.log(`Page ${isFirstPage ? 1 : 'additional'}: availableHeight=${availableHeight}, imagesOnThisPage=${imagesOnThisPage}, currentImageIndex=${currentImageIndex}`);
+        console.log(`Page ${pageCount} (${isFirstPage ? 'first' : 'additional'}):
+          - availableHeight: ${availableHeight}
+          - imagesOnThisPage: ${imagesOnThisPage}
+          - currentImageIndex: ${currentImageIndex}
+          - embeddedImages.length: ${embeddedImages.length}
+          - startY: ${startY}
+          - imageSpacePerImage: ${imageSpacePerImage}
+        `);
 
         // If no images can fit on first page, we need to ensure we still process them on additional pages
         if (isFirstPage && imagesOnThisPage === 0) {
           console.log('No space on first page, will place all images on additional pages');
           // Skip adding images to first page, but continue to create additional pages
-          // Don't increment currentImageIndex here
+          // Continue to next iteration to create additional page
+          continue;
         }
 
         // Add images to current page (only if we have images to place)
         if (imagesOnThisPage > 0) {
+          console.log(`Adding ${imagesOnThisPage} images to page ${pageCount}, starting from index ${currentImageIndex}`);
           for (let i = 0; i < imagesOnThisPage && currentImageIndex < embeddedImages.length; i++) {
           const image = embeddedImages[currentImageIndex];
           const imageY = startY - (i * imageSpacePerImage);
@@ -753,6 +764,13 @@ export async function POST(
 
           currentImageIndex++;
           }
+        } else {
+          console.log(`No images placed on page ${pageCount}. Breaking to prevent infinite loop.`);
+          // If no images were placed and we're not on the first page, something is wrong
+          if (!isFirstPage) {
+            console.error('ERROR: No images could be placed on additional page. Breaking loop.');
+            break;
+          }
         }
 
         // Add page number (only for additional pages, first page has its own footer)
@@ -779,6 +797,12 @@ export async function POST(
           });
         }
       }
+
+      console.log(`PDF Generation Complete:
+        - Total pages created: ${pageCount}
+        - Images processed: ${currentImageIndex}/${embeddedImages.length}
+        - Final currentImageIndex: ${currentImageIndex}
+      `);
     }
 
     // Add footer to first page
