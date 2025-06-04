@@ -608,17 +608,18 @@ export async function POST(
       returnsSectionY = returnsSectionY - actualHeight;
     }
 
+    // Calculate remaining space on first page more accurately (moved outside to fix scope issue)
+    const footerSpace = 80; // Space needed for footer
+    const remainingSpace = Math.max(0, returnsSectionY - footerSpace);
+    const imageSpacePerImage = 200; // Minimum space needed per image including title and margins
+    const headerSpaceForImagePages = 100; // Space needed for headers on additional pages
+    const imagesPerAdditionalPage = Math.floor((pageHeight - headerSpaceForImagePages - footerSpace) / imageSpacePerImage);
+
+    // Ensure we have at least 1 image per additional page
+    const safeImagesPerAdditionalPage = Math.max(1, imagesPerAdditionalPage);
+
     // Add images section - improved multi-page logic
     if (embeddedImages.length > 0) {
-      // Calculate remaining space on first page more accurately
-      const footerSpace = 80; // Space needed for footer
-      const remainingSpace = Math.max(0, returnsSectionY - footerSpace);
-      const imageSpacePerImage = 200; // Minimum space needed per image including title and margins
-      const headerSpaceForImagePages = 100; // Space needed for headers on additional pages
-      const imagesPerAdditionalPage = Math.floor((pageHeight - headerSpaceForImagePages - footerSpace) / imageSpacePerImage);
-
-      // Ensure we have at least 1 image per additional page
-      const safeImagesPerAdditionalPage = Math.max(1, imagesPerAdditionalPage);
 
       let currentImageIndex = 0;
 
@@ -803,9 +804,6 @@ export async function POST(
 
     // Create the public URL for the PDF
     const pdfUrl = `/uploads/pdf/${fileName}.pdf`;
-
-    // Get the current time
-    const now = new Date();
 
     // Update the stop with the PDF URL and mark as completed
     await prisma.stop.update({
