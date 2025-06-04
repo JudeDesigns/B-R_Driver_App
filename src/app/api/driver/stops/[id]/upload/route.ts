@@ -446,58 +446,58 @@ export async function POST(
       // Draw table header background
       firstPage.drawRectangle({
         x: margin + 10,
-        y: returnsSectionY - 50,
+        y: returnsSectionY - 55,
         width: contentWidth - 20,
-        height: 20,
+        height: 25,
         color: rgb(0.9, 0.85, 0.85),
         borderColor: rgb(0.8, 0.7, 0.7),
         borderWidth: 1,
       });
 
-      // Enhanced table headers with better spacing (fixed column widths)
+      // Enhanced table headers with better spacing and larger font
       firstPage.drawText("SKU", {
         x: margin + 15,
-        y: returnsSectionY - 45,
-        size: 8,
+        y: returnsSectionY - 42,
+        size: 10,
         font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.1, 0.1, 0.1),
       });
 
       firstPage.drawText("Product Name", {
         x: margin + 85,
-        y: returnsSectionY - 45,
-        size: 8,
+        y: returnsSectionY - 42,
+        size: 10,
         font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.1, 0.1, 0.1),
       });
 
       firstPage.drawText("Description", {
         x: margin + 200,
-        y: returnsSectionY - 45,
-        size: 8,
+        y: returnsSectionY - 42,
+        size: 10,
         font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.1, 0.1, 0.1),
       });
 
       firstPage.drawText("Qty", {
         x: margin + 320,
-        y: returnsSectionY - 45,
-        size: 8,
+        y: returnsSectionY - 42,
+        size: 10,
         font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.1, 0.1, 0.1),
       });
 
       firstPage.drawText("Reason", {
         x: margin + 360,
-        y: returnsSectionY - 45,
-        size: 8,
+        y: returnsSectionY - 42,
+        size: 10,
         font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.1, 0.1, 0.1),
       });
 
       // Add return items with enhanced formatting (limited to what fits on first page)
       returns.slice(0, maxItemsOnFirstPage).forEach((returnItem, index) => {
-        const itemY = returnsSectionY - 65 - (index * itemHeight);
+        const itemY = returnsSectionY - 70 - (index * itemHeight);
 
         // Alternate row background for better readability
         if (index % 2 === 0) {
@@ -618,6 +618,15 @@ export async function POST(
     // Ensure we have at least 1 image per additional page
     const safeImagesPerAdditionalPage = Math.max(1, imagesPerAdditionalPage);
 
+    console.log(`PDF Generation Debug:
+      - returnsSectionY: ${returnsSectionY}
+      - remainingSpace: ${remainingSpace}
+      - imageSpacePerImage: ${imageSpacePerImage}
+      - embeddedImages.length: ${embeddedImages.length}
+      - pageHeight: ${pageHeight}
+      - safeImagesPerAdditionalPage: ${safeImagesPerAdditionalPage}
+    `);
+
     // Add images section - improved multi-page logic
     if (embeddedImages.length > 0) {
 
@@ -655,9 +664,16 @@ export async function POST(
         // Calculate images that can fit on this page
         let imagesOnThisPage;
         if (isFirstPage) {
-          // For first page, check if we have enough space for at least one image
-          imagesOnThisPage = availableHeight >= imageSpacePerImage ?
-            Math.min(embeddedImages.length - currentImageIndex, Math.floor(availableHeight / imageSpacePerImage)) : 0;
+          // For first page, be more conservative with space calculation
+          const minSpaceNeeded = 150; // Minimum space needed for one image
+          if (availableHeight >= minSpaceNeeded) {
+            imagesOnThisPage = Math.min(
+              embeddedImages.length - currentImageIndex,
+              Math.max(1, Math.floor(availableHeight / imageSpacePerImage))
+            );
+          } else {
+            imagesOnThisPage = 0; // Force to next page if not enough space
+          }
         } else {
           // For additional pages, ensure we place at least 1 image but not more than what fits
           imagesOnThisPage = Math.min(
@@ -666,13 +682,18 @@ export async function POST(
           );
         }
 
-        // If no images can fit on first page, skip to next page
+        console.log(`Page ${isFirstPage ? 1 : 'additional'}: availableHeight=${availableHeight}, imagesOnThisPage=${imagesOnThisPage}, currentImageIndex=${currentImageIndex}`);
+
+        // If no images can fit on first page, we need to ensure we still process them on additional pages
         if (isFirstPage && imagesOnThisPage === 0) {
-          continue; // This will create a new page on next iteration
+          console.log('No space on first page, will place all images on additional pages');
+          // Skip adding images to first page, but continue to create additional pages
+          // Don't increment currentImageIndex here
         }
 
-        // Add images to current page
-        for (let i = 0; i < imagesOnThisPage && currentImageIndex < embeddedImages.length; i++) {
+        // Add images to current page (only if we have images to place)
+        if (imagesOnThisPage > 0) {
+          for (let i = 0; i < imagesOnThisPage && currentImageIndex < embeddedImages.length; i++) {
           const image = embeddedImages[currentImageIndex];
           const imageY = startY - (i * imageSpacePerImage);
 
@@ -731,6 +752,7 @@ export async function POST(
           });
 
           currentImageIndex++;
+          }
         }
 
         // Add page number (only for additional pages, first page has its own footer)
