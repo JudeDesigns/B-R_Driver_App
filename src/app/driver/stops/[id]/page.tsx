@@ -14,6 +14,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import StatusButton from "@/components/driver/StatusButton";
 import DriverNotes from "@/components/driver/DriverNotes";
 import InvoiceUpload from "@/components/driver/InvoiceUpload";
+import EnhancedInvoiceUpload from "@/components/driver/EnhancedInvoiceUpload";
 import ReturnManagement from "@/components/driver/ReturnManagement";
 
 interface Customer {
@@ -754,8 +755,8 @@ export default function StopDetailPage({
                 </div>
               </div>
 
-              {/* Delivery Instructions - Mobile Optimized */}
-              {stop.initialDriverNotes && (
+              {/* All Instructions - Mobile Optimized */}
+              {(stop.initialDriverNotes || (stop.adminNotes && stop.adminNotes.length > 0)) && (
                 <div className="mt-5 sm:mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
                   <div className="flex items-start">
                     <div className="flex-shrink-0">
@@ -772,15 +773,49 @@ export default function StopDetailPage({
                         />
                       </svg>
                     </div>
-                    <div className="ml-2 sm:ml-3">
+                    <div className="ml-2 sm:ml-3 w-full">
                       <h3 className="text-sm font-medium text-blue-800">
-                        Delivery Instructions
+                        All Instructions
                       </h3>
-                      <div className="mt-1 sm:mt-2 text-sm text-blue-700">
-                        <p className="whitespace-pre-wrap break-words">
-                          {stop.initialDriverNotes}
-                        </p>
-                      </div>
+
+                      {/* Admin Notes */}
+                      {stop.adminNotes && stop.adminNotes.length > 0 && (
+                        <div className="mt-2 sm:mt-3">
+                          <h4 className="text-xs font-semibold text-red-900 uppercase tracking-wide mb-2 flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                            Admin Instructions:
+                          </h4>
+                          <div className="space-y-2">
+                            {stop.adminNotes.map((note, index) => (
+                              <div key={note.id} className="bg-red-100 border border-red-300 rounded p-2 text-sm">
+                                <p className="text-red-800 font-medium whitespace-pre-wrap break-words">
+                                  {note.note}
+                                </p>
+                                <p className="text-xs text-red-600 mt-1">
+                                  — {note.admin.fullName || note.admin.username} ({new Date(note.createdAt).toLocaleDateString()})
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Driver Instructions */}
+                      {stop.initialDriverNotes && (
+                        <div className="mt-2 sm:mt-3">
+                          <h4 className="text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1 flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Delivery Instructions:
+                          </h4>
+                          <div className="bg-blue-100 border border-blue-300 rounded p-2 text-sm text-blue-800">
+                            <p className="whitespace-pre-wrap break-words">{stop.initialDriverNotes}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -982,110 +1017,68 @@ export default function StopDetailPage({
             onSave={handleSaveDriverNotes}
           />
 
-          {/* Invoice Photo Upload - Opens camera but doesn't automatically mark delivery as completed */}
-          <InvoiceUpload
-            stopId={stop.id}
-            onUploadSuccess={handleUploadSuccess}
-            existingPdfUrl={stop.signedInvoicePdfUrl}
-            markAsCompleted={false}
-            currentStopStatus={stop.status}
-          />
-
-          {/* Admin Notes - Enhanced */}
-          {stop.adminNotes && stop.adminNotes.length > 0 && (
+          {/* Enhanced Invoice Photo Upload - Multiple images with preview */}
+          {(stop.status === "ARRIVED" || stop.status === "COMPLETED") && (
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-5 border-b border-gray-200">
-                <div className="flex items-center">
-                  <svg
-                    className="h-5 w-5 text-yellow-500 mr-2"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    Notes from Admin
-                  </h2>
-                  <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                    {stop.adminNotes.length}
-                  </span>
-                </div>
+              <div className="p-4 sm:p-5 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">
+                  Invoice Upload & Completion
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Upload multiple invoice images, preview them, and generate the delivery PDF
+                </p>
               </div>
-              <div className="p-5">
-                <div className="space-y-4">
-                  {stop.adminNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 shadow-sm"
-                    >
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                          <svg
-                            className="h-5 w-5 text-yellow-600"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <p className="text-sm text-yellow-800 whitespace-pre-wrap">
-                            {note.note}
-                          </p>
-                          <div className="mt-3 flex justify-between items-center border-t border-yellow-200 pt-2">
-                            <div className="flex items-center">
-                              <svg
-                                className="h-4 w-4 text-yellow-600 mr-1"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                              <p className="text-xs font-medium text-yellow-700">
-                                {note.admin.fullName || note.admin.username}
-                              </p>
-                            </div>
-                            <div className="flex items-center">
-                              <svg
-                                className="h-4 w-4 text-yellow-600 mr-1"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                              <p className="text-xs text-yellow-700">
-                                {new Date(note.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="p-4 sm:p-5">
+                <EnhancedInvoiceUpload
+                  stopId={stop.id}
+                  onUploadSuccess={handleUploadSuccess}
+                  onUploadComplete={() => {
+                    // PDF generated successfully - driver can now manually complete delivery
+                    console.log("PDF generated successfully");
+                  }}
+                />
               </div>
             </div>
           )}
+
+          {/* Manual Completion Button - Only show if PDF has been generated */}
+          {stop.signedInvoicePdfUrl && stop.status === "ARRIVED" && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div className="flex-1">
+                  <h3 className="text-base sm:text-lg font-medium text-green-800">
+                    ✅ Ready to Complete Delivery
+                  </h3>
+                  <p className="text-sm text-green-600 mt-1">
+                    Invoice PDF has been generated. You can now mark this delivery as completed.
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateStatus("COMPLETED")}
+                  disabled={updatingStatus}
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-6 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation"
+                >
+                  {updatingStatus ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Completing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Complete Delivery
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500">

@@ -121,6 +121,25 @@ export default function ReturnManagement({
     setReturnItems(returnItems.filter((item) => item.id !== id));
   };
 
+  // Update quantity for an existing return item
+  const handleUpdateQuantity = (id: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      handleRemoveReturnItem(id);
+      return;
+    }
+
+    setReturnItems(returnItems.map(item =>
+      item.id === id ? { ...item, quantity: newQuantity } : item
+    ));
+  };
+
+  // Update reason for an existing return item
+  const handleUpdateReason = (id: string, newReason: string) => {
+    setReturnItems(returnItems.map(item =>
+      item.id === id ? { ...item, reason: newReason } : item
+    ));
+  };
+
   // Submit the return
   const handleSubmitReturn = async () => {
     if (returnItems.length === 0) {
@@ -229,11 +248,23 @@ export default function ReturnManagement({
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {item.quantity}
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => handleUpdateQuantity(item.id, Number(e.target.value))}
+                        min="1"
+                        className="w-20 p-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {item.reason || "-"}
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      <input
+                        type="text"
+                        value={item.reason}
+                        onChange={(e) => handleUpdateReason(item.id, e.target.value)}
+                        placeholder="Reason for return"
+                        className="w-full p-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                       <button

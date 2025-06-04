@@ -6,6 +6,29 @@ import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
 import { useOptimizedRouteDetails } from "@/hooks/useOptimizedSocketEvents";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+interface Driver {
+  id: string;
+  username: string;
+  fullName?: string;
+}
 
 interface Customer {
   id: string;
@@ -77,7 +100,37 @@ export default function RouteDetailPage({
     completedStops: number;
     totalStops: number;
   } | null>(null);
+
+  // Add Stop Modal State
+  const [showAddStopModal, setShowAddStopModal] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [addStopForm, setAddStopForm] = useState({
+    customerNameFromUpload: "",
+    driverId: "",
+    orderNumberWeb: "",
+    quickbooksInvoiceNum: "",
+    initialDriverNotes: "",
+    isCOD: false,
+    amount: "",
+    address: "",
+    contactInfo: "",
+  });
+  const [addingStop, setAddingStop] = useState(false);
+
+  // Drag and Drop State
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [draggedStop, setDraggedStop] = useState<Stop | null>(null);
+
   const router = useRouter();
+
+  // Drag and Drop Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   // Initialize socket connection
   const { isConnected, joinRoom, socketError, reconnect } = useSocket();
@@ -122,8 +175,29 @@ export default function RouteDetailPage({
   useEffect(() => {
     if (token) {
       fetchRouteDetails();
+      fetchDrivers();
     }
   }, [token, fetchRouteDetails]);
+
+  // Fetch drivers for the dropdown
+  const fetchDrivers = async () => {
+    if (!token) return;
+
+    try {
+      const response = await fetch("/api/admin/drivers", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDrivers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+    }
+  };
 
   // Use optimized route details hook for real-time updates
   const { route: optimizedRoute } = useOptimizedRouteDetails(routeId, route);
@@ -327,6 +401,267 @@ export default function RouteDetailPage({
     setDeleteLoading(false);
   };
 
+  // Add Stop Functions
+  const handleAddStop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addStopForm.customerNameFromUpload || !addStopForm.driverId) {
+      setError("Customer name and driver are required");
+      return;
+    }
+
+    setAddingStop(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/routes/${routeId}/stops`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...addStopForm,
+          amount: addStopForm.amount ? parseFloat(addStopForm.amount) : null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to add stop");
+      }
+
+      // Reset form and close modal
+      setAddStopForm({
+        customerNameFromUpload: "",
+        driverId: "",
+        orderNumberWeb: "",
+        quickbooksInvoiceNum: "",
+        initialDriverNotes: "",
+        isCOD: false,
+        amount: "",
+        address: "",
+        contactInfo: "",
+      });
+      setShowAddStopModal(false);
+
+      // Refresh route details
+      await fetchRouteDetails();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setAddingStop(false);
+    }
+  };
+
+  // Drag and Drop Functions
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+
+    // Find the dragged stop
+    const stop = route?.stops.find(s => s.id === active.id);
+    setDraggedStop(stop || null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    setActiveId(null);
+    setDraggedStop(null);
+
+    if (!over || !route) return;
+
+    const activeStopId = active.id as string;
+    const overDriverName = over.id as string;
+
+    // Find the stop being dragged
+    const activeStop = route.stops.find(stop => stop.id === activeStopId);
+    if (!activeStop) return;
+
+    // Check if we're dropping on a different driver
+    const currentDriverName = activeStop.driverNameFromUpload || route.driver.username;
+    if (currentDriverName === overDriverName) return;
+
+    // Find the driver ID for the target driver
+    const targetDriver = drivers.find(d =>
+      (d.fullName || d.username) === overDriverName
+    );
+
+    if (!targetDriver) return;
+
+    try {
+      const response = await fetch(`/api/admin/stops/${activeStopId}/reassign`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          driverId: targetDriver.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to reassign stop");
+      }
+
+      // Refresh route details
+      await fetchRouteDetails();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    }
+  };
+
+  // Sortable Stop Component
+  const SortableStopRow = ({ stop }: { stop: Stop }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: stop.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <tr
+        ref={setNodeRef}
+        style={style}
+        className={`hover:bg-gray-50 ${isDragging ? 'bg-blue-50' : ''}`}
+        {...attributes}
+      >
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          <div className="flex items-center">
+            <div
+              {...listeners}
+              className="cursor-grab hover:cursor-grabbing mr-3 p-1 rounded hover:bg-gray-200"
+            >
+              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+            {stop.sequence}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.customerNameFromUpload}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.orderNumberWeb || "N/A"}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.quickbooksInvoiceNum || "N/A"}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <span
+            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(
+              stop.status
+            )}`}
+          >
+            {stop.status.replace("_", " ")}
+          </span>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.isCOD ? "Yes" : "No"}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {getPaymentMethod(stop)}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatDateTime(stop.arrivalTime)}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {formatDateTime(stop.completionTime)}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+          <Link
+            href={`/admin/stops/${stop.id}`}
+            className="text-blue-600 hover:text-blue-900"
+          >
+            View Details
+          </Link>
+        </td>
+      </tr>
+    );
+  };
+
+  // Droppable Driver Section Component
+  const DroppableDriverSection = ({ driverName, stops }: { driverName: string; stops: Stop[] }) => {
+    const { setNodeRef, isOver } = useSortable({ id: driverName });
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={`overflow-hidden ${isOver ? 'bg-blue-50 border-2 border-blue-300 border-dashed' : ''}`}
+      >
+        <div className={`bg-gray-100 px-6 py-3 border-l-4 border-blue-500 mb-4 ${isOver ? 'bg-blue-100' : ''}`}>
+          <h3 className="text-md font-medium text-gray-800">
+            Driver: {driverName} ({stops.length} stops)
+            {isOver && <span className="ml-2 text-blue-600 font-semibold">Drop here to reassign</span>}
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sequence
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order #
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Invoice #
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  COD
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Payment
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Arrival
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Completion
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              <SortableContext items={stops.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                {stops.map((stop) => (
+                  <SortableStopRow key={stop.id} stop={stop} />
+                ))}
+              </SortableContext>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8">
       {/* WebSocket Error Alert */}
@@ -397,6 +732,25 @@ export default function RouteDetailPage({
             </button>
             {route && (
               <>
+                <button
+                  onClick={() => setShowAddStopModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  <svg
+                    className="h-4 w-4 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  Add Stop
+                </button>
                 <Link
                   href={`/admin/routes/${route.id}/edit`}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -706,163 +1060,48 @@ export default function RouteDetailPage({
                   </div>
                 </div>
               ) : groupByDriver ? (
-                // Grouped by driver view
-                <div className="space-y-8">
-                  {Object.entries(getStopsGroupedByDriver()).map(
-                    ([driverName, stops]) => (
-                      <div key={driverName} className="overflow-hidden">
-                        <div className="bg-gray-100 px-6 py-3 border-l-4 border-blue-500 mb-4">
-                          <h3 className="text-md font-medium text-gray-800">
-                            Driver: {driverName} ({stops.length} stops)
-                          </h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Seq
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Customer
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Invoice #
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Status
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Payment
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Amount
-                                </th>
-                                <th
-                                  scope="col"
-                                  className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                                >
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {stops.map((stop, index) => (
-                                <tr
-                                  key={stop.id}
-                                  className={`hover:bg-gray-50 transition-colors duration-150 ${
-                                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                  }`}
-                                >
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-semibold">
-                                        {stop.sequence}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                      <div className="text-sm font-medium text-gray-900">
-                                        {stop.customer.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        {stop.customer.address}
-                                        {stop.customer.groupCode && (
-                                          <span className="ml-2 text-xs text-gray-400">
-                                            ({stop.customer.groupCode})
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {stop.quickbooksInvoiceNum || "N/A"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span
-                                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(
-                                        stop.status
-                                      )}`}
-                                    >
-                                      {stop.status.replace("_", " ")}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex flex-col">
-                                      <span className="text-sm font-medium text-gray-900">
-                                        {getPaymentMethod(stop)}
-                                      </span>
-                                      {stop.isCOD && (
-                                        <span className="mt-1 px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md bg-red-100 text-red-800 w-fit">
-                                          COD
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-bold text-gray-900">
-                                      {stop.amount
-                                        ? `$${stop.amount.toFixed(2)}`
-                                        : "N/A"}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                                    <button
-                                      onClick={() =>
-                                        router.push(`/admin/stops/${stop.id}`)
-                                      }
-                                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700"
-                                    >
-                                      <svg
-                                        className="h-3.5 w-3.5 mr-1"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                        />
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                        />
-                                      </svg>
-                                      View
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                // Grouped by driver view with drag and drop
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="space-y-8">
+                    <SortableContext
+                      items={Object.keys(getStopsGroupedByDriver())}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {Object.entries(getStopsGroupedByDriver()).map(
+                        ([driverName, stops]) => (
+                          <DroppableDriverSection
+                            key={driverName}
+                            driverName={driverName}
+                            stops={stops}
+                          />
+                        )
+                      )}
+                    </SortableContext>
+                  </div>
+                  <DragOverlay>
+                    {activeId && draggedStop ? (
+                      <div className="bg-white shadow-lg rounded-lg p-4 border-2 border-blue-300">
+                        <div className="flex items-center space-x-3">
+                          <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-medium">
+                            {draggedStop.sequence}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {draggedStop.customerNameFromUpload}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Dragging to reassign driver...
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    )
-                  )}
-                </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               ) : (
                 // Regular view (not grouped)
                 <div className="overflow-x-auto">
@@ -1071,6 +1310,180 @@ export default function RouteDetailPage({
               </svg>
               Back to Routes
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Add Stop Modal */}
+      {showAddStopModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Add New Stop</h3>
+                <button
+                  onClick={() => setShowAddStopModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleAddStop} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Customer Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={addStopForm.customerNameFromUpload}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, customerNameFromUpload: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Assign to Driver *
+                    </label>
+                    <select
+                      value={addStopForm.driverId}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, driverId: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select a driver</option>
+                      {drivers.map((driver) => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.fullName || driver.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Order Number
+                    </label>
+                    <input
+                      type="text"
+                      value={addStopForm.orderNumberWeb}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, orderNumberWeb: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Invoice Number
+                    </label>
+                    <input
+                      type="text"
+                      value={addStopForm.quickbooksInvoiceNum}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, quickbooksInvoiceNum: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <input
+                      type="text"
+                      value={addStopForm.address}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, address: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contact Info
+                    </label>
+                    <input
+                      type="text"
+                      value={addStopForm.contactInfo}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, contactInfo: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Amount
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={addStopForm.amount}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, amount: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="isCOD"
+                      checked={addStopForm.isCOD}
+                      onChange={(e) => setAddStopForm(prev => ({ ...prev, isCOD: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="isCOD" className="ml-2 block text-sm text-gray-900">
+                      Cash on Delivery (COD)
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Driver Notes
+                  </label>
+                  <textarea
+                    value={addStopForm.initialDriverNotes}
+                    onChange={(e) => setAddStopForm(prev => ({ ...prev, initialDriverNotes: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Any special instructions for the driver..."
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStopModal(false)}
+                    disabled={addingStop}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingStop}
+                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 flex items-center"
+                  >
+                    {addingStop && (
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                    Add Stop
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -25,6 +25,7 @@ model User {
   routes       Route[]       @relation("DriverRoutes")
   adminNotes   AdminNote[]   @relation("AdminNotes")
   safetyChecks SafetyCheck[] @relation("DriverSafetyChecks")
+  documents    Document[]    @relation("DocumentUploads")
 
   @@index([role])
   @@index([isDeleted])
@@ -114,8 +115,9 @@ model Stop {
   isDeleted              Boolean    @default(false)
 
   // Relations
-  returns    Return[]
-  adminNotes AdminNote[]
+  returns       Return[]
+  adminNotes    AdminNote[]
+  stopDocuments StopDocument[]
 
   @@index([routeId])
   @@index([customerId])
@@ -207,6 +209,17 @@ model SafetyCheck {
 
   // Additional fields
   notes     String? // Additional notes
+
+  // Simplified Safety Check fields (for start-of-day)
+  lightsWorking      Boolean? // All lights working
+  tiresCondition     Boolean? // Tires in good condition
+  braksWorking       Boolean? // Brakes working properly
+  vehicleClean       Boolean? // Vehicle is clean and presentable
+  palletJackWorking  Boolean? // Pallet jack working properly
+  dolliesSecured     Boolean? // Dollies secured and in good condition
+  strapsAvailable    Boolean? // Straps available and in good condition
+  routeReviewed      Boolean? // Route reviewed and understood
+
   responses Json // Keep original responses for backward compatibility
   timestamp DateTime @default(now())
   createdAt DateTime @default(now())
@@ -285,6 +298,54 @@ model CustomerEmail {
   @@map("customer_emails")
 }
 
+// Document model for admin-uploaded documents that drivers can print
+model Document {
+  id          String       @id @default(uuid())
+  title       String // Document title/name
+  description String? // Optional description
+  type        DocumentType // Type of document (invoice, credit_memo, other)
+  fileName    String // Original file name
+  filePath    String // Path to the uploaded file
+  fileSize    Int // File size in bytes
+  mimeType    String // MIME type of the file
+  uploadedBy  String // ID of the admin who uploaded the document
+  uploader    User         @relation("DocumentUploads", fields: [uploadedBy], references: [id])
+  isActive    Boolean      @default(true) // Whether the document is active/available
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  isDeleted   Boolean      @default(false)
+
+  // Relations
+  stopDocuments StopDocument[]
+
+  @@index([type])
+  @@index([uploadedBy])
+  @@index([isActive])
+  @@index([isDeleted])
+  @@map("documents")
+}
+
+// Junction table for documents assigned to specific stops
+model StopDocument {
+  id         String   @id @default(uuid())
+  stopId     String
+  stop       Stop     @relation(fields: [stopId], references: [id])
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  isPrinted  Boolean  @default(false) // Whether the driver has printed this document
+  printedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+
+  @@unique([stopId, documentId]) // Prevent duplicate assignments
+  @@index([stopId])
+  @@index([documentId])
+  @@index([isPrinted])
+  @@index([isDeleted])
+  @@map("stop_documents")
+}
+
 // Enums
 enum Role {
   ADMIN
@@ -323,4 +384,12 @@ enum EmailStatus {
   PENDING
   SENT
   FAILED
+}
+
+enum DocumentType {
+  INVOICE
+  CREDIT_MEMO
+  DELIVERY_RECEIPT
+  RETURN_FORM
+  OTHER
 }

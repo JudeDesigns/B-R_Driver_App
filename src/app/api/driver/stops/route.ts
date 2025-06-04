@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
-    
+
     if (!decoded || !decoded.id || decoded.role !== "DRIVER") {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -48,13 +48,13 @@ export async function GET(request: NextRequest) {
     const status = url.searchParams.get("status");
 
     const driverName = driver.fullName || driver.username;
-    
-    // Find all stops assigned to this driver
+
+    // Find all stops assigned to this driver (exclude completed stops unless specifically requested)
     const stops = await prisma.stop.findMany({
       where: {
         OR: [
           { driverNameFromUpload: driverName },
-          { 
+          {
             AND: [
               { driverNameFromUpload: null },
               { route: { driverId: decoded.id } }
@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
           }
         ],
         isDeleted: false,
+        // Hide completed stops from driver view unless specifically requested
+        ...(status === "COMPLETED" ? {} : { status: { not: "COMPLETED" } }),
         ...(date ? {
           route: {
             date: {

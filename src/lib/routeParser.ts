@@ -43,6 +43,7 @@ function shouldIgnoreDriver(driverName: string): boolean {
     upperName.includes("CUSTOMER") ||
     upperName === "LUIS" ||
     upperName === "BARAK" ||
+    upperName === "KHIARA" ||
     upperName.includes("BARAK CUSTOMER") ||
     // Add more specific names to ignore if needed
     upperName.includes("ADMIN") ||
@@ -163,7 +164,7 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     // Find column indices based on headers - optimized with Map for O(1) lookups
     const columnIndices = {
       routeNumber: headerMap.get("Route #") ?? -1,
-      driver: headerMap.get("Driver") ?? -1,
+      driver: 1, // Always use column B (index 1) for driver names as specified
       sequence: 3, // Column D (index 3) contains the delivery sequence numbers (1,2,3,4...)
       customerName: headerMap.get("Customers") ?? -1,
       customerGroupCode: headerMap.get("Customer GROUP CODE") ?? -1,
@@ -608,13 +609,14 @@ export async function saveRouteToDatabase(
       );
     }
 
-    // Check if a route with the same route number already exists
+    // Check if a route with the same route number AND date already exists
     let route: Route | null = null;
 
     if (parsedRoute.routeNumber) {
       const existingRoute = await tx.route.findFirst({
         where: {
           routeNumber: parsedRoute.routeNumber,
+          date: parsedRoute.date, // Check for same route number AND same date
           isDeleted: false,
         },
       });

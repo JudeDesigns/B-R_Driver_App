@@ -252,6 +252,9 @@ export default function DriverStopsPage() {
     const allCompleted =
       stops.length > 0 && stops.every((stop) => stop.status === "COMPLETED");
 
+    // Check if we have no stops because they're all completed
+    const allStopsCompleted = stops.length === 0 && summary.completed > 0;
+
     // Update the state to reflect if all deliveries are completed
     setAllDeliveriesCompleted(allCompleted);
 
@@ -1350,7 +1353,7 @@ export default function DriverStopsPage() {
 
                     <Link
                       href={`/driver/stops/${stop.id}`}
-                      className="inline-flex items-center px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition duration-200"
+                      className="inline-flex items-center px-4 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 active:bg-gray-900 transition duration-200 touch-manipulation"
                     >
                       <span>Details</span>
                       <svg
@@ -1466,7 +1469,7 @@ export default function DriverStopsPage() {
 
                       <Link
                         href={`/driver/stops/${stop.id}`}
-                        className="inline-flex items-center px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition duration-200 mt-1"
+                        className="inline-flex items-center px-4 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 active:bg-gray-900 transition duration-200 mt-1 touch-manipulation"
                       >
                         <span>View Details</span>
                         <svg

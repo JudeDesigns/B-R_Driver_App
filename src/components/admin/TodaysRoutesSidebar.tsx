@@ -97,8 +97,9 @@ export default function TodaysRoutesSidebar() {
         throw new Error(data.message || "Failed to fetch routes");
       }
 
-      console.log("Routes data:", data.routes);
-      setRoutes(data.routes || []);
+      console.log("Routes data:", data);
+      // The API returns routes directly, not wrapped in a routes property
+      setRoutes(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching today's routes:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -166,6 +167,10 @@ export default function TodaysRoutesSidebar() {
           ) : error ? (
             <div className="py-2 px-4 text-red-400 text-sm">
               Error loading routes
+            </div>
+          ) : routes.length === 0 ? (
+            <div className="py-2 px-4 text-gray-400 text-sm">
+              No routes for today
             </div>
           ) : (
             routes.map((route) => (

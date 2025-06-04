@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import EnhancedSafetyChecklist, {
-  SafetyCheckData,
-} from "@/components/driver/EnhancedSafetyChecklist";
+import SimpleSafetyChecklist, {
+  SimpleSafetyCheckData,
+} from "@/components/driver/SimpleSafetyChecklist";
 
 export default function SafetyCheckPage() {
   const [loading, setLoading] = useState(false);
@@ -171,7 +171,7 @@ export default function SafetyCheckPage() {
     }
   };
 
-  const handleSubmit = async (safetyData: SafetyCheckData) => {
+  const handleSubmit = async (safetyData: SimpleSafetyCheckData) => {
     if (!token || !selectedRouteId) {
       setError("Please select a route");
       return;
@@ -212,16 +212,19 @@ export default function SafetyCheckPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 pb-20 mobile-spacing prevent-pull-refresh">
       <h1 className="text-xl font-medium text-black text-center mt-4 mobile-heading">
-        Safety Checklist
+        🚛 Start-of-Day Safety Check
       </h1>
 
-      <div className="border border-gray-200 rounded overflow-hidden mobile-card">
+      <div className="border border-gray-200 rounded-lg overflow-hidden mobile-card">
         <div className="p-4 sm:p-6">
-          <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-4 bg-yellow-50">
-            <p className="text-sm text-gray-600 mobile-text">
-              You must complete this safety checklist before starting your
-              route. This helps ensure both your safety and the safety of
-              others.
+          <div className="border-l-4 border-green-400 pl-4 py-3 mb-6 bg-green-50 rounded-r-lg">
+            <div className="flex items-center mb-2">
+              <span className="text-lg mr-2">✅</span>
+              <h3 className="text-sm font-medium text-green-800">Quick Safety Check</h3>
+            </div>
+            <p className="text-sm text-green-700 mobile-text">
+              Complete this simplified safety checklist before starting your route.
+              Quick and essential checks to ensure a safe delivery day.
             </p>
           </div>
 
@@ -262,10 +265,9 @@ export default function SafetyCheckPage() {
           </div>
 
           {selectedRouteId && (
-            <EnhancedSafetyChecklist
+            <SimpleSafetyChecklist
               onSubmit={handleSubmit}
               isSubmitting={loading}
-              checklistType="START_OF_DAY"
             />
           )}
         </div>

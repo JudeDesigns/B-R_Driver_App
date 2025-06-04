@@ -111,9 +111,9 @@ export async function POST(request: NextRequest) {
         throw new Error("Route not found");
       }
 
-      // Extract enhanced safety check fields if they exist
+      // Extract safety check fields (both enhanced and simplified)
       const {
-        // Vehicle & Fuel Check fields
+        // Enhanced Vehicle & Fuel Check fields
         date,
         mileage1,
         mileage2,
@@ -128,21 +128,34 @@ export async function POST(request: NextRequest) {
         palletJackNumber,
         truckNumber,
 
-        // Fueling Details
+        // Enhanced Fueling Details
         dieselAmount,
         creditCardNumber,
         fuelCapKeyNumber,
         creditCardCashAmount,
         cashBackAmount,
 
-        // Photo/Video Upload Checklist
+        // Enhanced Photo/Video Upload Checklist
         frontLightsPhoto,
         electricityBoxPhoto,
         palletsPhoto,
         vehicleConditionVideo,
         calledWarehouse,
 
-        // Additional fields
+        // Simplified Safety Check fields
+        mileage,
+        fuelLevel,
+        lightsWorking,
+        tiresCondition,
+        braksWorking,
+        vehicleClean,
+        palletJackWorking,
+        dolliesSecured,
+        strapsAvailable,
+        routeReviewed,
+        warehouseContacted,
+
+        // Common fields
         notes,
       } = details || {};
 
@@ -160,9 +173,9 @@ export async function POST(request: NextRequest) {
           },
           // Add enhanced fields if they exist
           date: date ? new Date(date) : undefined,
-          mileage1,
+          mileage1: mileage1 || mileage, // Use simplified mileage if enhanced not available
           mileage2,
-          dieselLevel,
+          dieselLevel: dieselLevel || fuelLevel, // Use simplified fuelLevel if enhanced not available
           palletsIn:
             palletsIn !== undefined
               ? parseInt(palletsIn.toString())
@@ -196,8 +209,18 @@ export async function POST(request: NextRequest) {
           electricityBoxPhoto,
           palletsPhoto,
           vehicleConditionVideo,
-          calledWarehouse,
+          calledWarehouse: calledWarehouse || warehouseContacted, // Use simplified field if enhanced not available
           notes,
+
+          // Add simplified safety check fields
+          lightsWorking,
+          tiresCondition,
+          braksWorking,
+          vehicleClean,
+          palletJackWorking,
+          dolliesSecured,
+          strapsAvailable,
+          routeReviewed,
         },
       });
     });

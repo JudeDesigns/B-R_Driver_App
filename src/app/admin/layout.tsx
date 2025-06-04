@@ -562,6 +562,56 @@ export default function AdminLayout({
                   </span>
                 </Link>
               </li>
+
+              <li>
+                <Link
+                  href="/admin/documents"
+                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                    pathname === "/admin/documents"
+                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                      : "hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  {pathname === "/admin/documents" && (
+                    <span className="absolute left-0 top-0 h-full w-1 bg-indigo-500"></span>
+                  )}
+                  <span
+                    className={`absolute inset-0 w-1 bg-indigo-500 transition-all duration-300 ${
+                      pathname === "/admin/documents"
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-5 w-5 mr-3 text-indigo-500 transition-transform duration-300 ${
+                      pathname === "/admin/documents"
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span
+                    className={`font-medium transition-all duration-300 ${
+                      pathname === "/admin/documents"
+                        ? "text-white"
+                        : "group-hover:translate-x-1"
+                    }`}
+                  >
+                    Documents
+                  </span>
+                </Link>
+              </li>
             </ul>
           </nav>
 

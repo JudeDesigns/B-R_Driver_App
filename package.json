@@ -23,9 +23,14 @@
     "deploy:stop": "pm2 stop br-driver-app",
     "deploy:logs": "pm2 logs br-driver-app",
     "docker:build": "docker build -t br-driver-app .",
-    "docker:run": "docker run -d --name br-driver-app -p 3000:3000 --env-file .env.production br-driver-app"
+    "docker:run": "docker run -d --name br-driver-app -p 3000:3000 --env-file .env.production br-driver-app",
+    "deploy:configure": "chmod +x configure-deployment.sh && ./configure-deployment.sh",
+    "deploy": "chmod +x deploy-to-server.sh && ./deploy-to-server.sh"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@prisma/client": "^6.7.0",
     "@types/file-saver": "^2.0.7",
     "argon2": "^0.43.0",

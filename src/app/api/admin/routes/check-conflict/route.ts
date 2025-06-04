@@ -59,10 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if a route with the same route number already exists
+    // Check if a route with the same route number AND date already exists
+    const routeDate = parseResult.route?.date;
+
+    if (!routeDate) {
+      return NextResponse.json(
+        { message: "No route date found in the file" },
+        { status: 400 }
+      );
+    }
+
     const existingRoute = await prisma.route.findFirst({
       where: {
         routeNumber: routeNumber,
+        date: routeDate, // Check for same route number AND same date
         isDeleted: false,
       },
       include: {

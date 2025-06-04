@@ -20,6 +20,7 @@ export default function DriverDashboard() {
 
   const [token, setToken] = useState<string | null>(null);
   const [routes, setRoutes] = useState<any[]>([]);
+  const [pendingDocuments, setPendingDocuments] = useState(0);
 
   // Initialize socket connection
   const { isConnected, joinRoom, subscribe } = useSocket();
@@ -106,6 +107,22 @@ export default function DriverDashboard() {
       if (safetyChecksResponse.ok) {
         const safetyData = await safetyChecksResponse.json();
         setSafetyCheckCompleted(safetyData.hasCompletedChecks || false);
+      }
+
+      // Fetch document counts
+      const documentsResponse = await fetch("/api/driver/documents", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: isMobile ? "force-cache" : "default",
+      });
+
+      if (documentsResponse.ok) {
+        const documentsData = await documentsResponse.json();
+        const pending = documentsData.reduce((total: number, stop: any) => {
+          return total + stop.stopDocuments.filter((doc: any) => !doc.isPrinted).length;
+        }, 0);
+        setPendingDocuments(pending);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -210,7 +227,34 @@ export default function DriverDashboard() {
         </div>
       </div>
 
-      {/* Menu buttons removed as requested */}
+      {/* Documents Quick Access */}
+      {pendingDocuments > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <svg className="h-7 w-7 sm:h-8 sm:w-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium text-orange-800">
+                  📄 Documents Need Printing
+                </h3>
+                <p className="text-sm text-orange-600">
+                  {pendingDocuments} document{pendingDocuments !== 1 ? 's' : ''} waiting to be printed
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/driver/documents"
+              className="bg-orange-600 text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-orange-700 active:bg-orange-800 transition-colors text-center touch-manipulation w-full sm:w-auto"
+            >
+              View Documents
+            </Link>
+          </div>
+        </div>
+      )}
 
       <h2 className="text-lg font-medium text-black mt-3 mobile-heading">
         Today&apos;s Deliveries
