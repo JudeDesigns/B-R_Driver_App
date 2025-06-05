@@ -10,6 +10,30 @@ import { emitStopStatusUpdate } from "@/app/api/socketio/route";
 const writeFileAsync = promisify(fs.writeFile);
 const mkdirAsync = promisify(fs.mkdir);
 const existsAsync = promisify(fs.exists);
+const readdirAsync = promisify(fs.readdir);
+const readFileAsync = promisify(fs.readFile);
+
+// Helper function to calculate image size while maintaining aspect ratio
+function calculateImageSize(image: any, maxWidth: number, maxHeight: number) {
+  const aspectRatio = image.width / image.height;
+
+  let width = image.width;
+  let height = image.height;
+
+  // Scale down if too wide
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = width / aspectRatio;
+  }
+
+  // Scale down if too tall
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * aspectRatio;
+  }
+
+  return { width, height };
+}
 
 // POST /api/driver/stops/[id]/upload - Upload an invoice image and convert to PDF
 export async function POST(
@@ -61,6 +85,7 @@ export async function POST(
         customer: {
           select: {
             name: true,
+            address: true,
           },
         },
         route: {
@@ -137,66 +162,78 @@ export async function POST(
       },
     });
 
-    // Create a PDF with multiple images support
+    // REFACTORED PDF GENERATION - Clean and Simple Approach
+    console.log(`=== PDF GENERATION START ===`);
+    console.log(`Processing image ${imageIndex + 1} of ${totalImages} for stop ${stop.id}`);
+
+    // Only generate PDF on the LAST image upload
+    if (imageIndex < totalImages - 1) {
+      console.log(`Saving image ${imageIndex + 1}, waiting for remaining images...`);
+      return NextResponse.json({
+        message: `Image ${imageIndex + 1} of ${totalImages} uploaded successfully. Waiting for remaining images.`,
+        imageIndex: imageIndex + 1,
+        totalImages: totalImages,
+        isComplete: false
+      });
+    }
+
+    console.log(`Last image received. Generating PDF with all ${totalImages} images...`);
+
+    // Create PDF document
     const pdfDoc = await PDFDocument.create();
 
-    // Get all images for this stop (check for existing images from previous uploads)
+    // Collect all images for this stop
+    const allImages = [];
+
+    // Get all uploaded images for this stop
     const imagePattern = new RegExp(`invoice_${stop.id}_.*_img\\d+\\.jpg$`);
-    const existingImages = [];
 
     try {
-      const files = await fs.readdir(uploadsDir);
-      for (const fileName of files) {
-        if (imagePattern.test(fileName)) {
-          const imagePath = path.join(uploadsDir, fileName);
-          const imageBuffer = await fs.readFile(imagePath);
-          existingImages.push({
+      const files = await readdirAsync(uploadsDir);
+      console.log(`Scanning ${files.length} files for images...`);
+
+      for (const file of files) {
+        if (imagePattern.test(file)) {
+          const imagePath = path.join(uploadsDir, file);
+          const imageBuffer = await readFileAsync(imagePath);
+          const imageIndex = parseInt(file.match(/_img(\d+)\.jpg$/)?.[1] || '0');
+
+          allImages.push({
             buffer: imageBuffer,
-            name: fileName
+            index: imageIndex,
+            name: file
           });
+          console.log(`Found image: ${file} (index: ${imageIndex})`);
         }
       }
     } catch (error) {
-      console.log("No existing images found or error reading directory");
+      console.error("Error reading images:", error);
     }
 
-    // Add current image to the list
-    existingImages.push({
+    // Add current image
+    allImages.push({
       buffer: Buffer.from(fileBuffer),
+      index: imageIndex + 1,
       name: `${fileName}.jpg`
     });
 
-    // Sort images by their index to maintain order
-    existingImages.sort((a, b) => {
-      const aIndex = parseInt(a.name.match(/_img(\d+)\.jpg$/)?.[1] || '0');
-      const bIndex = parseInt(b.name.match(/_img(\d+)\.jpg$/)?.[1] || '0');
-      return aIndex - bIndex;
-    });
+    // Sort by index
+    allImages.sort((a, b) => a.index - b.index);
+    console.log(`Total images to process: ${allImages.length}`);
 
     // Embed all images
     const embeddedImages = [];
-    for (const imageData of existingImages) {
+    for (const img of allImages) {
       try {
-        const image = await pdfDoc.embedJpg(imageData.buffer);
-        embeddedImages.push(image);
+        const embeddedImage = await pdfDoc.embedJpg(img.buffer);
+        embeddedImages.push(embeddedImage);
+        console.log(`Embedded image: ${img.name}`);
       } catch (error) {
-        console.error("Error embedding image:", error);
-        // Try as PNG if JPG fails
-        try {
-          const image = await pdfDoc.embedPng(imageData.buffer);
-          embeddedImages.push(image);
-        } catch (pngError) {
-          console.error("Error embedding image as PNG:", pngError);
-        }
+        console.error(`Failed to embed ${img.name}:`, error);
       }
     }
 
-    if (embeddedImages.length === 0) {
-      return NextResponse.json(
-        { message: "Failed to process any images" },
-        { status: 500 }
-      );
-    }
+    console.log(`Successfully embedded ${embeddedImages.length} images`);
 
     // Create first page with invoice details
     const firstPage = pdfDoc.addPage([612, 792]); // Letter size
@@ -608,201 +645,142 @@ export async function POST(
       returnsSectionY = returnsSectionY - actualHeight;
     }
 
-    // Calculate remaining space on first page more accurately (moved outside to fix scope issue)
-    const footerSpace = 80; // Space needed for footer
-    const remainingSpace = Math.max(0, returnsSectionY - footerSpace);
-    const imageSpacePerImage = 200; // Minimum space needed per image including title and margins
-    const headerSpaceForImagePages = 100; // Space needed for headers on additional pages
-    const imagesPerAdditionalPage = Math.floor((pageHeight - headerSpaceForImagePages - footerSpace) / imageSpacePerImage);
+    // REFACTORED IMAGE LAYOUT - Simple and Accommodating
+    console.log(`=== IMAGE LAYOUT START ===`);
+    console.log(`Laying out ${embeddedImages.length} images`);
 
-    // Ensure we have at least 1 image per additional page
-    const safeImagesPerAdditionalPage = Math.max(1, imagesPerAdditionalPage);
-
-    console.log(`PDF Generation Debug:
-      - returnsSectionY: ${returnsSectionY}
-      - remainingSpace: ${remainingSpace}
-      - imageSpacePerImage: ${imageSpacePerImage}
-      - embeddedImages.length: ${embeddedImages.length}
-      - pageHeight: ${pageHeight}
-      - safeImagesPerAdditionalPage: ${safeImagesPerAdditionalPage}
-    `);
-
-    // Add images section - improved multi-page logic
     if (embeddedImages.length > 0) {
+      // Calculate available space on first page
+      const footerSpace = 60;
+      const availableSpaceFirstPage = returnsSectionY - footerSpace;
 
-      let currentImageIndex = 0;
-      let pageCount = 0; // Safety counter to prevent infinite loops
+      console.log(`Available space on first page: ${availableSpaceFirstPage}px`);
 
-      // Add images to pages
-      while (currentImageIndex < embeddedImages.length && pageCount < 10) { // Max 10 pages safety limit
-        pageCount++;
-        const isFirstPage = currentImageIndex === 0;
-        const currentPage = isFirstPage ? firstPage : pdfDoc.addPage([612, 792]);
+      // Determine layout strategy based on number of images and available space
+      let layoutStrategy;
 
-        // Add header for image pages (except first page which already has header)
-        if (!isFirstPage) {
-          // Simple header for image pages
-          currentPage.drawRectangle({
-            x: 0,
-            y: pageHeight - 60,
-            width: pageWidth,
-            height: 60,
-            color: rgb(0.95, 0.95, 0.95),
-          });
-
-          currentPage.drawText("B&R FOOD SERVICES - INVOICE IMAGES", {
-            x: margin,
-            y: pageHeight - 35,
-            size: 16,
-            font: helveticaBold,
-            color: accentColor,
-          });
-        }
-
-        // Calculate how many images to put on this page with improved logic
-        const startY = isFirstPage ? returnsSectionY - 50 : pageHeight - headerSpaceForImagePages;
-        const availableHeight = isFirstPage ? remainingSpace : pageHeight - headerSpaceForImagePages - footerSpace;
-
-        // Calculate images that can fit on this page
-        let imagesOnThisPage;
-        if (isFirstPage) {
-          // For first page, be more conservative with space calculation
-          const minSpaceNeeded = 150; // Minimum space needed for one image
-          if (availableHeight >= minSpaceNeeded) {
-            imagesOnThisPage = Math.min(
-              embeddedImages.length - currentImageIndex,
-              Math.max(1, Math.floor(availableHeight / imageSpacePerImage))
-            );
-          } else {
-            imagesOnThisPage = 0; // Force to next page if not enough space
-          }
-        } else {
-          // For additional pages, ensure we place at least 1 image but not more than what fits
-          imagesOnThisPage = Math.min(
-            embeddedImages.length - currentImageIndex,
-            Math.max(1, Math.floor(availableHeight / imageSpacePerImage))
-          );
-        }
-
-        console.log(`Page ${pageCount} (${isFirstPage ? 'first' : 'additional'}):
-          - availableHeight: ${availableHeight}
-          - imagesOnThisPage: ${imagesOnThisPage}
-          - currentImageIndex: ${currentImageIndex}
-          - embeddedImages.length: ${embeddedImages.length}
-          - startY: ${startY}
-          - imageSpacePerImage: ${imageSpacePerImage}
-        `);
-
-        // If no images can fit on first page, we need to ensure we still process them on additional pages
-        if (isFirstPage && imagesOnThisPage === 0) {
-          console.log('No space on first page, will place all images on additional pages');
-          // Skip adding images to first page, but continue to create additional pages
-          // Continue to next iteration to create additional page
-          continue;
-        }
-
-        // Add images to current page (only if we have images to place)
-        if (imagesOnThisPage > 0) {
-          console.log(`Adding ${imagesOnThisPage} images to page ${pageCount}, starting from index ${currentImageIndex}`);
-          for (let i = 0; i < imagesOnThisPage && currentImageIndex < embeddedImages.length; i++) {
-          const image = embeddedImages[currentImageIndex];
-          const imageY = startY - (i * imageSpacePerImage);
-
-          // Add image title
-          currentPage.drawText(`Invoice Image ${currentImageIndex + 1}:`, {
-            x: margin,
-            y: imageY,
-            size: 12,
-            font: helveticaBold,
-            color: primaryColor,
-          });
-
-          // Calculate image dimensions
-          const maxImageWidth = contentWidth;
-          const maxImageHeight = imageSpacePerImage - 40; // Leave space for title
-
-          const imgWidth = image.width;
-          const imgHeight = image.height;
-
-          let scaledWidth = imgWidth;
-          let scaledHeight = imgHeight;
-
-          // Scale to fit within bounds
-          if (imgWidth > maxImageWidth) {
-            const scale = maxImageWidth / imgWidth;
-            scaledWidth = imgWidth * scale;
-            scaledHeight = imgHeight * scale;
-          }
-
-          if (scaledHeight > maxImageHeight) {
-            const scale = maxImageHeight / scaledHeight;
-            scaledWidth = scaledWidth * scale;
-            scaledHeight = scaledHeight * scale;
-          }
-
-          // Center image horizontally
-          const imageX = margin + (contentWidth - scaledWidth) / 2;
-          const finalImageY = imageY - 25 - scaledHeight;
-
-          // Draw image border
-          currentPage.drawRectangle({
-            x: imageX - 2,
-            y: finalImageY - 2,
-            width: scaledWidth + 4,
-            height: scaledHeight + 4,
-            borderColor: rgb(0.8, 0.8, 0.8),
-            borderWidth: 1,
-          });
-
-          // Draw the image
-          currentPage.drawImage(image, {
-            x: imageX,
-            y: finalImageY,
-            width: scaledWidth,
-            height: scaledHeight,
-          });
-
-          currentImageIndex++;
-          }
-        } else {
-          console.log(`No images placed on page ${pageCount}. Breaking to prevent infinite loop.`);
-          // If no images were placed and we're not on the first page, something is wrong
-          if (!isFirstPage) {
-            console.error('ERROR: No images could be placed on additional page. Breaking loop.');
-            break;
-          }
-        }
-
-        // Add page number (only for additional pages, first page has its own footer)
-        if (!isFirstPage) {
-          // Calculate total pages more accurately
-          const imagesOnFirstPage = Math.floor(remainingSpace / imageSpacePerImage);
-          const remainingImages = Math.max(0, embeddedImages.length - imagesOnFirstPage);
-          const additionalPages = remainingImages > 0 ? Math.ceil(remainingImages / safeImagesPerAdditionalPage) : 0;
-          const totalPages = 1 + additionalPages;
-
-          // Calculate current page number
-          const imagesProcessedBeforeThisPage = currentImageIndex - imagesOnThisPage;
-          const imagesAfterFirstPage = Math.max(0, imagesProcessedBeforeThisPage - imagesOnFirstPage);
-          const currentPageNum = 2 + Math.floor(imagesAfterFirstPage / safeImagesPerAdditionalPage);
-
-          const pageNumberText = `Page ${currentPageNum} of ${totalPages}`;
-          const pageNumberWidth = helvetica.widthOfTextAtSize(pageNumberText, 10);
-          currentPage.drawText(pageNumberText, {
-            x: pageWidth - margin - pageNumberWidth,
-            y: 30,
-            size: 10,
-            font: helvetica,
-            color: secondaryColor,
-          });
-        }
+      if (embeddedImages.length === 1) {
+        layoutStrategy = "single-large";
+      } else if (embeddedImages.length === 2 && availableSpaceFirstPage >= 300) {
+        layoutStrategy = "side-by-side";
+      } else if (embeddedImages.length <= 3 && availableSpaceFirstPage >= 400) {
+        layoutStrategy = "compact-grid";
+      } else {
+        layoutStrategy = "multi-page";
       }
 
-      console.log(`PDF Generation Complete:
-        - Total pages created: ${pageCount}
-        - Images processed: ${currentImageIndex}/${embeddedImages.length}
-        - Final currentImageIndex: ${currentImageIndex}
-      `);
+      console.log(`Using layout strategy: ${layoutStrategy}`);
+
+      if (layoutStrategy === "single-large") {
+        // Single large image
+        const image = embeddedImages[0];
+        const maxWidth = contentWidth;
+        const maxHeight = availableSpaceFirstPage - 60;
+
+        const { width, height } = calculateImageSize(image, maxWidth, maxHeight);
+        const x = margin + (contentWidth - width) / 2;
+        const y = returnsSectionY - 40 - height;
+
+        firstPage.drawText("Invoice Image:", {
+          x: margin,
+          y: returnsSectionY - 20,
+          size: 14,
+          font: helveticaBold,
+          color: primaryColor,
+        });
+
+        firstPage.drawImage(image, { x, y, width, height });
+
+      } else if (layoutStrategy === "side-by-side") {
+        // Two images side by side
+        const imageWidth = (contentWidth - 20) / 2; // 20px gap between images
+        const maxHeight = availableSpaceFirstPage - 60;
+
+        firstPage.drawText("Invoice Images:", {
+          x: margin,
+          y: returnsSectionY - 20,
+          size: 14,
+          font: helveticaBold,
+          color: primaryColor,
+        });
+
+        embeddedImages.slice(0, 2).forEach((image, index) => {
+          const { width, height } = calculateImageSize(image, imageWidth, maxHeight);
+          const x = margin + (index * (imageWidth + 20)) + (imageWidth - width) / 2;
+          const y = returnsSectionY - 40 - height;
+
+          firstPage.drawImage(image, { x, y, width, height });
+        });
+
+      } else if (layoutStrategy === "compact-grid") {
+        // Compact grid for 3+ images
+        const cols = embeddedImages.length === 3 ? 3 : 2;
+        const rows = Math.ceil(embeddedImages.length / cols);
+        const imageWidth = (contentWidth - (cols - 1) * 15) / cols;
+        const imageHeight = (availableSpaceFirstPage - 80) / rows;
+
+        firstPage.drawText("Invoice Images:", {
+          x: margin,
+          y: returnsSectionY - 20,
+          size: 14,
+          font: helveticaBold,
+          color: primaryColor,
+        });
+
+        embeddedImages.forEach((image, index) => {
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          const { width, height } = calculateImageSize(image, imageWidth, imageHeight);
+
+          const x = margin + col * (imageWidth + 15) + (imageWidth - width) / 2;
+          const y = returnsSectionY - 40 - row * (imageHeight + 15) - height;
+
+          firstPage.drawImage(image, { x, y, width, height });
+        });
+
+      } else {
+        // Multi-page layout - simple approach
+        let currentImageIndex = 0;
+
+        while (currentImageIndex < embeddedImages.length) {
+          const isFirstPage = currentImageIndex === 0;
+          const currentPage = isFirstPage ? firstPage : pdfDoc.addPage([612, 792]);
+
+          if (!isFirstPage) {
+            currentPage.drawText("B&R FOOD SERVICES - INVOICE IMAGES", {
+              x: margin,
+              y: pageHeight - 40,
+              size: 16,
+              font: helveticaBold,
+              color: accentColor,
+            });
+          }
+
+          const startY = isFirstPage ? returnsSectionY - 40 : pageHeight - 80;
+          const availableHeight = isFirstPage ? availableSpaceFirstPage : pageHeight - 120;
+          const imagesPerPage = isFirstPage ? 1 : 2; // Conservative approach
+
+          for (let i = 0; i < imagesPerPage && currentImageIndex < embeddedImages.length; i++) {
+            const image = embeddedImages[currentImageIndex];
+            const imageY = startY - (i * (availableHeight / imagesPerPage));
+
+            const { width, height } = calculateImageSize(image, contentWidth, availableHeight / imagesPerPage - 40);
+            const x = margin + (contentWidth - width) / 2;
+            const y = imageY - height;
+
+            currentPage.drawText(`Invoice Image ${currentImageIndex + 1}:`, {
+              x: margin,
+              y: imageY,
+              size: 12,
+              font: helveticaBold,
+              color: primaryColor,
+            });
+
+            currentPage.drawImage(image, { x, y, width, height });
+            currentImageIndex++;
+          }
+        }
+      }
     }
 
     // Add footer to first page
@@ -822,15 +800,18 @@ export async function POST(
       color: secondaryColor,
     });
 
-    // Calculate total pages based on improved logic
+    // Calculate total pages based on layout strategy
     let actualTotalPages = 1; // Always have at least the first page
 
     if (embeddedImages.length > 0) {
-      // Use the same calculation logic as above for consistency
-      const imagesOnFirstPage = Math.floor(remainingSpace / imageSpacePerImage);
-      const remainingImages = Math.max(0, embeddedImages.length - imagesOnFirstPage);
-      const additionalPages = remainingImages > 0 ? Math.ceil(remainingImages / safeImagesPerAdditionalPage) : 0;
-      actualTotalPages = 1 + additionalPages;
+      // Simple page calculation - if more than 3 images, likely multi-page
+      if (embeddedImages.length > 3) {
+        // Conservative estimate: 1-2 images per additional page
+        const imagesAfterFirst = Math.max(0, embeddedImages.length - 1);
+        const additionalPages = Math.ceil(imagesAfterFirst / 2);
+        actualTotalPages = 1 + additionalPages;
+      }
+      // For 3 or fewer images, all fit on first page
     }
 
     const pageNumberText = `Page 1 of ${actualTotalPages}`;
