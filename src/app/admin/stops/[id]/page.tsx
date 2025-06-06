@@ -20,6 +20,7 @@ interface Stop {
   arrivalTime: string | null;
   completionTime: string | null;
   signedInvoicePdfUrl: string | null;
+  invoiceImageUrls: string[];
   driverNotes: string | null;
   isCOD: boolean;
   paymentFlagCash: boolean;
@@ -1247,6 +1248,93 @@ export default function StopDetailPage({
                   <p className="mt-2">No signed invoice uploaded yet</p>
                   <p className="text-xs text-gray-400 mt-1">
                     The driver will upload the signed invoice when completing the delivery
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Invoice Images Preview */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden mt-6">
+            <div className="px-6 py-4 border-b border-mono-200">
+              <h2 className="text-lg font-medium text-mono-800">Invoice Images</h2>
+            </div>
+            <div className="p-6">
+              {stop.invoiceImageUrls && stop.invoiceImageUrls.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
+                    <svg
+                      className="h-5 w-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-blue-700 font-medium">
+                        {stop.invoiceImageUrls.length} image{stop.invoiceImageUrls.length !== 1 ? 's' : ''} uploaded
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Driver uploaded delivery photos for verification
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Image Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {stop.invoiceImageUrls.map((imageUrl, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-700">
+                            📷 Photo {index + 1}
+                          </h4>
+                        </div>
+                        <div className="p-2">
+                          <img
+                            src={imageUrl}
+                            alt={`Invoice photo ${index + 1}`}
+                            className="w-full h-48 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(imageUrl, '_blank')}
+                          />
+                        </div>
+                        <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                          <a
+                            href={imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            View Full Size
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-300"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <p className="mt-2">No invoice images uploaded yet</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Images will appear here when the driver uploads them
                   </p>
                 </div>
               )}

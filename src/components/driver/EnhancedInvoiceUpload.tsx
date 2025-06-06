@@ -133,6 +133,9 @@ export default function EnhancedInvoiceUpload({
     try {
       const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
 
+      // Generate a unique session ID for this upload batch
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+
       // Upload images one by one
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
@@ -140,6 +143,7 @@ export default function EnhancedInvoiceUpload({
         formData.append('file', image.file);
         formData.append('imageIndex', i.toString());
         formData.append('totalImages', images.length.toString());
+        formData.append('sessionId', sessionId); // Add session ID for grouping
 
         const response = await fetch(`/api/driver/stops/${stopId}/upload`, {
           method: 'POST',
@@ -235,16 +239,25 @@ export default function EnhancedInvoiceUpload({
 
         {/* Image Preview Grid */}
         {images.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-            {images.map((image) => (
-              <div key={image.id} className="relative group">
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <img
-                    src={image.preview}
-                    alt="Invoice preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+          <div className="space-y-4 mb-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-gray-700">
+                Selected Images ({images.length})
+              </h4>
+              <p className="text-xs text-gray-500">
+                Hover over images to see edit options
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {images.map((image) => (
+                <div key={image.id} className="relative group">
+                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 group-hover:border-blue-300 transition-colors">
+                    <img
+                      src={image.preview}
+                      alt="Invoice preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
                 {/* Image Status Indicator */}
                 <div className="absolute top-2 right-2">
@@ -263,31 +276,56 @@ export default function EnhancedInvoiceUpload({
                   )}
                 </div>
 
-                {/* Image Actions */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center space-x-2">
+                {/* Image Actions - Enhanced visibility */}
+                <div className="absolute inset-0 bg-black bg-opacity-60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center space-x-3">
                   <button
                     onClick={() => replaceImage(image.id)}
                     disabled={isUploading}
-                    className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50"
+                    className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 disabled:opacity-50 shadow-lg transform hover:scale-105 transition-transform"
                     title="Replace image"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" />
                     </svg>
                   </button>
                   <button
                     onClick={() => removeImage(image.id)}
                     disabled={isUploading}
-                    className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 disabled:opacity-50"
+                    className="bg-red-600 text-white p-3 rounded-full hover:bg-red-700 disabled:opacity-50 shadow-lg transform hover:scale-105 transition-transform"
                     title="Remove image"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Mobile-friendly action buttons (always visible on small screens) */}
+                <div className="md:hidden absolute bottom-2 right-2 flex space-x-1">
+                  <button
+                    onClick={() => replaceImage(image.id)}
+                    disabled={isUploading}
+                    className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50 shadow-lg"
+                    title="Replace"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => removeImage(image.id)}
+                    disabled={isUploading}
+                    className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 disabled:opacity-50 shadow-lg"
+                    title="Delete"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                   </button>
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
 

@@ -101,6 +101,7 @@ model Stop {
   arrivalTime            DateTime? // Time when driver arrived at the stop (status changed to ARRIVED)
   completionTime         DateTime? // Time when delivery was completed (status changed to COMPLETED)
   signedInvoicePdfUrl    String?
+  invoiceImageUrls       String[] @default([]) // URLs of uploaded invoice images for admin preview
   driverNotes            String? // Notes added by driver during delivery
   isCOD                  Boolean    @default(false) // COD Account flag
   paymentFlagCash        Boolean    @default(false) // Cash payment flag

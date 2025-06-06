@@ -118,6 +118,7 @@ export async function POST(
     // Get image metadata for multiple image handling
     const imageIndex = parseInt(formData.get('imageIndex') as string || '0');
     const totalImages = parseInt(formData.get('totalImages') as string || '1');
+    const sessionId = formData.get('sessionId') as string || Math.random().toString(36).substring(2, 15);
 
     // Check file type
     if (!file.type.startsWith("image/")) {
@@ -130,10 +131,9 @@ export async function POST(
     // Read the file as an ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
 
-    // Create a unique filename with image index
+    // Create a unique filename with session ID for grouping
     const timestamp = new Date().getTime();
-    const uniqueId = Math.random().toString(36).substring(2, 15);
-    const fileName = `invoice_${stop.id}_${timestamp}_${uniqueId}_img${imageIndex + 1}`;
+    const fileName = `invoice_${stop.id}_${timestamp}_${sessionId}_img${imageIndex + 1}`;
 
     // Ensure the uploads directory exists
     const uploadsDir = path.join(process.cwd(), "public", "uploads");
@@ -182,58 +182,55 @@ export async function POST(
     // Create PDF document
     const pdfDoc = await PDFDocument.create();
 
-    // Collect all images for this stop
+    // FIXED: Collect ALL images from current upload session
     const allImages = [];
 
-    // Get all uploaded images for this stop
-    const imagePattern = new RegExp(`invoice_${stop.id}_.*_img\\d+\\.jpg$`);
+    // Get all images from this upload session (based on sessionId pattern)
+    const sessionPattern = new RegExp(`invoice_${stop.id}_\\d+_${sessionId}_img\\d+\\.jpg$`);
 
     try {
       const files = await readdirAsync(uploadsDir);
-      console.log(`Scanning ${files.length} files for images...`);
+      console.log(`Scanning for current session images with sessionId: ${sessionId}`);
 
       for (const file of files) {
-        if (imagePattern.test(file)) {
+        if (sessionPattern.test(file)) {
           const imagePath = path.join(uploadsDir, file);
           const imageBuffer = await readFileAsync(imagePath);
-          const imageIndex = parseInt(file.match(/_img(\d+)\.jpg$/)?.[1] || '0');
+          const imageIndexMatch = file.match(/_img(\d+)\.jpg$/);
+          const fileImageIndex = parseInt(imageIndexMatch?.[1] || '0');
 
           allImages.push({
             buffer: imageBuffer,
-            index: imageIndex,
+            index: fileImageIndex,
             name: file
           });
-          console.log(`Found image: ${file} (index: ${imageIndex})`);
+          console.log(`Found session image: ${file} (index: ${fileImageIndex})`);
         }
       }
     } catch (error) {
-      console.error("Error reading images:", error);
+      console.error("Error reading session images:", error);
+      // Fallback to current image only
+      allImages.push({
+        buffer: Buffer.from(fileBuffer),
+        index: imageIndex + 1,
+        name: `${fileName}.jpg`
+      });
     }
 
-    // Add current image
-    allImages.push({
-      buffer: Buffer.from(fileBuffer),
-      index: imageIndex + 1,
-      name: `${fileName}.jpg`
-    });
+    console.log(`Total session images found: ${allImages.length}`);
 
     // Sort by index
     allImages.sort((a, b) => a.index - b.index);
     console.log(`Total images to process: ${allImages.length}`);
 
-    // Embed all images
-    const embeddedImages = [];
-    for (const img of allImages) {
-      try {
-        const embeddedImage = await pdfDoc.embedJpg(img.buffer);
-        embeddedImages.push(embeddedImage);
-        console.log(`Embedded image: ${img.name}`);
-      } catch (error) {
-        console.error(`Failed to embed ${img.name}:`, error);
-      }
-    }
+    // Generate image URLs instead of embedding
+    const imageUrls = allImages.map(img => ({
+      url: `/uploads/${img.name}`,
+      name: img.name,
+      index: img.index
+    }));
 
-    console.log(`Successfully embedded ${embeddedImages.length} images`);
+    console.log(`Generated ${imageUrls.length} image URLs:`, imageUrls.map(img => img.url));
 
     // Create first page with invoice details
     const firstPage = pdfDoc.addPage([612, 792]); // Letter size
@@ -241,14 +238,16 @@ export async function POST(
     // Embed fonts
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const helveticaOblique = await pdfDoc.embedFont(
-      StandardFonts.HelveticaOblique
-    );
+    const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
 
-    // Define colors
-    const primaryColor = rgb(0, 0, 0);
-    const secondaryColor = rgb(0.2, 0.2, 0.2);
-    const accentColor = rgb(0.1, 0.4, 0.7);
+    // Define enhanced color palette
+    const primaryColor = rgb(0.15, 0.15, 0.15); // Rich dark gray
+    const secondaryColor = rgb(0.4, 0.4, 0.4); // Medium gray
+    const accentColor = rgb(0.0, 0.3, 0.6); // Professional blue
+    const successColor = rgb(0.0, 0.5, 0.2); // Green for completed items
+    const warningColor = rgb(0.8, 0.4, 0.0); // Orange for attention items
+    const lightGray = rgb(0.95, 0.95, 0.95); // Light background
+    const borderColor = rgb(0.8, 0.8, 0.8); // Border color
 
     // Define dimensions
     const pageWidth = firstPage.getWidth();
@@ -282,13 +281,32 @@ export async function POST(
       color: accentColor,
     });
 
-    // Add document title
-    firstPage.drawText("DELIVERY INVOICE", {
+    // Add document title with enhanced styling
+    firstPage.drawText("DELIVERY CONFIRMATION RECEIPT", {
       x: margin,
       y: pageHeight - 65,
-      size: 14,
-      font: helvetica,
-      color: secondaryColor,
+      size: 16,
+      font: helveticaBold,
+      color: primaryColor,
+    });
+
+    // Add completion status badge (moved to avoid overlap with route info)
+    const statusText = "COMPLETED";
+    const statusWidth = helveticaBold.widthOfTextAtSize(statusText, 12);
+    firstPage.drawRectangle({
+      x: pageWidth - margin - statusWidth - 20,
+      y: pageHeight - 25,
+      width: statusWidth + 16,
+      height: 18,
+      color: successColor,
+    });
+
+    firstPage.drawText(statusText, {
+      x: pageWidth - margin - statusWidth - 12,
+      y: pageHeight - 20,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(1, 1, 1), // White text
     });
 
     // Add date on the right
@@ -324,100 +342,138 @@ export async function POST(
       color: secondaryColor,
     });
 
-    // Customer information section
-    const customerSectionY = pageHeight - 130;
+    // Customer information section with enhanced design
+    const customerSectionY = pageHeight - 140;
 
-    // Draw customer section background
+    // Draw customer section with modern styling
     firstPage.drawRectangle({
       x: margin,
-      y: customerSectionY - 60,
+      y: customerSectionY - 70,
       width: contentWidth,
-      height: 60,
-      color: rgb(0.97, 0.97, 1),
-      borderColor: rgb(0.8, 0.8, 0.9),
+      height: 70,
+      color: lightGray,
+      borderColor: borderColor,
       borderWidth: 1,
     });
 
-    // Add customer section title
+    // Add left border accent
+    firstPage.drawRectangle({
+      x: margin,
+      y: customerSectionY - 70,
+      width: 4,
+      height: 70,
+      color: accentColor,
+    });
+
+    // Add customer section title with icon
     firstPage.drawText("CUSTOMER INFORMATION", {
-      x: margin + 10,
-      y: customerSectionY - 20,
-      size: 10,
+      x: margin + 15,
+      y: customerSectionY - 25,
+      size: 11,
       font: helveticaBold,
       color: accentColor,
     });
 
-    // Add customer name
-    firstPage.drawText(`Customer: ${stop.customer.name}`, {
-      x: margin + 10,
-      y: customerSectionY - 35,
-      size: 10,
-      font: helvetica,
+    // Add customer details in two columns
+    firstPage.drawText(`${stop.customer.name}`, {
+      x: margin + 15,
+      y: customerSectionY - 45,
+      size: 11,
+      font: helveticaBold,
       color: primaryColor,
     });
 
-    // Add customer address
-    firstPage.drawText(`Address: ${stop.customer.address}`, {
-      x: margin + 10,
-      y: customerSectionY - 50,
+    firstPage.drawText(`${stop.customer.address}`, {
+      x: margin + 15,
+      y: customerSectionY - 60,
       size: 10,
       font: helvetica,
-      color: primaryColor,
+      color: secondaryColor,
     });
 
-    // Delivery information section
-    const deliverySectionY = customerSectionY - 80;
+    // Add order information on the right side
+    const orderInfo = stop.quickbooksInvoiceNum ? `Order #${stop.quickbooksInvoiceNum}` : "No Order #";
+    const orderInfoWidth = helvetica.widthOfTextAtSize(orderInfo, 10);
+    firstPage.drawText(orderInfo, {
+      x: pageWidth - margin - orderInfoWidth - 15,
+      y: customerSectionY - 45,
+      size: 10,
+      font: helvetica,
+      color: secondaryColor,
+    });
 
-    // Draw delivery section background
+    // Delivery information section with enhanced design
+    const deliverySectionY = customerSectionY - 90;
+
+    // Draw delivery section with modern styling
     firstPage.drawRectangle({
       x: margin,
-      y: deliverySectionY - 60,
+      y: deliverySectionY - 70,
       width: contentWidth,
-      height: 60,
-      color: rgb(0.97, 0.97, 1),
-      borderColor: rgb(0.8, 0.8, 0.9),
+      height: 70,
+      color: rgb(0.95, 0.98, 0.95),
+      borderColor: borderColor,
       borderWidth: 1,
     });
 
-    // Add delivery section title
-    firstPage.drawText("DELIVERY INFORMATION", {
-      x: margin + 10,
-      y: deliverySectionY - 20,
+    // Add left border accent
+    firstPage.drawRectangle({
+      x: margin,
+      y: deliverySectionY - 70,
+      width: 4,
+      height: 70,
+      color: successColor,
+    });
+
+    // Add delivery section title with icon
+    firstPage.drawText("DELIVERY SUMMARY", {
+      x: margin + 15,
+      y: deliverySectionY - 25,
+      size: 11,
+      font: helveticaBold,
+      color: successColor,
+    });
+
+    // Format delivery date nicely
+    const deliveryDate = new Date(stop.route.date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    firstPage.drawText(`${deliveryDate}`, {
+      x: margin + 15,
+      y: deliverySectionY - 45,
+      size: 10,
+      font: helvetica,
+      color: primaryColor,
+    });
+
+    // Add completion time
+    const completionTime = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    firstPage.drawText(`Completed at ${completionTime}`, {
+      x: margin + 15,
+      y: deliverySectionY - 60,
+      size: 10,
+      font: helvetica,
+      color: primaryColor,
+    });
+
+    // Add route information on the right side
+    const routeInfo = `Route ${stop.route.routeNumber || 'N/A'}`;
+    const routeInfoWidth = helvetica.widthOfTextAtSize(routeInfo, 10);
+    firstPage.drawText(routeInfo, {
+      x: pageWidth - margin - routeInfoWidth - 15,
+      y: deliverySectionY - 45,
       size: 10,
       font: helveticaBold,
       color: accentColor,
-    });
-
-    // Add delivery date
-    firstPage.drawText(
-      `Delivery Date: ${new Date(stop.route.date).toLocaleDateString()}`,
-      {
-        x: margin + 10,
-        y: deliverySectionY - 35,
-        size: 10,
-        font: helvetica,
-        color: primaryColor,
-      }
-    );
-
-    // Add delivery status (show as COMPLETED for PDF)
-    firstPage.drawText(`Status: COMPLETED`, {
-      x: margin + 10,
-      y: deliverySectionY - 50,
-      size: 10,
-      font: helvetica,
-      color: primaryColor,
-    });
-
-    // Add delivery time on the right side
-    const timeText = `Time: ${new Date().toLocaleTimeString()}`;
-    const timeTextWidth = helvetica.widthOfTextAtSize(timeText, 10);
-    firstPage.drawText(timeText, {
-      x: pageWidth - margin - timeTextWidth - 10,
-      y: deliverySectionY - 35,
-      size: 10,
-      font: helvetica,
-      color: primaryColor,
     });
 
     // Returns section (if any returns exist)
@@ -458,13 +514,13 @@ export async function POST(
         borderWidth: 2,
       });
 
-      // Add returns section title
+      // Add returns section title with enhanced styling and icon
       firstPage.drawText("RETURNED ITEMS", {
         x: margin + 15,
         y: returnsSectionY - 25,
         size: 12,
         font: helveticaBold,
-        color: rgb(0.7, 0.2, 0.2),
+        color: warningColor,
       });
 
       // Add summary info with truncation notice if needed
@@ -603,9 +659,11 @@ export async function POST(
           color: rgb(0.8, 0.3, 0.3),
         });
 
-        // Reason (fixed width: remaining space)
-        const reason = returnItem.reasonCode || "N/A";
-        const maxReasonLength = 12;
+        // Reason (fixed width: remaining space) - Use actual reason text
+        const reason = returnItem.reasonCode && returnItem.reasonCode !== "Driver return"
+          ? returnItem.reasonCode
+          : "Driver Return";
+        const maxReasonLength = 15; // Increased length for better readability
         const truncatedReason = reason.length > maxReasonLength
           ? reason.substring(0, maxReasonLength) + "..."
           : reason;
@@ -645,157 +703,138 @@ export async function POST(
       returnsSectionY = returnsSectionY - actualHeight;
     }
 
-    // REFACTORED IMAGE LAYOUT - Simple and Accommodating
-    console.log(`=== IMAGE LAYOUT START ===`);
-    console.log(`Laying out ${embeddedImages.length} images`);
+    // ADD IMAGE LINKS SECTION - Simple Text-Based Approach
+    console.log(`=== IMAGE LINKS SECTION ===`);
+    console.log(`Adding ${imageUrls.length} image links to PDF`);
 
-    if (embeddedImages.length > 0) {
-      // Calculate available space on first page
+    if (imageUrls.length > 0) {
+      // Calculate available space for image links section
       const footerSpace = 60;
-      const availableSpaceFirstPage = returnsSectionY - footerSpace;
+      const availableSpace = returnsSectionY - footerSpace;
 
-      console.log(`Available space on first page: ${availableSpaceFirstPage}px`);
+      // Draw image links section background
+      const sectionHeight = Math.min(120, availableSpace);
+      firstPage.drawRectangle({
+        x: margin,
+        y: returnsSectionY - sectionHeight,
+        width: contentWidth,
+        height: sectionHeight,
+        color: rgb(0.95, 0.98, 0.95),
+        borderColor: rgb(0.6, 0.8, 0.6),
+        borderWidth: 2,
+      });
 
-      // Determine layout strategy based on number of images and available space
-      let layoutStrategy;
+      // Add section title with icon
+      firstPage.drawText("DELIVERY PHOTOS", {
+        x: margin + 15,
+        y: returnsSectionY - 25,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0.2, 0.6, 0.2),
+      });
 
-      if (embeddedImages.length === 1) {
-        layoutStrategy = "single-large";
-      } else if (embeddedImages.length === 2 && availableSpaceFirstPage >= 300) {
-        layoutStrategy = "side-by-side";
-      } else if (embeddedImages.length <= 3 && availableSpaceFirstPage >= 400) {
-        layoutStrategy = "compact-grid";
-      } else {
-        layoutStrategy = "multi-page";
-      }
+      // Add image count with professional styling
+      const countText = `${imageUrls.length} photo${imageUrls.length !== 1 ? 's' : ''} uploaded`;
+      const countWidth = helvetica.widthOfTextAtSize(countText, 9);
+      firstPage.drawRectangle({
+        x: pageWidth - margin - countWidth - 25,
+        y: returnsSectionY - 32,
+        width: countWidth + 16,
+        height: 16,
+        color: rgb(0.9, 0.95, 0.9),
+        borderColor: rgb(0.6, 0.8, 0.6),
+        borderWidth: 1,
+      });
 
-      console.log(`Using layout strategy: ${layoutStrategy}`);
+      firstPage.drawText(countText, {
+        x: pageWidth - margin - countWidth - 17,
+        y: returnsSectionY - 27,
+        size: 9,
+        font: helveticaBold,
+        color: rgb(0.2, 0.6, 0.2),
+      });
 
-      if (layoutStrategy === "single-large") {
-        // Single large image
-        const image = embeddedImages[0];
-        const maxWidth = contentWidth;
-        const maxHeight = availableSpaceFirstPage - 60;
+      // Add instruction text for customers
+      firstPage.drawText("Copy the links below to view delivery photos:", {
+        x: margin + 15,
+        y: returnsSectionY - 45,
+        size: 10,
+        font: helvetica,
+        color: rgb(0.3, 0.3, 0.3),
+      });
 
-        const { width, height } = calculateImageSize(image, maxWidth, maxHeight);
-        const x = margin + (contentWidth - width) / 2;
-        const y = returnsSectionY - 40 - height;
+      // Add clean image links for customers
+      imageUrls.forEach((img, index) => {
+        const linkY = returnsSectionY - 65 - (index * 20); // Increased spacing for better readability
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const fullUrl = `${baseUrl}${img.url}`;
 
-        firstPage.drawText("Invoice Image:", {
-          x: margin,
-          y: returnsSectionY - 20,
-          size: 14,
+        // Add image label
+        firstPage.drawText(`Image ${index + 1}:`, {
+          x: margin + 15,
+          y: linkY + 5,
+          size: 10,
           font: helveticaBold,
-          color: primaryColor,
+          color: rgb(0.2, 0.2, 0.2),
         });
 
-        firstPage.drawImage(image, { x, y, width, height });
-
-      } else if (layoutStrategy === "side-by-side") {
-        // Two images side by side
-        const imageWidth = (contentWidth - 20) / 2; // 20px gap between images
-        const maxHeight = availableSpaceFirstPage - 60;
-
-        firstPage.drawText("Invoice Images:", {
-          x: margin,
-          y: returnsSectionY - 20,
-          size: 14,
-          font: helveticaBold,
-          color: primaryColor,
+        // Add the URL on the next line
+        firstPage.drawText(fullUrl, {
+          x: margin + 15,
+          y: linkY - 8,
+          size: 8,
+          font: helvetica,
+          color: rgb(0.1, 0.3, 0.7), // Blue color for links
         });
+      });
 
-        embeddedImages.slice(0, 2).forEach((image, index) => {
-          const { width, height } = calculateImageSize(image, imageWidth, maxHeight);
-          const x = margin + (index * (imageWidth + 20)) + (imageWidth - width) / 2;
-          const y = returnsSectionY - 40 - height;
+      // Add note for customers
+      firstPage.drawText("Note: Copy and paste the links above into your browser to view photos", {
+        x: margin + 15,
+        y: returnsSectionY - sectionHeight + 15,
+        size: 8,
+        font: helveticaOblique,
+        color: rgb(0.5, 0.5, 0.5),
+      });
 
-          firstPage.drawImage(image, { x, y, width, height });
-        });
-
-      } else if (layoutStrategy === "compact-grid") {
-        // Compact grid for 3+ images
-        const cols = embeddedImages.length === 3 ? 3 : 2;
-        const rows = Math.ceil(embeddedImages.length / cols);
-        const imageWidth = (contentWidth - (cols - 1) * 15) / cols;
-        const imageHeight = (availableSpaceFirstPage - 80) / rows;
-
-        firstPage.drawText("Invoice Images:", {
-          x: margin,
-          y: returnsSectionY - 20,
-          size: 14,
-          font: helveticaBold,
-          color: primaryColor,
-        });
-
-        embeddedImages.forEach((image, index) => {
-          const col = index % cols;
-          const row = Math.floor(index / cols);
-          const { width, height } = calculateImageSize(image, imageWidth, imageHeight);
-
-          const x = margin + col * (imageWidth + 15) + (imageWidth - width) / 2;
-          const y = returnsSectionY - 40 - row * (imageHeight + 15) - height;
-
-          firstPage.drawImage(image, { x, y, width, height });
-        });
-
-      } else {
-        // Multi-page layout - simple approach
-        let currentImageIndex = 0;
-
-        while (currentImageIndex < embeddedImages.length) {
-          const isFirstPage = currentImageIndex === 0;
-          const currentPage = isFirstPage ? firstPage : pdfDoc.addPage([612, 792]);
-
-          if (!isFirstPage) {
-            currentPage.drawText("B&R FOOD SERVICES - INVOICE IMAGES", {
-              x: margin,
-              y: pageHeight - 40,
-              size: 16,
-              font: helveticaBold,
-              color: accentColor,
-            });
-          }
-
-          const startY = isFirstPage ? returnsSectionY - 40 : pageHeight - 80;
-          const availableHeight = isFirstPage ? availableSpaceFirstPage : pageHeight - 120;
-          const imagesPerPage = isFirstPage ? 1 : 2; // Conservative approach
-
-          for (let i = 0; i < imagesPerPage && currentImageIndex < embeddedImages.length; i++) {
-            const image = embeddedImages[currentImageIndex];
-            const imageY = startY - (i * (availableHeight / imagesPerPage));
-
-            const { width, height } = calculateImageSize(image, contentWidth, availableHeight / imagesPerPage - 40);
-            const x = margin + (contentWidth - width) / 2;
-            const y = imageY - height;
-
-            currentPage.drawText(`Invoice Image ${currentImageIndex + 1}:`, {
-              x: margin,
-              y: imageY,
-              size: 12,
-              font: helveticaBold,
-              color: primaryColor,
-            });
-
-            currentPage.drawImage(image, { x, y, width, height });
-            currentImageIndex++;
-          }
-        }
-      }
+      // Update returnsSectionY for footer positioning
+      returnsSectionY = returnsSectionY - sectionHeight;
     }
 
-    // Add footer to first page
-    const footerY = 30;
-    firstPage.drawLine({
-      start: { x: margin, y: footerY + 10 },
-      end: { x: pageWidth - margin, y: footerY + 10 },
-      thickness: 1,
-      color: rgb(0.8, 0.8, 0.8),
+    // Add enhanced footer to first page
+    const footerY = 40;
+
+    // Footer background
+    firstPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: footerY + 15,
+      color: lightGray,
     });
 
-    firstPage.drawText("Thank you for your business!", {
+    // Footer border
+    firstPage.drawLine({
+      start: { x: 0, y: footerY + 15 },
+      end: { x: pageWidth, y: footerY + 15 },
+      thickness: 2,
+      color: accentColor,
+    });
+
+    // Thank you message with icon
+    firstPage.drawText("Thank you for choosing B&R Food Services!", {
       x: margin,
       y: footerY,
-      size: 10,
+      size: 11,
+      font: helveticaBold,
+      color: accentColor,
+    });
+
+    // Contact information
+    firstPage.drawText("Questions? Contact support for assistance", {
+      x: margin,
+      y: footerY - 15,
+      size: 9,
       font: helvetica,
       color: secondaryColor,
     });
@@ -803,15 +842,10 @@ export async function POST(
     // Calculate total pages based on layout strategy
     let actualTotalPages = 1; // Always have at least the first page
 
-    if (embeddedImages.length > 0) {
-      // Simple page calculation - if more than 3 images, likely multi-page
-      if (embeddedImages.length > 3) {
-        // Conservative estimate: 1-2 images per additional page
-        const imagesAfterFirst = Math.max(0, embeddedImages.length - 1);
-        const additionalPages = Math.ceil(imagesAfterFirst / 2);
-        actualTotalPages = 1 + additionalPages;
-      }
-      // For 3 or fewer images, all fit on first page
+    if (imageUrls.length > 0) {
+      // All images are now displayed as links on the first page
+      // No additional pages needed for images
+      actualTotalPages = 1;
     }
 
     const pageNumberText = `Page 1 of ${actualTotalPages}`;
@@ -832,21 +866,44 @@ export async function POST(
     // Create the public URL for the PDF
     const pdfUrl = `/uploads/pdf/${fileName}.pdf`;
 
-    // Update the stop with the PDF URL and mark as completed
+    // Update the stop with the PDF URL and image URLs
     await prisma.stop.update({
       where: {
         id: stop.id,
       },
       data: {
         signedInvoicePdfUrl: pdfUrl,
+        // TODO: Add invoiceImageUrls back after Prisma client is properly updated
+        // invoiceImageUrls: imageUrls?.map(img => img.url) || [], // Store image URLs for admin preview
         // Don't automatically update status here since the client will handle it
         // This allows for better control flow and error handling on the client side
       },
     });
 
+    // Test email notification (optional - remove this in production)
+    console.log(`=== EMAIL NOTIFICATION TEST ===`);
+    try {
+      const customer = await prisma.customer.findUnique({
+        where: { id: stop.customerId },
+        select: { email: true, name: true },
+      });
+
+      if (customer && customer.email) {
+        console.log(`Customer email found: ${customer.email}`);
+        console.log(`Email notification will be sent when stop status is set to COMPLETED`);
+      } else {
+        console.log(`No customer email found for stop ${stop.id}`);
+      }
+    } catch (emailError) {
+      console.error("Error checking customer email:", emailError);
+    }
+
     return NextResponse.json({
-      message: "Invoice uploaded and converted to PDF successfully",
+      message: "PDF generated successfully with image links",
       pdfUrl,
+      imageUrls: imageUrls.map(img => img.url),
+      totalImages: allImages.length,
+      isComplete: true
     });
   } catch (error) {
     console.error("Error uploading invoice:", error);
