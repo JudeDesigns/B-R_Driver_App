@@ -277,7 +277,10 @@ export async function PATCH(
                   isDeleted: false,
                 },
                 select: {
-                  reason: true,
+                  id: true,
+                  productDescription: true,
+                  quantity: true,
+                  reasonCode: true,
                 },
               });
 
@@ -288,29 +291,37 @@ export async function PATCH(
 
               // Get return reasons
               const returnReasons = returns.map(
-                (returnItem) => returnItem.reason
+                (returnItem) => returnItem.reasonCode
               );
 
-              // Get the signed invoice URL
-              const signedInvoiceUrl = updatedStop.signedInvoicePdfUrl || "";
+              // Prepare stop data for PDF generation
+              const stopDataForPdf = {
+                id: updatedStop.id,
+                customerName: customer.name,
+                customerAddress: updatedStop.address,
+                routeNumber: updatedStop.route.routeNumber,
+                arrivalTime: updatedStop.arrivalTime,
+                completionTime: updatedStop.completionTime,
+                driverNotes: updatedStop.driverNotes,
+                adminNotes: null, // Will be populated if needed
+              };
 
-              // Get the original invoice URL (this would typically come from QuickBooks or another system)
-              // For now, we'll use a placeholder or the invoice number if available
-              const originalInvoiceUrl = updatedStop.quickbooksInvoiceNum
-                ? `https://example.com/invoices/${updatedStop.quickbooksInvoiceNum}.pdf`
-                : "";
+              // Prepare image URLs for PDF (from invoice images)
+              const imageUrls = updatedStop.invoiceImageUrls.map((url: string, index: number) => ({
+                url: url,
+                name: `Invoice Image ${index + 1}`,
+              }));
 
-              // Send the email
+              // Send the email with PDF attachment
               await sendDeliveryConfirmationEmail(
                 updatedStop.id,
                 customer.email,
                 customer.name,
                 updatedStop.orderNumberWeb || "N/A",
                 deliveryTime,
-                returns.length > 0,
-                returnReasons,
-                signedInvoiceUrl,
-                originalInvoiceUrl
+                stopDataForPdf,
+                imageUrls,
+                returns
               );
 
               console.log(

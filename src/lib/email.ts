@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import prisma from './db';
+import { generateDeliveryPDF } from '@/utils/pdfGenerator';
 
 // Configure the email transporter
 const createTransporter = () => {
@@ -28,15 +29,11 @@ const createTransporter = () => {
   });
 };
 
-// Create HTML email template for delivery confirmation
+// Create HTML email template for delivery confirmation - matching the clean design
 const createDeliveryConfirmationEmail = (
   customerName: string,
   orderNumber: string,
-  deliveryTime: string,
-  hasReturns: boolean,
-  returnReasons: string[],
-  signedInvoiceUrl: string,
-  originalInvoiceUrl: string
+  deliveryTime: string
 ) => {
   return `
     <!DOCTYPE html>
@@ -44,96 +41,160 @@ const createDeliveryConfirmationEmail = (
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Delivery Confirmation</title>
+      <title>Your order has been delivered!</title>
       <style>
         body {
-          font-family: Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
           line-height: 1.6;
           color: #333;
           margin: 0;
           padding: 0;
+          background-color: #f5f5f5;
         }
         .container {
           max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
+          margin: 40px auto;
+          background-color: #ffffff;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .header {
           text-align: center;
-          margin-bottom: 20px;
+          padding: 40px 40px 20px 40px;
+          background-color: #ffffff;
         }
-        .logo {
-          max-width: 200px;
-          height: auto;
+        .company-logo {
+          font-size: 28px;
+          font-weight: bold;
+          color: #1a1a1a;
+          margin-bottom: 24px;
+          letter-spacing: 1px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin: 0 0 12px 0;
+        }
+        .subtitle {
+          font-size: 16px;
+          color: #666;
+          margin: 0;
         }
         .content {
-          background-color: #f9f9f9;
-          padding: 20px;
-          border-radius: 5px;
+          padding: 20px 40px 40px 40px;
         }
-        .delivery-details {
-          margin-bottom: 20px;
+        .details-section {
+          background-color: #f8f9fa;
+          border-radius: 8px;
+          padding: 24px;
+          margin: 24px 0;
         }
-        .returns {
-          margin-top: 20px;
-          padding-top: 20px;
-          border-top: 1px solid #ddd;
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 1px solid #e9ecef;
         }
-        .button {
-          display: inline-block;
-          background-color: #000;
-          color: #fff;
-          padding: 10px 20px;
-          text-decoration: none;
-          border-radius: 5px;
-          margin-right: 10px;
-          margin-bottom: 10px;
+        .detail-row:last-child {
+          border-bottom: none;
         }
+        .detail-label {
+          font-weight: 500;
+          color: #495057;
+        }
+        .detail-value {
+          color: #1a1a1a;
+          font-weight: 500;
+        }
+
         .footer {
-          margin-top: 20px;
           text-align: center;
-          font-size: 12px;
-          color: #777;
+          padding: 24px 40px;
+          background-color: #f8f9fa;
+          border-top: 1px solid #e9ecef;
+        }
+        .footer-text {
+          font-size: 14px;
+          color: #6c757d;
+          margin: 0;
+        }
+        .company-name {
+          font-weight: 600;
+          color: #495057;
+        }
+        .help-section {
+          margin-top: 32px;
+          padding: 20px;
+          text-align: center;
+        }
+        .help-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1a1a1a;
+          margin: 0 0 8px 0;
+        }
+        .help-text {
+          font-size: 14px;
+          color: #666;
+          margin: 0;
+        }
+        .attachment-note {
+          background-color: #e3f2fd;
+          border-radius: 8px;
+          padding: 16px;
+          margin: 20px 0;
+          border-left: 4px solid #2196f3;
+        }
+        .attachment-text {
+          font-size: 14px;
+          color: #1565c0;
+          margin: 0;
+          font-weight: 500;
         }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <img src="https://example.com/logo.png" alt="B&R Food Services Logo" class="logo">
+          <div class="company-logo">B&R Food Services</div>
+          <h1 class="title">Your order has been delivered!</h1>
+          <p class="subtitle">Good news! According to our records, your order has been delivered to you.</p>
         </div>
+
         <div class="content">
-          <h2>Delivery Confirmation</h2>
-          <p>Hello ${customerName},</p>
-          <p>Your order has been successfully delivered.</p>
-          
-          <div class="delivery-details">
-            <p><strong>Order #:</strong> ${orderNumber}</p>
-            <p><strong>Delivered To:</strong> ${customerName}</p>
-            <p><strong>Time:</strong> ${deliveryTime}</p>
-            <p><strong>Returns:</strong> ${hasReturns ? 'Yes' : 'No'}</p>
+          <div class="details-section">
+            <div class="detail-row">
+              <span class="detail-label">Order number:</span>
+              <span class="detail-value">${orderNumber}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Delivered to:</span>
+              <span class="detail-value">${customerName}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Time:</span>
+              <span class="detail-value">${deliveryTime}</span>
+            </div>
           </div>
-          
-          ${hasReturns ? `
-          <div class="returns">
-            <h3>Returned Items Summary</h3>
-            <ul>
-              ${returnReasons.map(reason => `<li>${reason}</li>`).join('')}
-            </ul>
+
+          <div class="attachment-note">
+            <p class="attachment-text">📎 Your delivery confirmation document is attached to this email for your records.</p>
           </div>
-          ` : ''}
-          
-          <div class="invoice-links">
-            <p>You can download your invoices using the links below:</p>
-            <a href="${signedInvoiceUrl}" class="button">Download Signed Invoice</a>
-            <a href="${originalInvoiceUrl}" class="button">Download Original Invoice</a>
+
+          <div class="help-section">
+            <h3 class="help-title">Need help?</h3>
+            <p class="help-text">If you have any questions, please contact us by email at support@brfoodservices.com</p>
           </div>
         </div>
-        
+
         <div class="footer">
-          <p>B&R Food Services</p>
-          <p>123 Main Street, City, State, ZIP</p>
-          <p>Phone: (123) 456-7890 | Email: info@brfoodservices.com</p>
+          <p class="footer-text">
+            <span class="company-name">B&R Food Services</span><br>
+            Professional Food Distribution & Delivery Solutions
+          </p>
         </div>
       </div>
     </body>
@@ -141,36 +202,39 @@ const createDeliveryConfirmationEmail = (
   `;
 };
 
-// Send delivery confirmation email
+// Send delivery confirmation email with PDF attachment
 export const sendDeliveryConfirmationEmail = async (
   stopId: string,
   customerEmail: string,
   customerName: string,
   orderNumber: string,
   deliveryTime: string,
-  hasReturns: boolean,
-  returnReasons: string[],
-  signedInvoiceUrl: string,
-  originalInvoiceUrl: string
+  stopData: any, // Full stop data for PDF generation
+  imageUrls: any[], // Image URLs for PDF
+  returns: any[] // Return items for PDF
 ) => {
   try {
+    // Generate the delivery confirmation PDF
+    console.log('Generating delivery confirmation PDF...');
+    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returns);
+    console.log(`PDF generated successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+
+    // Create the email HTML content
+    const emailHtml = createDeliveryConfirmationEmail(
+      customerName,
+      orderNumber,
+      deliveryTime
+    );
+
     // Create the email record in the database
     const emailRecord = await prisma.customerEmail.create({
       data: {
         stopId,
         customerEmail,
-        subject: 'B&R Food Services - Delivery Confirmation',
-        body: createDeliveryConfirmationEmail(
-          customerName,
-          orderNumber,
-          deliveryTime,
-          hasReturns,
-          returnReasons,
-          signedInvoiceUrl,
-          originalInvoiceUrl
-        ),
-        signedInvoiceUrl,
-        originalInvoiceUrl,
+        subject: 'Your order has been delivered!',
+        body: emailHtml,
+        signedInvoiceUrl: '', // Not needed since we're attaching PDF
+        originalInvoiceUrl: '', // Not needed since we're attaching PDF
         status: 'PENDING',
       },
     });
@@ -178,12 +242,22 @@ export const sendDeliveryConfirmationEmail = async (
     // Create the transporter
     const transporter = createTransporter();
 
-    // Send the email
+    // Generate filename for the PDF attachment
+    const pdfFilename = `delivery-confirmation-${orderNumber.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}.pdf`;
+
+    // Send the email with PDF attachment
     const info = await transporter.sendMail({
       from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'noreply@brfoodservices.com'}>`,
       to: customerEmail,
-      subject: 'B&R Food Services - Delivery Confirmation',
+      subject: 'Your order has been delivered!',
       html: emailRecord.body,
+      attachments: [
+        {
+          filename: pdfFilename,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
     });
 
     // Update the email record with the sent status
@@ -200,8 +274,8 @@ export const sendDeliveryConfirmationEmail = async (
   } catch (error) {
     console.error('Error sending email:', error);
 
-    // If we have an email record, update it with the error
-    if (arguments[0]) {
+    // If we have a stopId, try to update any pending email record with the error
+    if (stopId) {
       try {
         const existingEmail = await prisma.customerEmail.findFirst({
           where: {

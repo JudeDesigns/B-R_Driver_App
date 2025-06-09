@@ -25,7 +25,7 @@ export async function POST(
     // Get the stop ID from the URL
     const stopId = params.id;
 
-    // Get the stop with customer and return data
+    // Get the stop with customer, route, and return data
     const stop = await prisma.stop.findUnique({
       where: {
         id: stopId,
@@ -33,6 +33,12 @@ export async function POST(
       },
       include: {
         customer: true,
+        route: {
+          select: {
+            id: true,
+            routeNumber: true,
+          },
+        },
         returns: {
           where: {
             isDeleted: false,
@@ -64,34 +70,42 @@ export async function POST(
       );
     }
 
-    // Get the signed invoice URL
-    const signedInvoiceUrl = stop.signedInvoiceUrl || "";
-
-    // Get the original invoice URL (this would typically come from QuickBooks or another system)
-    // For now, we'll use a placeholder
-    const originalInvoiceUrl = stop.invoiceNumber
-      ? `https://example.com/invoices/${stop.invoiceNumber}.pdf`
-      : "";
-
     // Get return reasons
-    const returnReasons = stop.returns.map((returnItem) => returnItem.reason);
+    const returnReasons = stop.returns.map((returnItem) => returnItem.reasonCode);
 
     // Format delivery time
-    const deliveryTime = stop.completedAt
-      ? new Date(stop.completedAt).toLocaleString()
+    const deliveryTime = stop.completionTime
+      ? new Date(stop.completionTime).toLocaleString()
       : new Date().toLocaleString();
 
-    // Send the email
+    // Prepare stop data for PDF generation
+    const stopDataForPdf = {
+      id: stop.id,
+      customerName: stop.customer.name,
+      customerAddress: stop.address,
+      routeNumber: stop.route?.routeNumber || 'N/A',
+      arrivalTime: stop.arrivalTime,
+      completionTime: stop.completionTime,
+      driverNotes: stop.driverNotes,
+      adminNotes: null, // Will be populated if needed
+    };
+
+    // Prepare image URLs for PDF (from invoice images)
+    const imageUrls = (stop.invoiceImageUrls || []).map((url: string, index: number) => ({
+      url: url,
+      name: `Invoice Image ${index + 1}`,
+    }));
+
+    // Send the email with PDF attachment
     const emailResult = await sendDeliveryConfirmationEmail(
       stopId,
       stop.customer.email,
       stop.customer.name,
-      stop.orderNumber || "N/A",
+      stop.orderNumberWeb || "N/A",
       deliveryTime,
-      stop.returns.length > 0,
-      returnReasons,
-      signedInvoiceUrl,
-      originalInvoiceUrl
+      stopDataForPdf,
+      imageUrls,
+      stop.returns
     );
 
     if (!emailResult.success) {
