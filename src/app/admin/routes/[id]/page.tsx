@@ -121,6 +121,10 @@ export default function RouteDetailPage({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedStop, setDraggedStop] = useState<Stop | null>(null);
 
+  // Sorting state
+  const [sortField, setSortField] = useState<string>('sequence');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   const router = useRouter();
 
   // Drag and Drop Sensors
@@ -279,6 +283,54 @@ export default function RouteDetailPage({
     if (stop.paymentFlagCC) return "Credit Card";
     if (stop.paymentFlagNotPaid) return "Not Paid";
     return "Unknown";
+  };
+
+  // Sorting function
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort stops function
+  const getSortedStops = (stops: Stop[]) => {
+    return [...stops].sort((a, b) => {
+      let aValue: any = a[sortField as keyof Stop];
+      let bValue: any = b[sortField as keyof Stop];
+
+      // Handle special cases
+      if (sortField === 'customerNameFromUpload') {
+        aValue = a.customerNameFromUpload || '';
+        bValue = b.customerNameFromUpload || '';
+      } else if (sortField === 'amount') {
+        aValue = a.amount || 0;
+        bValue = b.amount || 0;
+      } else if (sortField === 'arrivalTime' || sortField === 'completionTime') {
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+      }
+    });
+  };
+
+  // Calculate total amount
+  const getTotalAmount = () => {
+    if (!route) return 0;
+    return route.stops.reduce((total, stop) => total + (stop.amount || 0), 0);
   };
 
   // Function to group stops by driver
@@ -586,6 +638,8 @@ export default function RouteDetailPage({
         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
           <Link
             href={`/admin/stops/${stop.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-900"
           >
             View Details
@@ -595,9 +649,15 @@ export default function RouteDetailPage({
     );
   };
 
+  // Calculate total amount for a specific driver
+  const getDriverTotalAmount = (stops: Stop[]) => {
+    return stops.reduce((total, stop) => total + (stop.amount || 0), 0);
+  };
+
   // Droppable Driver Section Component
   const DroppableDriverSection = ({ driverName, stops }: { driverName: string; stops: Stop[] }) => {
     const { setNodeRef, isOver } = useSortable({ id: driverName });
+    const driverTotal = getDriverTotalAmount(stops);
 
     return (
       <div
@@ -605,10 +665,15 @@ export default function RouteDetailPage({
         className={`overflow-hidden ${isOver ? 'bg-blue-50 border-2 border-blue-300 border-dashed' : ''}`}
       >
         <div className={`bg-gray-100 px-6 py-3 border-l-4 border-blue-500 mb-4 ${isOver ? 'bg-blue-100' : ''}`}>
-          <h3 className="text-md font-medium text-gray-800">
-            Driver: {driverName} ({stops.length} stops)
-            {isOver && <span className="ml-2 text-blue-600 font-semibold">Drop here to reassign</span>}
-          </h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-md font-medium text-gray-800">
+              Driver: {driverName} ({stops.length} stops)
+              {isOver && <span className="ml-2 text-blue-600 font-semibold">Drop here to reassign</span>}
+            </h3>
+            <div className="text-md font-bold text-green-600">
+              Total: ${driverTotal.toFixed(2)}
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden">
@@ -655,6 +720,18 @@ export default function RouteDetailPage({
                   <SortableStopRow key={stop.id} stop={stop} />
                 ))}
               </SortableContext>
+              {/* Driver Total Row */}
+              <tr className="bg-blue-50 border-t-2 border-blue-300">
+                <td colSpan={7} className="px-6 py-3 text-right text-sm font-bold text-gray-900">
+                  Driver Total:
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap">
+                  <div className="text-md font-bold text-blue-600">
+                    ${driverTotal.toFixed(2)}
+                  </div>
+                </td>
+                <td colSpan={3} className="px-6 py-3"></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1110,33 +1187,73 @@ export default function RouteDetailPage({
                       <tr>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('sequence')}
                         >
-                          Seq
+                          <div className="flex items-center">
+                            Seq
+                            {sortField === 'sequence' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('driverNameFromUpload')}
                         >
-                          Driver
+                          <div className="flex items-center">
+                            Driver
+                            {sortField === 'driverNameFromUpload' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('customerNameFromUpload')}
                         >
-                          Customer
+                          <div className="flex items-center">
+                            Customer
+                            {sortField === 'customerNameFromUpload' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('quickbooksInvoiceNum')}
                         >
-                          Invoice #
+                          <div className="flex items-center">
+                            Invoice #
+                            {sortField === 'quickbooksInvoiceNum' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('status')}
                         >
-                          Status
+                          <div className="flex items-center">
+                            Status
+                            {sortField === 'status' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
@@ -1146,9 +1263,17 @@ export default function RouteDetailPage({
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('amount')}
                         >
-                          Amount
+                          <div className="flex items-center">
+                            Amount
+                            {sortField === 'amount' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
                         </th>
                         <th
                           scope="col"
@@ -1159,8 +1284,7 @@ export default function RouteDetailPage({
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {route.stops
-                        .sort((a, b) => a.sequence - b.sequence)
+                      {getSortedStops(route.stops)
                         .map((stop, index) => (
                           <tr
                             key={stop.id}
@@ -1230,10 +1354,10 @@ export default function RouteDetailPage({
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <button
-                                onClick={() =>
-                                  router.push(`/admin/stops/${stop.id}`)
-                                }
+                              <Link
+                                href={`/admin/stops/${stop.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-700"
                               >
                                 <svg
@@ -1256,10 +1380,22 @@ export default function RouteDetailPage({
                                   />
                                 </svg>
                                 View
-                              </button>
+                              </Link>
                             </td>
                           </tr>
                         ))}
+                      {/* Total Amount Row */}
+                      <tr className="bg-gray-50 border-t-2 border-gray-300">
+                        <td colSpan={6} className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                          Total Amount:
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-lg font-bold text-green-600">
+                            ${getTotalAmount().toFixed(2)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"></td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>

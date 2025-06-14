@@ -195,6 +195,11 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     columnIndices.quickbooksInvoiceNum = 34; // Column AI (0-based index)
     console.log("Using column AI (index 34) for invoice numbers as specified");
 
+    // Always use column C (index 2) for driver names as specified
+    // This overrides any column mapping that might have been found by name
+    columnIndices.driver = 2; // Column C (0-based index)
+    console.log("Using column C (index 2) for driver names as specified");
+
     // Log the headers and column indices for debugging
     console.log("Excel Headers:", headers);
     console.log("Column Indices:", columnIndices);

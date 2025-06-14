@@ -4,21 +4,15 @@ import { generateDeliveryPDF } from '@/utils/pdfGenerator';
 
 // Configure the email transporter
 const createTransporter = () => {
-  // For development, use a test account
-  if (process.env.NODE_ENV === 'development') {
-    return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER || '',
-        pass: process.env.EMAIL_PASS || '',
-      },
-    });
-  }
+  console.log(`Creating email transporter for environment: ${process.env.NODE_ENV}`);
+  console.log(`EMAIL_HOST: ${process.env.EMAIL_HOST}`);
+  console.log(`EMAIL_PORT: ${process.env.EMAIL_PORT}`);
+  console.log(`EMAIL_SECURE: ${process.env.EMAIL_SECURE}`);
+  console.log(`EMAIL_USER: ${process.env.EMAIL_USER}`);
+  console.log(`EMAIL_FROM: ${process.env.EMAIL_FROM}`);
 
-  // For production, use the configured SMTP server
-  return nodemailer.createTransport({
+  // Always use production SMTP settings for Brevo
+  const transporterConfig = {
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || '587'),
     secure: process.env.EMAIL_SECURE === 'true',
@@ -26,7 +20,19 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    debug: true, // Enable debug output
+    logger: true, // Log to console
+  };
+
+  console.log('Transporter config:', {
+    host: transporterConfig.host,
+    port: transporterConfig.port,
+    secure: transporterConfig.secure,
+    user: transporterConfig.auth.user,
+    hasPassword: !!transporterConfig.auth.pass
   });
+
+  return nodemailer.createTransport(transporterConfig);
 };
 
 // Create HTML email template for delivery confirmation - matching the clean design
@@ -246,6 +252,9 @@ export const sendDeliveryConfirmationEmail = async (
     const pdfFilename = `delivery-confirmation-${orderNumber.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}.pdf`;
 
     // Send the email with PDF attachment
+    console.log(`Attempting to send email to: ${customerEmail}`);
+    console.log(`PDF attachment size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+
     const info = await transporter.sendMail({
       from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'noreply@brfoodservices.com'}>`,
       to: customerEmail,
@@ -259,6 +268,9 @@ export const sendDeliveryConfirmationEmail = async (
         },
       ],
     });
+
+    console.log(`Email sent successfully - Message ID: ${info.messageId}`);
+    console.log(`SMTP Response: ${info.response}`);
 
     // Update the email record with the sent status
     await prisma.customerEmail.update({

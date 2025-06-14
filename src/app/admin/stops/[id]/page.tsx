@@ -123,6 +123,12 @@ export default function StopDetailPage({
   const [loadingReturns, setLoadingReturns] = useState(false);
   const [returnsError, setReturnsError] = useState("");
 
+  // Driver reassignment state
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [reassigningDriver, setReassigningDriver] = useState(false);
+  const [showDriverSelect, setShowDriverSelect] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState("");
+
   const router = useRouter();
 
   // Initialize socket connection
@@ -214,9 +220,89 @@ export default function StopDetailPage({
     }
   }, [stopId, router]);
 
+  // Fetch drivers for reassignment
+  const fetchDrivers = useCallback(async () => {
+    try {
+      // Check both localStorage and sessionStorage
+      let token = localStorage.getItem("token");
+
+      // If not found in localStorage, check sessionStorage
+      if (!token) {
+        token = sessionStorage.getItem("token");
+      }
+
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch("/api/admin/drivers", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDrivers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+    }
+  }, [router]);
+
+  // Reassign driver function
+  const handleReassignDriver = async () => {
+    if (!selectedDriverId || !stop) return;
+
+    setReassigningDriver(true);
+    setError("");
+
+    try {
+      // Check both localStorage and sessionStorage
+      let token = localStorage.getItem("token");
+
+      // If not found in localStorage, check sessionStorage
+      if (!token) {
+        token = sessionStorage.getItem("token");
+      }
+
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/admin/stops/${stopId}/reassign`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          driverId: selectedDriverId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to reassign driver");
+      }
+
+      // Refresh stop details to show updated driver
+      await fetchStopDetails();
+      setShowDriverSelect(false);
+      setSelectedDriverId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setReassigningDriver(false);
+    }
+  };
+
   useEffect(() => {
     fetchStopDetails();
     fetchReturns();
+    fetchDrivers();
   }, [stopId, fetchStopDetails, fetchReturns]);
 
   // Use optimized admin stop details hook for real-time updates
@@ -888,11 +974,52 @@ export default function StopDetailPage({
                     <h3 className="text-sm font-medium text-gray-500">
                       Driver
                     </h3>
-                    <p className="mt-1 text-sm text-gray-900">
-                      {stop.driverNameFromUpload ||
-                        stop.route.driver.fullName ||
-                        stop.route.driver.username}
-                    </p>
+                    {showDriverSelect ? (
+                      <div className="mt-1 flex items-center space-x-2">
+                        <select
+                          value={selectedDriverId}
+                          onChange={(e) => setSelectedDriverId(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-blue"
+                        >
+                          <option value="">Select a driver</option>
+                          {drivers.map((driver) => (
+                            <option key={driver.id} value={driver.id}>
+                              {driver.fullName || driver.username}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleReassignDriver}
+                          disabled={!selectedDriverId || reassigningDriver}
+                          className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {reassigningDriver ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowDriverSelect(false);
+                            setSelectedDriverId("");
+                          }}
+                          className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-center space-x-2">
+                        <p className="text-sm text-gray-900">
+                          {stop.driverNameFromUpload ||
+                            stop.route.driver.fullName ||
+                            stop.route.driver.username}
+                        </p>
+                        <button
+                          onClick={() => setShowDriverSelect(true)}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>
