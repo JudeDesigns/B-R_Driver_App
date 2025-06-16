@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "stops" ADD COLUMN     "driverPaymentAmount" DOUBLE PRECISION,
+ADD COLUMN     "driverPaymentMethods" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "paymentAmountCC" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN     "paymentAmountCash" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN     "paymentAmountCheck" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN     "totalPaymentAmount" DOUBLE PRECISION DEFAULT 0;

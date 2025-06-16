@@ -111,6 +111,14 @@ model Stop {
   returnFlagInitial      Boolean    @default(false) // Return flag from upload
   driverRemarkInitial    String? // Other Remarks from upload
   amount                 Float? // Amount from the upload
+  // Payment amounts from Excel columns AK, AL, AM
+  paymentAmountCash      Float?     @default(0) // Cash payment amount from column AK
+  paymentAmountCheck     Float?     @default(0) // Check payment amount from column AL
+  paymentAmountCC        Float?     @default(0) // Credit Card payment amount from column AM
+  totalPaymentAmount     Float?     @default(0) // Sum of all payment amounts
+  // Driver-recorded payment information (for future use)
+  driverPaymentAmount    Float? // Payment amount recorded by driver during delivery
+  driverPaymentMethods   String[] @default([]) // Payment methods selected by driver (Cash, Check, CC)
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
   isDeleted              Boolean    @default(false)

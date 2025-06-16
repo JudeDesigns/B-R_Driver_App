@@ -46,6 +46,14 @@ interface Stop {
   returnFlagInitial: boolean;
   driverRemarkInitial: string | null;
   amount: number | null;
+  // Payment amounts from Excel
+  paymentAmountCash?: number;
+  paymentAmountCheck?: number;
+  paymentAmountCC?: number;
+  totalPaymentAmount?: number;
+  // Driver-recorded payment information
+  driverPaymentAmount?: number;
+  driverPaymentMethods?: string[];
   customer: Customer;
   route: {
     id: string;
@@ -78,6 +86,13 @@ export default function StopDetailPage({
   const [driverNotes, setDriverNotes] = useState("");
   const [notificationVisible, setNotificationVisible] = useState(false);
   const [deliveryTimer, setDeliveryTimer] = useState<number | null>(null);
+
+  // Payment recording state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   const router = useRouter();
 
@@ -432,6 +447,65 @@ export default function StopDetailPage({
     fetchStopDetails();
   };
 
+  // Handle payment recording
+  const handleSavePayment = async () => {
+    if (!token || !stop) return;
+
+    if (!paymentAmount || selectedPaymentMethods.length === 0) {
+      setPaymentError("Please enter payment amount and select at least one payment method");
+      return;
+    }
+
+    setSavingPayment(true);
+    setPaymentError("");
+
+    try {
+      const response = await fetch(`/api/driver/stops/${unwrappedParams.id}/payment`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          driverPaymentAmount: parseFloat(paymentAmount),
+          driverPaymentMethods: selectedPaymentMethods,
+        }),
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to save payment");
+        } else {
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+      }
+
+      // Reset form and close modal
+      setPaymentAmount("");
+      setSelectedPaymentMethods([]);
+      setShowPaymentModal(false);
+
+      // Refresh stop details
+      fetchStopDetails();
+    } catch (err) {
+      console.error("Error saving payment:", err);
+      setPaymentError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  // Handle payment method selection
+  const togglePaymentMethod = (method: string) => {
+    setSelectedPaymentMethods(prev =>
+      prev.includes(method)
+        ? prev.filter(m => m !== method)
+        : [...prev, method]
+    );
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
 
@@ -752,6 +826,50 @@ export default function StopDetailPage({
                     </span>
                   )}
                   {/* Return flag removed from payment information section as it's not a payment method */}
+                </div>
+
+                {/* Payment Recording Section */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-700">Payment Received</h4>
+                      {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? (
+                        <div className="mt-1">
+                          <div className="text-lg font-bold text-green-600">
+                            ${stop.driverPaymentAmount.toFixed(2)}
+                          </div>
+                          {stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0 && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Methods: {stop.driverPaymentMethods.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 mt-1">
+                          No payment recorded yet
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation tap-target"
+                    >
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                        />
+                      </svg>
+                      {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? "Update Payment" : "Record Payment"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1084,6 +1202,117 @@ export default function StopDetailPage({
         <div className="text-center py-8 text-gray-500">
           Stop not found. It may have been deleted or you may not have
           permission to view it.
+        </div>
+      )}
+
+      {/* Payment Recording Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Record Payment Received
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaymentError("");
+                    setPaymentAmount("");
+                    setSelectedPaymentMethods([]);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Payment Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Amount *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500 sm:text-sm">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Methods */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Methods * (Select all that apply)
+                  </label>
+                  <div className="space-y-2">
+                    {["Cash", "Check", "Credit Card"].map((method) => (
+                      <label key={method} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedPaymentMethods.includes(method)}
+                          onChange={() => togglePaymentMethod(method)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{method}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {paymentError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    {paymentError}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowPaymentModal(false);
+                      setPaymentError("");
+                      setPaymentAmount("");
+                      setSelectedPaymentMethods([]);
+                    }}
+                    disabled={savingPayment}
+                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSavePayment}
+                    disabled={savingPayment || !paymentAmount || selectedPaymentMethods.length === 0}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {savingPayment ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Payment"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

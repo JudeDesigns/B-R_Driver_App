@@ -22,6 +22,11 @@ export interface ParsedStop {
   returnFlagInitial: boolean;
   driverRemarkInitial?: string;
   amount?: number;
+  // Payment amounts from Excel columns AK, AL, AM
+  paymentAmountCash?: number; // Column AK
+  paymentAmountCheck?: number; // Column AL
+  paymentAmountCC?: number; // Column AM
+  totalPaymentAmount?: number; // Sum of all payment amounts
 }
 
 /**
@@ -188,6 +193,10 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       returnFlag: headerMap.get("Payments & Returns Remarks") ?? -1,
       driverRemark: headerMap.get("Other Remarks") ?? -1,
       amount: headerMap.get("Amount") ?? -1,
+      // Payment amount columns (will be overridden with fixed positions)
+      paymentAmountCash: headerMap.get("Cash Amount") ?? -1, // Column AK
+      paymentAmountCheck: headerMap.get("Check Amount") ?? -1, // Column AL
+      paymentAmountCC: headerMap.get("Credit Card Amount") ?? -1, // Column AM
     };
 
     // Always use column AI (index 34) for invoice numbers as specified
@@ -199,6 +208,13 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     // This overrides any column mapping that might have been found by name
     columnIndices.driver = 2; // Column C (0-based index)
     console.log("Using column C (index 2) for driver names as specified");
+
+    // Always use specific columns for payment amounts as specified
+    // AK = 36, AL = 37, AM = 38 (0-based indices)
+    columnIndices.paymentAmountCash = 36; // Column AK (0-based index)
+    columnIndices.paymentAmountCheck = 37; // Column AL (0-based index)
+    columnIndices.paymentAmountCC = 38; // Column AM (0-based index)
+    console.log("Using columns AK (36), AL (37), AM (38) for payment amounts as specified");
 
     // Log the headers and column indices for debugging
     console.log("Excel Headers:", headers);
@@ -405,7 +421,25 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           amount: row[columnIndices.amount]
             ? parseFloat(row[columnIndices.amount])
             : undefined,
+          // Extract payment amounts from Excel columns AK, AL, AM
+          paymentAmountCash: (() => {
+            const rawValue = row[columnIndices.paymentAmountCash];
+            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+          })(),
+          paymentAmountCheck: (() => {
+            const rawValue = row[columnIndices.paymentAmountCheck];
+            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+          })(),
+          paymentAmountCC: (() => {
+            const rawValue = row[columnIndices.paymentAmountCC];
+            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+          })(),
         };
+
+        // Calculate total payment amount
+        stop.totalPaymentAmount = (stop.paymentAmountCash || 0) +
+                                 (stop.paymentAmountCheck || 0) +
+                                 (stop.paymentAmountCC || 0);
 
         // Calculate paymentFlagNotPaid
         stop.paymentFlagNotPaid =
@@ -962,6 +996,11 @@ export async function saveRouteToDatabase(
         returnFlagInitial: parsedStop.returnFlagInitial,
         driverRemarkInitial: parsedStop.driverRemarkInitial,
         amount: parsedStop.amount,
+        // Payment amounts from Excel columns AK, AL, AM
+        paymentAmountCash: parsedStop.paymentAmountCash || 0,
+        paymentAmountCheck: parsedStop.paymentAmountCheck || 0,
+        paymentAmountCC: parsedStop.paymentAmountCC || 0,
+        totalPaymentAmount: parsedStop.totalPaymentAmount || 0,
         status: "PENDING" as const,
         // Store the driver name for reference
         driverNameFromUpload: parsedStop.driverName,
