@@ -79,91 +79,96 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     }
 
     body {
-      font-family: 'Times New Roman', Times, serif;
-      line-height: 1.4;
-      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333333;
       background: #ffffff;
-      font-size: 12px;
+      font-size: 14px;
     }
 
     .container {
       max-width: 210mm;
       margin: 0 auto;
-      padding: 25mm;
+      padding: 20mm;
       background: white;
     }
 
-    /* Professional Header */
+    /* Friendly Header */
     .header {
-      border-bottom: 3px solid #000000;
-      padding-bottom: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
       margin-bottom: 30px;
+      text-align: center;
     }
 
     .company-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
       margin-bottom: 15px;
     }
 
     .company-info {
-      flex: 1;
+      text-align: center;
     }
 
     .company-name {
-      font-size: 24px;
-      font-weight: bold;
-      color: #000000;
-      margin-bottom: 5px;
-      letter-spacing: 1px;
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
     .company-tagline {
-      font-size: 11px;
-      color: #666666;
-      font-style: italic;
+      font-size: 14px;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 15px;
     }
 
     .document-info {
-      text-align: right;
-      font-size: 10px;
-      color: #000000;
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: white;
+      display: inline-block;
     }
 
     .document-title {
-      font-size: 18px;
-      font-weight: bold;
       text-align: center;
-      margin: 20px 0;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      border: 2px solid #000000;
-      padding: 10px;
-      background: #f8f8f8;
+      font-size: 24px;
+      font-weight: 600;
+      color: #667eea;
+      margin: 25px 0;
+      padding: 15px;
+      background: #f8f9ff;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
     }
 
-    /* Professional Information Grid */
+    /* Friendly Information Grid */
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 30px;
+      gap: 20px;
       margin-bottom: 25px;
     }
 
     .info-section {
-      border: 1px solid #cccccc;
-      padding: 15px;
-      background: #fafafa;
+      border: 1px solid #e5e7eb;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
     .info-section h3 {
-      font-size: 14px;
-      font-weight: bold;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      border-bottom: 1px solid #000000;
-      padding-bottom: 5px;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #667eea;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 8px;
     }
 
     .info-row {
@@ -185,17 +190,17 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     .status-section {
       text-align: center;
       margin: 20px 0;
-      padding: 15px;
-      border: 2px solid #000000;
-      background: #f0f0f0;
+      padding: 20px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius: 12px;
+      color: white;
     }
 
     .status-badge {
-      font-size: 16px;
-      font-weight: bold;
-      color: #000000;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      font-size: 20px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
     /* Professional Content Sections */
@@ -245,24 +250,27 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     }
 
     .photo-links {
-      border: 1px solid #cccccc;
-      padding: 10px;
-      background: #f9f9f9;
+      background: #f0f9ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 15px;
     }
 
     .photo-link {
-      display: block;
-      color: #000000;
-      text-decoration: underline;
-      font-size: 11px;
-      margin-bottom: 5px;
-      padding: 3px 0;
-      border-bottom: 1px dotted #cccccc;
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      margin: 5px 10px 5px 0;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: background-color 0.2s;
     }
 
-    .photo-link:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
+    .photo-link:hover {
+      background: #5a67d8;
     }
 
     /* Professional Returns Table */
@@ -331,27 +339,28 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
       font-size: 9px;
     }
 
-    /* Professional Footer */
+    /* Friendly Footer */
     .footer {
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 2px solid #000000;
+      margin-top: 40px;
+      padding: 20px;
+      background: #f8f9ff;
+      border-radius: 8px;
       text-align: center;
-      font-size: 9px;
-      color: #666666;
+      font-size: 12px;
+      color: #667eea;
+      border-top: 3px solid #667eea;
     }
 
     .footer-company {
-      font-weight: bold;
-      color: #000000;
-      margin-bottom: 3px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 10px;
     }
 
     .footer-details {
-      color: #666666;
-      line-height: 1.3;
+      line-height: 1.6;
+      color: #6b7280;
     }
 
     /* Print Styles */
@@ -371,26 +380,24 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
 </head>
 <body>
   <div class="container">
-    <!-- Professional Header -->
+    <!-- Friendly Header -->
     <div class="header">
       <div class="company-header">
         <div class="company-info">
-          <div class="company-name">B&R FOOD SERVICES</div>
-          <div class="company-tagline">Professional Food Distribution & Delivery Solutions</div>
+          <div class="company-name">🍽️ B&R Food Services</div>
+          <div class="company-tagline">Your trusted food distribution partner</div>
         </div>
-        <div class="document-info">
-          <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
-          <div><strong>Time:</strong> ${new Date().toLocaleTimeString()}</div>
-          <div><strong>Route:</strong> ${stop.routeNumber}</div>
-        </div>
+      </div>
+      <div class="document-info">
+        Document #: ${stop.id.substring(0, 8).toUpperCase()} | ${new Date().toLocaleDateString()} | Route: ${stop.routeNumber}
       </div>
     </div>
 
-    <div class="document-title">DELIVERY CONFIRMATION CERTIFICATE</div>
+    <div class="document-title">✅ Delivery Completed Successfully!</div>
 
     <!-- Status Section -->
     <div class="status-section">
-      <div class="status-badge">DELIVERY COMPLETED</div>
+      <div class="status-badge">🎉 Delivery Completed Successfully!</div>
     </div>
 
     <!-- Information Grid -->
@@ -440,7 +447,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
         <div class="photo-links">
           ${imageUrls.map((img, index) => `
             <a href="${baseUrl}${img.url}" class="photo-link">
-              Photo ${index + 1}: ${baseUrl}${img.url}
+              📸 View Image ${index + 1}
             </a>
           `).join('')}
         </div>
@@ -503,13 +510,13 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     </div>
     ` : ''}
 
-    <!-- Professional Footer -->
+    <!-- Friendly Footer -->
     <div class="footer">
-      <div class="footer-company">B&R Food Services</div>
+      <div class="footer-company">🍽️ B&R Food Services</div>
       <div class="footer-details">
-        Professional Food Distribution & Delivery Solutions<br>
-        Document Generated: ${new Date().toLocaleString()}<br>
-        This document serves as official confirmation of delivery completion.
+        Thank you for choosing B&R Food Services!<br>
+        Generated: ${new Date().toLocaleString()}<br>
+        Questions? Contact us anytime - we're here to help! 😊
       </div>
     </div>
   </div>
