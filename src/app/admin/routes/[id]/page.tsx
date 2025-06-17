@@ -129,6 +129,9 @@ export default function RouteDetailPage({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
+  // User role state
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   const router = useRouter();
 
   // Drag and Drop Sensors
@@ -173,12 +176,24 @@ export default function RouteDetailPage({
   }, [token, routeId]);
 
   useEffect(() => {
-    // Get the token from localStorage
-    const storedToken = localStorage.getItem("token");
-    if (storedToken) {
-      setToken(storedToken);
+    // Get the token and role from localStorage/sessionStorage
+    let storedToken = localStorage.getItem("token");
+    let storedRole = localStorage.getItem("userRole");
+
+    // If not found in localStorage, check sessionStorage
+    if (!storedToken) {
+      storedToken = sessionStorage.getItem("token");
+      storedRole = sessionStorage.getItem("userRole");
     }
-  }, []);
+
+    if (!storedToken || !["ADMIN", "SUPER_ADMIN"].includes(storedRole || "")) {
+      router.push("/login");
+      return;
+    }
+
+    setToken(storedToken);
+    setUserRole(storedRole);
+  }, [router]);
 
   useEffect(() => {
     if (token) {
@@ -282,11 +297,17 @@ export default function RouteDetailPage({
   };
 
   const getPaymentMethod = (stop: Stop) => {
+    // Check if driver has recorded payments
+    if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
+      return "Paid";
+    }
+
+    // Check legacy payment flags
     if (stop.paymentFlagCash) return "Cash";
     if (stop.paymentFlagCheck) return "Check";
     if (stop.paymentFlagCC) return "Credit Card";
     if (stop.paymentFlagNotPaid) return "Not Paid";
-    return "Unknown";
+    return "Not Paid";
   };
 
   // Sorting function
@@ -995,25 +1016,28 @@ export default function RouteDetailPage({
                   )}
                   {exporting ? "Exporting..." : "Export JSON"}
                 </button>
-                <button
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  <svg
-                    className="h-4 w-4 mr-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                {/* Delete Route - Super Admin Only */}
+                {userRole === "SUPER_ADMIN" && (
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  Delete Route
-                </button>
+                    <svg
+                      className="h-4 w-4 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                    Delete Route
+                  </button>
+                )}
               </>
             )}
           </div>

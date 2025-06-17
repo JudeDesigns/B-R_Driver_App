@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
 
 interface Route {
   id: string;
@@ -40,8 +41,10 @@ interface Document {
 }
 
 export default function DocumentsPage() {
+  // Use the Admin auth hook (allows both ADMIN and SUPER_ADMIN)
+  const { token, userRole, isLoading: authLoading, isAuthenticated } = useAdminAuth();
+
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,42 +64,16 @@ export default function DocumentsPage() {
   const documentTypes = [
     { value: "INVOICE", label: "Invoice" },
     { value: "CREDIT_MEMO", label: "Credit Memo" },
-    { value: "DELIVERY_RECEIPT", label: "Delivery Receipt" },
+    { value: "DELIVERY_RECEIPT", label: "Statement" },
     { value: "RETURN_FORM", label: "Return Form" },
     { value: "OTHER", label: "Other" },
   ];
 
   useEffect(() => {
-    // Check authentication
-    const checkAuth = () => {
-      try {
-        const localStorageToken = localStorage.getItem("token");
-        const sessionStorageToken = sessionStorage.getItem("token");
-        const storedToken = sessionStorageToken || localStorageToken;
-
-        const localStorageRole = localStorage.getItem("userRole");
-        const sessionStorageRole = sessionStorage.getItem("userRole");
-        const userRole = sessionStorageRole || localStorageRole;
-
-        if (!storedToken || !["ADMIN", "SUPER_ADMIN"].includes(userRole || "")) {
-          router.push("/login");
-        } else {
-          setToken(storedToken);
-        }
-      } catch (error) {
-        console.error("Error checking authentication:", error);
-        router.push("/login");
-      }
-    };
-
-    checkAuth();
-  }, [router]);
-
-  useEffect(() => {
-    if (token) {
+    if (token && isAuthenticated) {
       fetchTodaysRoutes();
     }
-  }, [token]);
+  }, [token, isAuthenticated]);
 
   const fetchTodaysRoutes = async () => {
     try {
@@ -271,6 +248,16 @@ export default function DocumentsPage() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return <AuthLoadingSpinner message="Loading documents..." />;
+  }
+
+  // Only show access denied if auth is complete and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <AccessDenied title="Access Denied" message="Admin access required" />;
+  }
 
   if (loading) {
     return (

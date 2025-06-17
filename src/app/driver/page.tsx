@@ -211,7 +211,8 @@ export default function DriverDashboard() {
     sessionStorage.removeItem("storageType");
 
     console.log("Driver logged out successfully");
-    router.push("/login");
+    // Force a page reload to clear any cached state
+    window.location.href = "/login";
   };
 
   return (

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       whereClause.status = status;
     }
 
-    // Fetch routes with all stop details
+    // Fetch routes with all stop details including payments
     const routes = await prisma.route.findMany({
       where: whereClause,
       include: {
@@ -61,6 +61,19 @@ export async function GET(request: NextRequest) {
             adminNotes: {
               include: {
                 admin: true,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            payments: {
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            returns: {
+              where: {
+                isDeleted: false,
               },
               orderBy: {
                 createdAt: "desc",
@@ -82,83 +95,139 @@ export async function GET(request: NextRequest) {
       return new NextResponse("No routes found for export", { status: 400 });
     }
 
-    // Prepare export data - flatten all stops from all routes
+    // Helper functions for clean data formatting
+    const formatDate = (date: any): string => {
+      if (!date) return "";
+      try {
+        return new Date(date).toISOString().split('T')[0]; // YYYY-MM-DD format
+      } catch {
+        return "";
+      }
+    };
+
+    const formatDateTime = (date: any): string => {
+      if (!date) return "";
+      try {
+        return new Date(date).toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      } catch {
+        return "";
+      }
+    };
+
+    const formatCurrency = (amount: any): string => {
+      if (!amount || isNaN(amount)) return "0.00";
+      return parseFloat(amount).toFixed(2);
+    };
+
+    const formatYesNo = (value: boolean): string => {
+      return value ? "Yes" : "No";
+    };
+
+    const cleanText = (text: any): string => {
+      if (!text) return "";
+      return String(text).replace(/[\r\n\t]/g, ' ').trim();
+    };
+
+    // Prepare clean, organized export data
     const exportData: any[] = [];
 
     routes.forEach((route) => {
       route.stops.forEach((stop) => {
+        // Calculate payment status
+        const hasDriverPayments = stop.payments && stop.payments.length > 0;
+        const totalDriverPayments = hasDriverPayments
+          ? stop.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0)
+          : 0;
+
+        const paymentStatus = hasDriverPayments ? "Paid" :
+          (stop.paymentFlagNotPaid ? "Not Paid" :
+          (stop.paymentFlagCash || stop.paymentFlagCheck || stop.paymentFlagCC ? "Paid" : "Unknown"));
+
+        // Format individual payments
+        const individualPayments = hasDriverPayments
+          ? stop.payments.map((p: any) => `${formatCurrency(p.amount)} (${p.method}${p.notes ? ` - ${p.notes}` : ''})`).join('; ')
+          : "";
+
+        // Format returns
+        const returnsInfo = stop.returns && stop.returns.length > 0
+          ? stop.returns.map((r: any) => `${r.productDescription || 'Unknown'} (Qty: ${r.quantity || 0})`).join('; ')
+          : "";
+
         exportData.push({
-          // Route Information
-          "Route ID": route.id,
-          "Route Number": route.routeNumber || "",
-          "Route Date": (() => {
-            try {
-              return new Date(route.date).toISOString().split('T')[0];
-            } catch (err) {
-              return route.date ? String(route.date) : "Invalid Date";
-            }
-          })(),
-          "Route Status": route.status,
-          "Route Driver": route.driver?.fullName || route.driver?.username || "",
-          
-          // Stop Information
-          "Stop ID": stop.id,
-          "Sequence": stop.sequence,
-          "Customer Name": stop.customerNameFromUpload || stop.customer.name,
-          "Customer Address": stop.address || stop.customer.address || "",
-          "Customer Email": stop.customer.email || "",
-          "Customer Group Code": stop.customer.groupCode || "",
-          
-          // Order Information
-          "Order Number": stop.orderNumberWeb || "",
-          "Invoice Number": stop.quickbooksInvoiceNum || "",
-          "Amount": stop.amount || 0,
-          
-          // Driver Information
-          "Assigned Driver": stop.driverNameFromUpload || route.driver?.fullName || route.driver?.username || "",
-          
-          // Status Information
-          "Stop Status": stop.status,
-          "Is COD": stop.isCOD ? "Yes" : "No",
-          
-          // Payment Status (from Excel)
-          "Payment Flag Cash": stop.paymentFlagCash ? "Yes" : "No",
-          "Payment Flag Check": stop.paymentFlagCheck ? "Yes" : "No",
-          "Payment Flag Credit Card": stop.paymentFlagCC ? "Yes" : "No",
-          "Payment Flag Not Paid": stop.paymentFlagNotPaid ? "Yes" : "No",
-          
-          // Payment Amounts (from Excel)
-          "Payment Amount Cash": stop.paymentAmountCash || 0,
-          "Payment Amount Check": stop.paymentAmountCheck || 0,
-          "Payment Amount Credit Card": stop.paymentAmountCC || 0,
-          "Total Payment Amount": stop.totalPaymentAmount || 0,
-          
-          // Driver Recorded Payment
-          "Driver Payment Amount": stop.driverPaymentAmount || 0,
-          "Driver Payment Methods": stop.driverPaymentMethods ? stop.driverPaymentMethods.join(", ") : "",
-          
-          // Timing Information
-          "Arrival Time": stop.arrivalTime ? new Date(stop.arrivalTime).toLocaleString() : "",
-          "Completion Time": stop.completionTime ? new Date(stop.completionTime).toLocaleString() : "",
-          
-          // Notes
-          "Initial Driver Notes": stop.initialDriverNotes || "",
-          "Driver Notes": stop.driverNotes || "",
-          "Driver Remarks": stop.driverRemarkInitial || "",
-          "Admin Notes": stop.adminNotes.map(note => `${note.admin.username}: ${note.note}`).join(" | "),
-          
-          // Return Information
-          "Return Flag": stop.returnFlagInitial ? "Yes" : "No",
-          
-          // Document Information
-          "Invoice PDF URL": stop.signedInvoicePdfUrl || "",
-          "Invoice Images": stop.invoiceImageUrls ? stop.invoiceImageUrls.join(", ") : "",
-          
-          // Timestamps
-          "Stop Created At": stop.createdAt.toLocaleString(),
-          "Stop Updated At": stop.updatedAt.toLocaleString(),
-          "Route Created At": route.createdAt.toLocaleString(),
-          "Route Updated At": route.updatedAt.toLocaleString(),
+          // === ROUTE INFORMATION ===
+          "Route Number": cleanText(route.routeNumber) || "",
+          "Route Date": formatDate(route.date),
+          "Route Status": cleanText(route.status),
+          "Route Driver": cleanText(route.driver?.fullName || route.driver?.username) || "",
+
+          // === STOP BASIC INFO ===
+          "Stop Sequence": stop.sequence || 0,
+          "Stop Status": cleanText(stop.status),
+          "Stop ID": cleanText(stop.id),
+
+          // === CUSTOMER INFORMATION ===
+          "Customer Name": cleanText(stop.customerNameFromUpload || stop.customer.name),
+          "Customer Address": cleanText(stop.address || stop.customer.address),
+          "Customer Email": cleanText(stop.customer.email),
+          "Customer Group Code": cleanText(stop.customer.groupCode),
+
+          // === ORDER DETAILS ===
+          "Order Number": cleanText(stop.orderNumberWeb),
+          "Invoice Number": cleanText(stop.quickbooksInvoiceNum),
+          "Order Amount": formatCurrency(stop.amount),
+          "Is COD": formatYesNo(stop.isCOD),
+
+          // === DRIVER ASSIGNMENT ===
+          "Assigned Driver": cleanText(stop.driverNameFromUpload || route.driver?.fullName || route.driver?.username),
+
+          // === PAYMENT INFORMATION ===
+          "Payment Status": paymentStatus,
+          "Driver Recorded Payments": individualPayments,
+          "Total Driver Payment Amount": formatCurrency(totalDriverPayments),
+
+          // Legacy Payment Flags (from Excel upload)
+          "Excel Payment Cash": formatYesNo(stop.paymentFlagCash),
+          "Excel Payment Check": formatYesNo(stop.paymentFlagCheck),
+          "Excel Payment Credit Card": formatYesNo(stop.paymentFlagCC),
+          "Excel Payment Not Paid": formatYesNo(stop.paymentFlagNotPaid),
+
+          // Legacy Payment Amounts (from Excel upload)
+          "Excel Cash Amount": formatCurrency(stop.paymentAmountCash),
+          "Excel Check Amount": formatCurrency(stop.paymentAmountCheck),
+          "Excel Credit Card Amount": formatCurrency(stop.paymentAmountCC),
+          "Excel Total Payment": formatCurrency(stop.totalPaymentAmount),
+
+          // === DELIVERY TIMING ===
+          "Arrival Time": formatDateTime(stop.arrivalTime),
+          "Completion Time": formatDateTime(stop.completionTime),
+          "On The Way Time": formatDateTime(stop.onTheWayTime),
+
+          // === NOTES AND COMMENTS ===
+          "Initial Driver Notes": cleanText(stop.initialDriverNotes),
+          "Driver Delivery Notes": cleanText(stop.driverNotes),
+          "Driver Remarks": cleanText(stop.driverRemarkInitial),
+          "Admin Notes": stop.adminNotes.length > 0
+            ? stop.adminNotes.map((note: any) => `[${note.admin.username}] ${cleanText(note.note)}`).join(' | ')
+            : "",
+
+          // === RETURNS INFORMATION ===
+          "Has Returns": formatYesNo(stop.returnFlagInitial),
+          "Return Details": returnsInfo,
+
+          // === DOCUMENTS ===
+          "Signed Invoice PDF": stop.signedInvoicePdfUrl ? "Yes" : "No",
+          "Invoice Images Count": stop.invoiceImageUrls ? stop.invoiceImageUrls.length : 0,
+
+          // === RECORD TIMESTAMPS ===
+          "Stop Created": formatDateTime(stop.createdAt),
+          "Stop Last Updated": formatDateTime(stop.updatedAt),
         });
       });
     });
@@ -192,25 +261,41 @@ export async function GET(request: NextRequest) {
         return new NextResponse("No data to export", { status: 400 });
       }
 
-      // Generate CSV content
+      // Helper function to properly escape CSV values
+      const escapeCsvValue = (value: any): string => {
+        if (value === null || value === undefined) return "";
+
+        const stringValue = String(value);
+
+        // If the value contains comma, quote, newline, or carriage return, wrap in quotes
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+          // Escape quotes by doubling them and wrap the whole value in quotes
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+
+        return stringValue;
+      };
+
+      // Generate clean CSV content with proper headers
       const headers = Object.keys(exportData[0]);
-      const csvContent = [
-        headers.join(","),
-        ...exportData.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            // Escape commas and quotes in CSV
-            if (typeof value === "string" && (value.includes(",") || value.includes('"'))) {
-              return `"${value.replace(/"/g, '""')}"`;
-            }
-            return value;
-          }).join(",")
+
+      // Create CSV with UTF-8 BOM for better Excel compatibility
+      const BOM = '\uFEFF';
+      const csvContent = BOM + [
+        // Header row
+        headers.map(header => escapeCsvValue(header)).join(","),
+        // Data rows
+        ...exportData.map(row =>
+          headers.map(header => escapeCsvValue(row[header as keyof typeof row])).join(",")
         )
       ].join("\n");
 
-      // Set appropriate headers for file download
+      // Set appropriate headers for file download with descriptive filename
       const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
-      const filename = `routes-export-${dateRange}.csv`;
+      const statusFilter = status && status !== "ALL" ? `_${status.toLowerCase()}` : "";
+      const totalRoutes = routes.length;
+      const totalStops = exportData.length;
+      const filename = `B&R_Routes_Export_${dateRange}${statusFilter}_${totalRoutes}routes_${totalStops}stops.csv`;
       
       return new NextResponse(csvContent, {
         headers: {

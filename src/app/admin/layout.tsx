@@ -39,11 +39,8 @@ export default function AdminLayout({
         return;
       }
 
-      // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
-      const normalizedRole = userRole === "SUPER_ADMIN" ? "ADMIN" : userRole;
-
-      // Store the normalized user role in state
-      setUserRole(normalizedRole);
+      // Store the actual user role in state (SUPER_ADMIN, ADMIN, DRIVER)
+      setUserRole(userRole);
 
       // Use the stored username directly instead of trying to decode the token
       if (storedUsername) {
@@ -70,11 +67,19 @@ export default function AdminLayout({
   }, []);
 
   const handleLogout = () => {
+    // Clear all authentication data from both localStorage and sessionStorage
     localStorage.removeItem("token");
     localStorage.removeItem("userRole");
     localStorage.removeItem("username");
     localStorage.removeItem("userId");
-    router.push("/login");
+
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("userRole");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("userId");
+
+    // Force a page reload to clear any cached state
+    window.location.href = "/login";
   };
 
   const toggleSidebar = () => {
@@ -463,55 +468,58 @@ export default function AdminLayout({
                 </Link>
               </li>
 
-              <li>
-                <Link
-                  href="/admin/users"
-                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
-                    pathname === "/admin/users"
-                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
-                      : "hover:bg-gray-800"
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  {pathname === "/admin/users" && (
-                    <span className="absolute left-0 top-0 h-full w-1 bg-purple-500"></span>
-                  )}
-                  <span
-                    className={`absolute inset-0 w-1 bg-purple-500 transition-all duration-300 ${
-                      pathname === "/admin/users"
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
+              {/* Super Admin Only - User Management */}
+              {userRole === "SUPER_ADMIN" && (
+                <li>
+                  <Link
+                    href="/admin/user-management"
+                    className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                      pathname === "/admin/user-management"
+                        ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                        : "hover:bg-gray-800"
                     }`}
-                  ></span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 mr-3 text-primary-purple transition-transform duration-300 ${
-                      pathname === "/admin/users"
-                        ? "scale-110"
-                        : "group-hover:scale-110"
-                    }`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                    onClick={() => setSidebarOpen(false)}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                    />
-                  </svg>
-                  <span
-                    className={`font-medium transition-all duration-300 ${
-                      pathname === "/admin/users"
-                        ? "text-white"
-                        : "group-hover:translate-x-1"
-                    }`}
-                  >
-                    Users
-                  </span>
-                </Link>
-              </li>
+                    {pathname === "/admin/user-management" && (
+                      <span className="absolute left-0 top-0 h-full w-1 bg-purple-500"></span>
+                    )}
+                    <span
+                      className={`absolute inset-0 w-1 bg-purple-500 transition-all duration-300 ${
+                        pathname === "/admin/user-management"
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100"
+                      }`}
+                    ></span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-5 w-5 mr-3 text-primary-purple transition-transform duration-300 ${
+                        pathname === "/admin/user-management"
+                          ? "scale-110"
+                          : "group-hover:scale-110"
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                      />
+                    </svg>
+                    <span
+                      className={`font-medium transition-all duration-300 ${
+                        pathname === "/admin/user-management"
+                          ? "text-white"
+                          : "group-hover:translate-x-1"
+                      }`}
+                    >
+                      User Management
+                    </span>
+                  </Link>
+                </li>
+              )}
 
               <li>
                 <Link

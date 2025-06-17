@@ -271,11 +271,17 @@ export default function DriverRouteDetailPage({
   };
 
   const getPaymentMethod = (stop: Stop) => {
+    // Check if driver has recorded payments
+    if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
+      return "Paid";
+    }
+
+    // Check legacy payment flags
     if (stop.paymentFlagCash) return "Cash";
     if (stop.paymentFlagCheck) return "Check";
     if (stop.paymentFlagCC) return "Credit Card";
     if (stop.paymentFlagNotPaid) return "Not Paid";
-    return "Unknown";
+    return "Not Paid";
   };
 
   const hasUnreadNotes = (stop: Stop) => {

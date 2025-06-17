@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
 import ColumnMappingModal from "@/components/ColumnMappingModal";
 
 interface UploadResult {
@@ -31,6 +32,9 @@ interface PreviewResult {
 }
 
 export default function RouteUploadPage() {
+  // Use the Admin auth hook (allows both ADMIN and SUPER_ADMIN)
+  const { token, userRole, isLoading: authLoading, isAuthenticated } = useAdminAuth();
+
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -39,29 +43,12 @@ export default function RouteUploadPage() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [conflictDetected, setConflictDetected] = useState(false);
   const [existingRoute, setExistingRoute] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [uploadAction, setUploadAction] = useState<'create' | 'update' | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    // Get the token and user role from localStorage
-    const storedToken = localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole");
-
-    // Redirect if not an admin or super admin
-    if (!storedToken || (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN")) {
-      router.push("/admin");
-      return;
-    }
-
-    if (storedToken) {
-      setToken(storedToken);
-    }
-  }, [router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -279,6 +266,16 @@ export default function RouteUploadPage() {
   const handleBackToDashboard = () => {
     router.push("/admin");
   };
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return <AuthLoadingSpinner message="Loading upload page..." />;
+  }
+
+  // Only show access denied if auth is complete and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <AccessDenied title="Access Denied" message="Admin access required" />;
+  }
 
   return (
     <div className="space-y-6">

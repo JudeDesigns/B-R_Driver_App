@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       stop.driverNameFromUpload === driverName ||
       stop.driverNameFromUpload === driver.username;
 
-    if (!isDriverAssigned && decoded.role !== "ADMIN") {
+    if (!isDriverAssigned && !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
       return NextResponse.json(
         { message: "You are not authorized to manage returns for this stop" },
         { status: 403 }

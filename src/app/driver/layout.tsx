@@ -122,7 +122,8 @@ export default function DriverLayout({
     sessionStorage.removeItem("storageType");
 
     console.log("Driver logged out successfully from layout");
-    router.push("/login");
+    // Force a page reload to clear any cached state
+    window.location.href = "/login";
   };
 
   return (

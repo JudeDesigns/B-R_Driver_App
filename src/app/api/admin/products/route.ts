@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
 
-    if (!decoded || !decoded.id || decoded.role !== "ADMIN") {
+    if (!decoded || !decoded.id || !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
 
-    if (!decoded || !decoded.id || decoded.role !== "ADMIN") {
+    if (!decoded || !decoded.id || !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 

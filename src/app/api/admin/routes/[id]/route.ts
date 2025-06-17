@@ -155,12 +155,11 @@ export async function DELETE(
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
 
-    if (
-      !decoded ||
-      !decoded.id ||
-      !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)
-    ) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!decoded || !decoded.id || decoded.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { message: "Unauthorized: Super Admin access required for route deletion" },
+        { status: 403 }
+      );
     }
 
     // Get the route ID from the URL - await the params object

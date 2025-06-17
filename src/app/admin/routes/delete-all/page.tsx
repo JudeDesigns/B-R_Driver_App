@@ -2,21 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSuperAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
 
 export default function DeleteAllRoutesPage() {
-  const [token, setToken] = useState<string | null>(null);
+  // Use the Super Admin auth hook
+  const { token, userRole, isLoading: authLoading, isAuthenticated } = useSuperAdminAuth();
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
   const router = useRouter();
-
-  useEffect(() => {
-    // Get the token from localStorage
-    const storedToken = localStorage.getItem("token");
-    if (storedToken) {
-      setToken(storedToken);
-    }
-  }, []);
 
   const handleDeleteAll = async () => {
     if (!token) {
@@ -53,6 +48,16 @@ export default function DeleteAllRoutesPage() {
       setLoading(false);
     }
   };
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return <AuthLoadingSpinner message="Checking permissions..." />;
+  }
+
+  // Only show access denied if auth is complete and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <AccessDenied title="Access Denied" message="Super Admin access required" />;
+  }
 
   return (
     <div className="space-y-6">

@@ -64,11 +64,9 @@ export async function authenticateUser(username: string, password: string) {
       }
 
       if (passwordMatches) {
-        // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
-        const userRole = user.role === "SUPER_ADMIN" ? "ADMIN" : user.role;
         return {
           isAuthenticated: true,
-          userRole: userRole,
+          userRole: user.role, // Keep original role (SUPER_ADMIN, ADMIN, DRIVER)
           userId: user.id,
           username: user.username,
         };
@@ -127,10 +125,7 @@ export function verifyToken(token: string) {
       audience: "br-food-services-users",
     }) as any;
 
-    // Convert SUPER_ADMIN to ADMIN as we're removing the SUPER_ADMIN role
-    if (decoded && decoded.role === "SUPER_ADMIN") {
-      decoded.role = "ADMIN";
-    }
+    // Keep original roles (SUPER_ADMIN, ADMIN, DRIVER) for proper role separation
 
     // Validate required fields
     if (!decoded.id || !decoded.role || !decoded.username) {

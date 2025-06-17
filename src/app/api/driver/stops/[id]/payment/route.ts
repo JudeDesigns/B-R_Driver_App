@@ -24,20 +24,52 @@ export async function PATCH(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse request body
-    const { driverPaymentAmount, driverPaymentMethods } = await request.json();
+    // Parse request body - support both old format and new format
+    const body = await request.json();
 
-    // Validate input
-    if (!driverPaymentAmount || driverPaymentAmount <= 0) {
-      return NextResponse.json(
-        { message: "Payment amount must be greater than 0" },
-        { status: 400 }
-      );
+    // New format: array of payments
+    if (body.payments && Array.isArray(body.payments)) {
+      // Validate payments array
+      if (body.payments.length === 0) {
+        return NextResponse.json(
+          { message: "At least one payment entry is required" },
+          { status: 400 }
+        );
+      }
+
+      for (const payment of body.payments) {
+        if (!payment.amount || payment.amount <= 0) {
+          return NextResponse.json(
+            { message: "All payment amounts must be greater than 0" },
+            { status: 400 }
+          );
+        }
+        if (!payment.method || !["Cash", "Check", "Credit Card"].includes(payment.method)) {
+          return NextResponse.json(
+            { message: "Invalid payment method. Must be Cash, Check, or Credit Card" },
+            { status: 400 }
+          );
+        }
+      }
     }
+    // Old format: single payment (for backward compatibility)
+    else if (body.driverPaymentAmount && body.driverPaymentMethods) {
+      if (!body.driverPaymentAmount || body.driverPaymentAmount <= 0) {
+        return NextResponse.json(
+          { message: "Payment amount must be greater than 0" },
+          { status: 400 }
+        );
+      }
 
-    if (!driverPaymentMethods || !Array.isArray(driverPaymentMethods) || driverPaymentMethods.length === 0) {
+      if (!body.driverPaymentMethods || !Array.isArray(body.driverPaymentMethods) || body.driverPaymentMethods.length === 0) {
+        return NextResponse.json(
+          { message: "At least one payment method must be selected" },
+          { status: 400 }
+        );
+      }
+    } else {
       return NextResponse.json(
-        { message: "At least one payment method must be selected" },
+        { message: "Invalid payment data format" },
         { status: 400 }
       );
     }
@@ -66,7 +98,7 @@ export async function PATCH(
 
     // Check if the driver is assigned to this stop's route or if the stop has the driver's name
     const driverUser = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: decoded.id },
     });
 
     if (!driverUser) {
@@ -77,8 +109,8 @@ export async function PATCH(
     }
 
     // Verify driver has access to this stop
-    const hasAccess = 
-      stop.route.driverId === decoded.userId || 
+    const hasAccess =
+      stop.route.driverId === decoded.id ||
       stop.driverNameFromUpload === driverUser.username ||
       stop.driverNameFromUpload === driverUser.fullName;
 
@@ -89,34 +121,99 @@ export async function PATCH(
       );
     }
 
-    // Update the stop with payment information
-    const updatedStop = await prisma.stop.update({
-      where: {
-        id: stopId,
-      },
-      data: {
-        driverPaymentAmount: driverPaymentAmount,
-        driverPaymentMethods: driverPaymentMethods,
-      },
-      include: {
-        customer: true,
-        route: {
+    // Handle payment creation in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Handle new format: array of payments
+      if (body.payments && Array.isArray(body.payments)) {
+        // Create individual payment records
+        const createdPayments = await Promise.all(
+          body.payments.map((payment: any) =>
+            tx.payment.create({
+              data: {
+                stopId: stopId,
+                amount: payment.amount,
+                method: payment.method,
+                notes: payment.notes || null,
+              },
+            })
+          )
+        );
+
+        // Calculate total payment amount
+        const totalAmount = body.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+        const allMethods = [...new Set(body.payments.map((p: any) => p.method))];
+
+        // Update stop with aggregated payment info and set payment status
+        const updatedStop = await tx.stop.update({
+          where: { id: stopId },
+          data: {
+            driverPaymentAmount: totalAmount,
+            driverPaymentMethods: allMethods,
+            paymentFlagNotPaid: false, // Mark as paid
+          },
           include: {
-            driver: true,
+            customer: true,
+            route: {
+              include: {
+                driver: true,
+              },
+            },
+            adminNotes: {
+              include: {
+                admin: true,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            payments: {
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
           },
-        },
-        adminNotes: {
+        });
+
+        return updatedStop;
+      }
+      // Handle old format: single payment (backward compatibility)
+      else {
+        // Update stop with legacy format and set payment status
+        const updatedStop = await tx.stop.update({
+          where: { id: stopId },
+          data: {
+            driverPaymentAmount: body.driverPaymentAmount,
+            driverPaymentMethods: body.driverPaymentMethods,
+            paymentFlagNotPaid: false, // Mark as paid
+          },
           include: {
-            admin: true,
+            customer: true,
+            route: {
+              include: {
+                driver: true,
+              },
+            },
+            adminNotes: {
+              include: {
+                admin: true,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            payments: {
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-      },
+        });
+
+        return updatedStop;
+      }
     });
 
-    return NextResponse.json(updatedStop);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error updating payment information:", error);
     return NextResponse.json(

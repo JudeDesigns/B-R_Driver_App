@@ -14,10 +14,10 @@ export async function DELETE(req: NextRequest) {
     }
 
     const decoded = await verifyToken(token);
-    if (!decoded || !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
+    if (!decoded || decoded.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { message: "Unauthorized: Invalid token or insufficient permissions" },
-        { status: 401 }
+        { message: "Unauthorized: Super Admin access required for this operation" },
+        { status: 403 }
       );
     }
 

@@ -7,6 +7,7 @@ import EnhancedTable, { Column } from "@/components/ui/EnhancedTable";
 import TableActions, { Action } from "@/components/ui/TableActions";
 import Pagination from "@/components/ui/Pagination";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
 
 interface Route {
   id: string;
@@ -31,13 +32,15 @@ interface RoutesResponse {
 }
 
 export default function RoutesPage() {
+  // Use the Admin auth hook (allows both ADMIN and SUPER_ADMIN)
+  const { token, userRole, isLoading: authLoading, isAuthenticated } = useAdminAuth();
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [totalCount, setTotalCount] = useState(0);
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
-  const [token, setToken] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -46,19 +49,14 @@ export default function RoutesPage() {
   const [deleteError, setDeleteError] = useState("");
   const router = useRouter();
 
+  // Fetch routes when authenticated
   useEffect(() => {
-    // Get the token from localStorage
-    const storedToken = localStorage.getItem("token");
-    if (storedToken) {
-      setToken(storedToken);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (token) {
+    if (token && isAuthenticated) {
       fetchRoutes();
     }
-  }, [token, limit, offset, dateFilter, statusFilter]);
+  }, [token, isAuthenticated, limit, offset, dateFilter, statusFilter]);
+
+
 
   const fetchRoutes = async () => {
     if (!token) return;
@@ -194,6 +192,16 @@ export default function RoutesPage() {
 
   const totalPages = Math.ceil(totalCount / limit);
   const currentPage = Math.floor(offset / limit) + 1;
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return <AuthLoadingSpinner message="Loading routes..." />;
+  }
+
+  // Only show access denied if auth is complete and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <AccessDenied title="Access Denied" message="Admin access required" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -357,11 +365,12 @@ export default function RoutesPage() {
                               href: `/admin/routes/${route.id}/edit`,
                               variant: "success",
                             },
-                            {
+                            // Delete action - Super Admin only
+                            ...(userRole === "SUPER_ADMIN" ? [{
                               label: "Delete",
                               onClick: () => handleDeleteRoute(route),
-                              variant: "danger",
-                            },
+                              variant: "danger" as const,
+                            }] : []),
                           ]}
                         />
                       ),

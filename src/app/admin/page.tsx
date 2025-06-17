@@ -7,6 +7,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { SocketEvents } from "@/lib/socketClient";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
 import ClientDate from "@/components/ui/ClientDate";
+import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
 
 interface Route {
   id: string;
@@ -56,6 +57,9 @@ interface ActiveDriverDetails {
 }
 
 export default function AdminDashboard() {
+  // Use the Admin auth hook (allows both ADMIN and SUPER_ADMIN)
+  const { token, userRole, isLoading: authLoading, isAuthenticated } = useAdminAuth();
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     completedStops: 0,
@@ -83,9 +87,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
-
-  // Initialize socket connection with token
-  const [token, setToken] = useState<string | null>(null);
   const {
     isConnected,
     joinRoom,
@@ -161,22 +162,12 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Check authentication and fetch initial data
+  // Fetch initial data when authenticated
   useEffect(() => {
-    // Check if user is logged in and has admin role
-    const storedToken = localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole");
-
-    if (!storedToken || (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN")) {
-      router.push("/login");
-      return;
+    if (token && isAuthenticated) {
+      fetchDashboardData();
     }
-
-    // Set the token for Socket.IO connection
-    setToken(storedToken);
-
-    fetchDashboardData();
-  }, [router, fetchDashboardData]);
+  }, [token, isAuthenticated, fetchDashboardData]);
 
   // Set up WebSocket connection and event listeners
   useEffect(() => {
@@ -211,6 +202,16 @@ export default function AdminDashboard() {
       unsubscribeRouteStatus();
     };
   }, [isConnected, joinRoom, subscribe, fetchDashboardData]);
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return <AuthLoadingSpinner message="Loading dashboard..." />;
+  }
+
+  // Only show access denied if auth is complete and user is not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <AccessDenied title="Access Denied" message="Admin access required" />;
+  }
 
   return (
     <div className="space-y-8">

@@ -25,6 +25,14 @@ interface Customer {
   preferences: string | null;
 }
 
+interface Payment {
+  id: string;
+  amount: number;
+  method: string;
+  notes?: string;
+  createdAt: string;
+}
+
 interface Stop {
   id: string;
   sequence: number;
@@ -54,6 +62,7 @@ interface Stop {
   // Driver-recorded payment information
   driverPaymentAmount?: number;
   driverPaymentMethods?: string[];
+  payments?: Payment[];
   customer: Customer;
   route: {
     id: string;
@@ -89,8 +98,7 @@ export default function StopDetailPage({
 
   // Payment recording state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
+  const [paymentEntries, setPaymentEntries] = useState<Array<{amount: string, method: string, notes: string}>>([{amount: "", method: "", notes: ""}]);
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
@@ -451,8 +459,13 @@ export default function StopDetailPage({
   const handleSavePayment = async () => {
     if (!token || !stop) return;
 
-    if (!paymentAmount || selectedPaymentMethods.length === 0) {
-      setPaymentError("Please enter payment amount and select at least one payment method");
+    // Validate payment entries
+    const validPayments = paymentEntries.filter(entry =>
+      entry.amount && parseFloat(entry.amount) > 0 && entry.method
+    );
+
+    if (validPayments.length === 0) {
+      setPaymentError("Please enter at least one valid payment with amount and method");
       return;
     }
 
@@ -460,6 +473,13 @@ export default function StopDetailPage({
     setPaymentError("");
 
     try {
+      // Convert to the format expected by the API
+      const payments = validPayments.map(entry => ({
+        amount: parseFloat(entry.amount),
+        method: entry.method,
+        notes: entry.notes || null,
+      }));
+
       const response = await fetch(`/api/driver/stops/${unwrappedParams.id}/payment`, {
         method: "PATCH",
         headers: {
@@ -467,8 +487,7 @@ export default function StopDetailPage({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          driverPaymentAmount: parseFloat(paymentAmount),
-          driverPaymentMethods: selectedPaymentMethods,
+          payments: payments,
         }),
       });
 
@@ -483,8 +502,7 @@ export default function StopDetailPage({
       }
 
       // Reset form and close modal
-      setPaymentAmount("");
-      setSelectedPaymentMethods([]);
+      setPaymentEntries([{amount: "", method: "", notes: ""}]);
       setShowPaymentModal(false);
 
       // Refresh stop details
@@ -497,13 +515,21 @@ export default function StopDetailPage({
     }
   };
 
-  // Handle payment method selection
-  const togglePaymentMethod = (method: string) => {
-    setSelectedPaymentMethods(prev =>
-      prev.includes(method)
-        ? prev.filter(m => m !== method)
-        : [...prev, method]
-    );
+  // Payment entry management
+  const addPaymentEntry = () => {
+    setPaymentEntries(prev => [...prev, {amount: "", method: "", notes: ""}]);
+  };
+
+  const removePaymentEntry = (index: number) => {
+    if (paymentEntries.length > 1) {
+      setPaymentEntries(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePaymentEntry = (index: number, field: string, value: string) => {
+    setPaymentEntries(prev => prev.map((entry, i) =>
+      i === index ? {...entry, [field]: value} : entry
+    ));
   };
 
   const formatDate = (dateString: string | null) => {
@@ -832,21 +858,33 @@ export default function StopDetailPage({
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-700">Payment Received</h4>
-                      {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? (
-                        <div className="mt-1">
-                          <div className="text-lg font-bold text-green-600">
-                            ${stop.driverPaymentAmount.toFixed(2)}
-                          </div>
-                          {stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0 && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Methods: {stop.driverPaymentMethods.join(", ")}
+                      <h4 className="text-sm font-medium text-gray-700">Payments Received</h4>
+                      {stop.payments && stop.payments.length > 0 ? (
+                        <div className="mt-2 space-y-2">
+                          {stop.payments.map((payment, index) => (
+                            <div key={payment.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-green-600">
+                                  ${payment.amount.toFixed(2)} - {payment.method}
+                                </div>
+                                {payment.notes && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {payment.notes}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-400">
+                                  {formatDate(payment.createdAt)}
+                                </div>
+                              </div>
                             </div>
-                          )}
+                          ))}
+                          <div className="text-lg font-bold text-green-600 pt-2 border-t border-gray-200">
+                            Total: ${stop.driverPaymentAmount?.toFixed(2) || "0.00"}
+                          </div>
                         </div>
                       ) : (
                         <div className="text-sm text-gray-500 mt-1">
-                          No payment recorded yet
+                          No payments recorded yet
                         </div>
                       )}
                     </div>
@@ -1218,8 +1256,7 @@ export default function StopDetailPage({
                   onClick={() => {
                     setShowPaymentModal(false);
                     setPaymentError("");
-                    setPaymentAmount("");
-                    setSelectedPaymentMethods([]);
+                    setPaymentEntries([{amount: "", method: "", notes: ""}]);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -1230,44 +1267,90 @@ export default function StopDetailPage({
               </div>
 
               <div className="space-y-4">
-                {/* Payment Amount */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payment Amount *
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      className="block w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0.00"
-                    />
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-700">Payment Entries</h4>
+                  <button
+                    type="button"
+                    onClick={addPaymentEntry}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    + Add Another Payment
+                  </button>
                 </div>
 
-                {/* Payment Methods */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payment Methods * (Select all that apply)
-                  </label>
-                  <div className="space-y-2">
-                    {["Cash", "Check", "Credit Card"].map((method) => (
-                      <label key={method} className="flex items-center">
+                {paymentEntries.map((entry, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Payment {index + 1}
+                      </span>
+                      {paymentEntries.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removePaymentEntry(index)}
+                          className="text-sm text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={selectedPaymentMethods.includes(method)}
-                          onChange={() => togglePaymentMethod(method)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={entry.amount}
+                          onChange={(e) => updatePaymentEntry(index, 'amount', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.00"
                         />
-                        <span className="ml-2 text-sm text-gray-700">{method}</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Method
+                        </label>
+                        <select
+                          value={entry.method}
+                          onChange={(e) => updatePaymentEntry(index, 'method', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select method</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Check">Check</option>
+                          <option value="Credit Card">Credit Card</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Notes (optional)
                       </label>
-                    ))}
+                      <input
+                        type="text"
+                        value={entry.notes}
+                        onChange={(e) => updatePaymentEntry(index, 'notes', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Check number, reference, etc."
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-sm font-medium text-gray-700">
+                    Total Amount: $
+                    {paymentEntries
+                      .filter(entry => entry.amount && parseFloat(entry.amount) > 0)
+                      .reduce((sum, entry) => sum + parseFloat(entry.amount), 0)
+                      .toFixed(2)
+                    }
                   </div>
                 </div>
 
@@ -1284,8 +1367,7 @@ export default function StopDetailPage({
                     onClick={() => {
                       setShowPaymentModal(false);
                       setPaymentError("");
-                      setPaymentAmount("");
-                      setSelectedPaymentMethods([]);
+                      setPaymentEntries([{amount: "", method: "", notes: ""}]);
                     }}
                     disabled={savingPayment}
                     className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
@@ -1294,7 +1376,7 @@ export default function StopDetailPage({
                   </button>
                   <button
                     onClick={handleSavePayment}
-                    disabled={savingPayment || !paymentAmount || selectedPaymentMethods.length === 0}
+                    disabled={savingPayment || paymentEntries.filter(entry => entry.amount && parseFloat(entry.amount) > 0 && entry.method).length === 0}
                     className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
                   >
                     {savingPayment ? (

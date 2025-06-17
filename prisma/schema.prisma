@@ -127,6 +127,7 @@ model Stop {
   returns       Return[]
   adminNotes    AdminNote[]
   stopDocuments StopDocument[]
+  payments      Payment[] // Individual payment entries
 
   @@index([routeId])
   @@index([customerId])
@@ -359,6 +360,7 @@ model StopDocument {
 enum Role {
   ADMIN
   DRIVER
+  SUPER_ADMIN
 }
 
 enum RouteStatus {
@@ -401,4 +403,22 @@ enum DocumentType {
   DELIVERY_RECEIPT
   RETURN_FORM
   OTHER
+}
+
+// Payment model for individual payment entries
+model Payment {
+  id        String   @id @default(uuid())
+  stopId    String
+  amount    Float    // Payment amount
+  method    String   // Payment method: "Cash", "Check", "Credit Card"
+  notes     String?  // Optional notes about the payment
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  stop Stop @relation(fields: [stopId], references: [id], onDelete: Cascade)
+
+  @@index([stopId])
+  @@index([method])
+  @@map("payments")
 }
