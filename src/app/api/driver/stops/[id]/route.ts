@@ -51,7 +51,19 @@ export async function GET(
         },
       },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            documents: {
+              where: {
+                isActive: true,
+                isDeleted: false,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+          },
+        },
         route: {
           select: {
             id: true,
@@ -78,6 +90,21 @@ export async function GET(
           },
         },
         payments: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+        stopDocuments: {
+          where: {
+            isDeleted: false,
+            document: {
+              isActive: true,
+              isDeleted: false,
+            },
+          },
+          include: {
+            document: true,
+          },
           orderBy: {
             createdAt: "desc",
           },

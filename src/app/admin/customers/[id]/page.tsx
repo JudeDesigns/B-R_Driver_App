@@ -27,6 +27,32 @@ interface Stop {
   };
 }
 
+interface Document {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+  uploader: {
+    id: string;
+    username: string;
+    fullName: string | null;
+  };
+}
+
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalStops: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  limit: number;
+}
+
 export default function CustomerDetailPage({
   params,
 }: {
@@ -38,13 +64,16 @@ export default function CustomerDetailPage({
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [recentStops, setRecentStops] = useState<Stop[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const fetchCustomerDetails = async () => {
+    const fetchCustomerDetails = async (page: number = 1) => {
       setLoading(true);
       setError("");
 
@@ -55,7 +84,7 @@ export default function CustomerDetailPage({
           return;
         }
 
-        const response = await fetch(`/api/admin/customers/${customerId}`, {
+        const response = await fetch(`/api/admin/customers/${customerId}?page=${page}&limit=10`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -71,6 +100,8 @@ export default function CustomerDetailPage({
         const data = await response.json();
         setCustomer(data.customer);
         setRecentStops(data.recentStops || []);
+        setDocuments(data.documents || []);
+        setPagination(data.pagination);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
         console.error("Error fetching customer details:", err);
@@ -79,8 +110,13 @@ export default function CustomerDetailPage({
       }
     };
 
-    fetchCustomerDetails();
-  }, [router, customerId]);
+    fetchCustomerDetails(currentPage);
+  }, [router, customerId, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // The useEffect will automatically trigger when currentPage changes
+  };
 
   const handleDelete = async () => {
     try {
@@ -111,6 +147,24 @@ export default function CustomerDetailPage({
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -412,10 +466,94 @@ export default function CustomerDetailPage({
             </div>
           </div>
 
-          {/* Recent Stops */}
+          {/* Customer Documents */}
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="px-6 py-4 bg-gray-900 text-white">
+              <h2 className="text-lg font-semibold">Customer Documents</h2>
+            </div>
+            <div className="p-6">
+              {documents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-12 w-12 mx-auto text-gray-300 mb-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <p>No documents found for this customer.</p>
+                  <p className="text-sm mt-1">Documents uploaded for this customer will appear here.</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {documents.map(doc => (
+                    <div key={doc.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 mb-1">{doc.title}</h3>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 mb-1">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                {doc.type.replace('_', ' ')}
+                              </span>
+                              <span>File: {doc.fileName}</span>
+                              <span>Size: {formatFileSize(doc.fileSize)}</span>
+                            </div>
+                            {doc.description && (
+                              <p className="text-sm text-gray-600 mb-2">{doc.description}</p>
+                            )}
+                            <div className="flex items-center space-x-4 text-xs text-gray-400">
+                              <span>Uploaded: {formatDateTime(doc.createdAt)}</span>
+                              <span>By: {doc.uploader.fullName || doc.uploader.username}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <a
+                            href={doc.filePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            View
+                          </a>
+                          <a
+                            href={doc.filePath}
+                            download
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Stops */}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="px-6 py-4 bg-gray-900 text-white flex justify-between items-center">
               <h2 className="text-lg font-semibold">Recent Deliveries</h2>
+              {pagination && (
+                <span className="text-sm text-gray-300">
+                  {pagination.totalStops} total deliveries
+                </span>
+              )}
             </div>
             <div className="p-6">
               {recentStops.length === 0 ? (
@@ -498,6 +636,74 @@ export default function CustomerDetailPage({
                   </table>
                 </div>
               )}
+
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <span>
+                      Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                      {Math.min(pagination.currentPage * pagination.limit, pagination.totalStops)} of{' '}
+                      {pagination.totalStops} deliveries
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage - 1)}
+                      disabled={!pagination.hasPrevPage}
+                      className={`px-3 py-1 rounded-md text-sm font-medium ${
+                        pagination.hasPrevPage
+                          ? 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          : 'text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed'
+                      }`}
+                    >
+                      Previous
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (pagination.totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (pagination.currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (pagination.currentPage >= pagination.totalPages - 2) {
+                          pageNum = pagination.totalPages - 4 + i;
+                        } else {
+                          pageNum = pagination.currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`px-3 py-1 rounded-md text-sm font-medium ${
+                              pageNum === pagination.currentPage
+                                ? 'text-white bg-gray-900'
+                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage + 1)}
+                      disabled={!pagination.hasNextPage}
+                      className={`px-3 py-1 rounded-md text-sm font-medium ${
+                        pagination.hasNextPage
+                          ? 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          : 'text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -520,7 +726,7 @@ export default function CustomerDetailPage({
             Customer Not Found
           </h2>
           <p className="mt-3 text-gray-500 max-w-md mx-auto">
-            The customer you're looking for doesn't exist or you may not have
+            The customer you&apos;re looking for doesn&apos;t exist or you may not have
             permission to view it.
           </p>
           <div className="mt-8">

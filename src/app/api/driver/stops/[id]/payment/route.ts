@@ -125,6 +125,13 @@ export async function PATCH(
     const result = await prisma.$transaction(async (tx) => {
       // Handle new format: array of payments
       if (body.payments && Array.isArray(body.payments)) {
+        // First, delete existing payment records to avoid duplicates
+        await tx.payment.deleteMany({
+          where: {
+            stopId: stopId,
+          },
+        });
+
         // Create individual payment records
         const createdPayments = await Promise.all(
           body.payments.map((payment: any) =>

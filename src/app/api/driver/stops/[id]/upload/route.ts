@@ -233,11 +233,11 @@ export async function POST(
       id: stop.id,
       customerName: stop.customer.name,
       customerAddress: stop.customer.address,
-      routeNumber: stop.route.routeNumber,
-      arrivalTime: stop.arrivalTime,
-      completionTime: stop.completionTime,
+      routeNumber: stop.route.routeNumber || "",
+      arrivalTime: stop.arrivalTime?.toISOString() || null,
+      completionTime: stop.completionTime?.toISOString() || null,
       driverNotes: stop.driverNotes,
-      adminNotes: stop.adminNotes
+      adminNotes: null // Admin notes not included in this query
     };
 
     // Prepare returns data for PDF

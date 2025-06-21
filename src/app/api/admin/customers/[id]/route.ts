@@ -44,7 +44,21 @@ export async function GET(
       );
     }
 
-    // Get recent stops for this customer
+    // Get pagination parameters
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const offset = (page - 1) * limit;
+
+    // Get total count of stops for pagination
+    const totalStops = await prisma.stop.count({
+      where: {
+        customerId: id,
+        isDeleted: false,
+      },
+    });
+
+    // Get recent stops for this customer with pagination
     const recentStops = await prisma.stop.findMany({
       where: {
         customerId: id,
@@ -53,7 +67,8 @@ export async function GET(
       orderBy: {
         createdAt: "desc",
       },
-      take: 10,
+      skip: offset,
+      take: limit,
       include: {
         route: {
           select: {
@@ -65,7 +80,45 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ customer, recentStops });
+    // Get customer documents
+    const documents = await prisma.document.findMany({
+      where: {
+        customerId: id,
+        isActive: true,
+        isDeleted: false,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        uploader: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalStops / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    return NextResponse.json({
+      customer,
+      recentStops,
+      documents,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalStops,
+        hasNextPage,
+        hasPrevPage,
+        limit,
+      },
+    });
   } catch (error) {
     console.error("Error fetching customer:", error);
     return NextResponse.json(

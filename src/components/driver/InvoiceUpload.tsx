@@ -120,7 +120,7 @@ export default function InvoiceUpload({
     const fetchStopStatus = async () => {
       try {
         // Check both sessionStorage and localStorage
-        let token =
+        const token =
           sessionStorage.getItem("token") ||
           localStorage.getItem("token") ||
           "";
@@ -165,7 +165,7 @@ export default function InvoiceUpload({
     // If we don't have a status or it's not "ARRIVED", try to fetch it again
     if (currentStatus !== "ARRIVED") {
       try {
-        let token =
+        const token =
           sessionStorage.getItem("token") ||
           localStorage.getItem("token") ||
           "";

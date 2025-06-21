@@ -48,6 +48,14 @@ export async function GET(request: NextRequest) {
             fullName: true,
           },
         },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            groupCode: true,
+          },
+        },
         _count: {
           select: {
             stopDocuments: true,
@@ -90,6 +98,8 @@ export async function POST(request: NextRequest) {
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
     const type = formData.get("type") as string;
+    const customerId = formData.get("customerId") as string;
+    const stopId = formData.get("stopId") as string;
 
     if (!file || !title || !type) {
       return NextResponse.json(
@@ -151,6 +161,7 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         mimeType: file.type,
         uploadedBy: decoded.id,
+        customerId: customerId || null, // Set customer ID if provided
       },
       include: {
         uploader: {
@@ -160,8 +171,26 @@ export async function POST(request: NextRequest) {
             fullName: true,
           },
         },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            groupCode: true,
+          },
+        },
       },
     });
+
+    // If this is a stop-specific document, automatically assign it to the stop
+    if (stopId) {
+      await prisma.stopDocument.create({
+        data: {
+          stopId,
+          documentId: document.id,
+        },
+      });
+    }
 
     return NextResponse.json({
       message: "Document uploaded successfully",

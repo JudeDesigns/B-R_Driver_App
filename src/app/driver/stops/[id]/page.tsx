@@ -17,12 +17,32 @@ import InvoiceUpload from "@/components/driver/InvoiceUpload";
 import EnhancedInvoiceUpload from "@/components/driver/EnhancedInvoiceUpload";
 import ReturnManagement from "@/components/driver/ReturnManagement";
 
+interface Document {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+}
+
+interface StopDocument {
+  id: string;
+  document: Document;
+  isPrinted: boolean;
+  printedAt: string | null;
+}
+
 interface Customer {
   id: string;
   name: string;
   address: string;
   contactInfo: string | null;
   preferences: string | null;
+  documents?: Document[];
 }
 
 interface Payment {
@@ -78,6 +98,7 @@ interface Stop {
       fullName: string | null;
     };
   }>;
+  stopDocuments?: StopDocument[];
 }
 
 export default function StopDetailPage({
@@ -889,7 +910,20 @@ export default function StopDetailPage({
                       )}
                     </div>
                     <button
-                      onClick={() => setShowPaymentModal(true)}
+                      onClick={() => {
+                        // Pre-populate form with existing payment data when updating
+                        if (stop.payments && stop.payments.length > 0) {
+                          const existingPayments = stop.payments.map(payment => ({
+                            amount: payment.amount.toString(),
+                            method: payment.method,
+                            notes: payment.notes || ""
+                          }));
+                          setPaymentEntries(existingPayments);
+                        } else {
+                          setPaymentEntries([{amount: "", method: "", notes: ""}]);
+                        }
+                        setShowPaymentModal(true);
+                      }}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation tap-target"
                     >
                       <svg
@@ -1141,6 +1175,137 @@ export default function StopDetailPage({
             </div>
           </div>
 
+          {/* Documents to Print - Customer and Stop-Specific */}
+          {((stop.customer.documents && stop.customer.documents.length > 0) ||
+            (stop.stopDocuments && stop.stopDocuments.length > 0)) && (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Documents to Print
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Print these documents for this customer and delivery
+                </p>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-4">
+                  {/* Customer-Level Documents */}
+                  {stop.customer.documents && stop.customer.documents.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                        </svg>
+                        Customer Documents
+                      </h3>
+                      <div className="grid gap-3">
+                        {stop.customer.documents.map((doc) => (
+                          <div key={doc.id} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3 flex-1">
+                                <div className="text-2xl">
+                                  {doc.type === 'INVOICE' ? '📄' :
+                                   doc.type === 'CREDIT_MEMO' ? '💳' :
+                                   doc.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                   doc.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium text-gray-900 truncate">
+                                    {doc.title}
+                                  </h4>
+                                  <p className="text-xs text-gray-600">
+                                    {doc.type.replace('_', ' ')} • {(doc.fileSize / 1024).toFixed(1)} KB
+                                  </p>
+                                  {doc.description && (
+                                    <p className="text-xs text-gray-500 mt-1 truncate">
+                                      {doc.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <a
+                                  href={doc.filePath}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
+                                >
+                                  View & Print
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stop-Specific Documents */}
+                  {stop.stopDocuments && stop.stopDocuments.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        Stop-Specific Documents
+                      </h3>
+                      <div className="grid gap-3">
+                        {stop.stopDocuments.map((stopDoc) => (
+                          <div key={stopDoc.id} className="border border-green-200 rounded-lg p-3 bg-green-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3 flex-1">
+                                <div className="text-2xl">
+                                  {stopDoc.document.type === 'INVOICE' ? '📄' :
+                                   stopDoc.document.type === 'CREDIT_MEMO' ? '💳' :
+                                   stopDoc.document.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                   stopDoc.document.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium text-gray-900 truncate">
+                                    {stopDoc.document.title}
+                                  </h4>
+                                  <p className="text-xs text-gray-600">
+                                    {stopDoc.document.type.replace('_', ' ')} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
+                                  </p>
+                                  {stopDoc.document.description && (
+                                    <p className="text-xs text-gray-500 mt-1 truncate">
+                                      {stopDoc.document.description}
+                                    </p>
+                                  )}
+                                  {stopDoc.isPrinted && (
+                                    <p className="text-xs text-green-600 mt-1 flex items-center">
+                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                      Printed {stopDoc.printedAt ? new Date(stopDoc.printedAt).toLocaleDateString() : ''}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <a
+                                  href={stopDoc.document.filePath}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
+                                >
+                                  View & Print
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Returns - Enhanced with ReturnManagement Component */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-gray-200">
@@ -1250,7 +1415,7 @@ export default function StopDetailPage({
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Record Payment Received
+                  {stop && stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? "Update Payment" : "Record Payment Received"}
                 </h3>
                 <button
                   onClick={() => {

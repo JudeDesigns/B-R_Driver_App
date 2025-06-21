@@ -54,7 +54,6 @@
 - Special delivery instructions
 - Contact information
 - Delivery time windows
-
 ---
 
 ## 👥 Driver Management

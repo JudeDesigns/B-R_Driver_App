@@ -46,7 +46,8 @@ model Customer {
   isDeleted   Boolean  @default(false)
 
   // Relations
-  stops Stop[]
+  stops     Stop[]
+  documents Document[] // Customer-level documents
 
   @@index([name])
   @@index([email])
@@ -325,6 +326,10 @@ model Document {
   updatedAt   DateTime     @updatedAt
   isDeleted   Boolean      @default(false)
 
+  // Document scope - either customer-level or stop-specific
+  customerId  String? // If set, this is a customer-level document
+  customer    Customer? @relation(fields: [customerId], references: [id])
+
   // Relations
   stopDocuments StopDocument[]
 
@@ -332,6 +337,7 @@ model Document {
   @@index([uploadedBy])
   @@index([isActive])
   @@index([isDeleted])
+  @@index([customerId])
   @@map("documents")
 }
 
