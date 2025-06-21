@@ -621,51 +621,7 @@ export default function AdminLayout({
                 </Link>
               </li>
 
-              <li>
-                <Link
-                  href="/admin/email-preview"
-                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
-                    pathname === "/admin/email-preview"
-                      ? "bg-indigo-600 shadow-lg"
-                      : "hover:bg-gray-800"
-                  }`}
-                >
-                  <span
-                    className={`absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-0 transition-opacity duration-300 ${
-                      pathname === "/admin/email-preview"
-                        ? "opacity-100"
-                        : "group-hover:opacity-100"
-                    }`}
-                  ></span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 mr-3 text-indigo-500 transition-transform duration-300 ${
-                      pathname === "/admin/email-preview"
-                        ? "scale-110"
-                        : "group-hover:scale-110"
-                    }`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span
-                    className={`font-medium transition-all duration-300 ${
-                      pathname === "/admin/email-preview"
-                        ? "text-white"
-                        : "group-hover:translate-x-1"
-                    }`}
-                  >
-                    📧 Email Preview
-                  </span>
-                </Link>
-              </li>
+
             </ul>
           </nav>
 
