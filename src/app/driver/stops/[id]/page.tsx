@@ -123,6 +123,18 @@ export default function StopDetailPage({
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
+  // Multi-step form state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  const steps = [
+    { id: 1, title: "Document Printing", icon: "📄" },
+    { id: 2, title: "Returns", icon: "📦" },
+    { id: 3, title: "Payment", icon: "💰" },
+    { id: 4, title: "Driver Notes", icon: "📝" },
+    { id: 5, title: "Image Upload", icon: "📸" },
+  ];
+
   const router = useRouter();
 
   // Initialize socket connection
@@ -160,6 +172,30 @@ export default function StopDetailPage({
       const data = await response.json();
       setStop(data);
       setDriverNotes(data.driverNotes || "");
+
+      // Auto-complete steps based on existing data
+      const autoCompletedSteps: number[] = [];
+
+      // Step 3: Payment - if driver has recorded payments
+      if (data.driverPaymentAmount && data.driverPaymentAmount > 0) {
+        autoCompletedSteps.push(3);
+      }
+
+      // Step 4: Driver Notes - if driver has saved notes
+      if (data.driverNotes && data.driverNotes.trim() !== "") {
+        autoCompletedSteps.push(4);
+      }
+
+      // Step 5: Image Upload - if PDF has been generated
+      if (data.signedInvoicePdfUrl) {
+        autoCompletedSteps.push(5);
+      }
+
+      // Update completed steps without duplicates
+      setCompletedSteps(prev => {
+        const combined = [...prev, ...autoCompletedSteps];
+        return [...new Set(combined)]; // Remove duplicates
+      });
     } catch (err) {
       console.error("Error fetching stop details:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -460,6 +496,13 @@ export default function StopDetailPage({
         }
       }
 
+      // Automatically mark Step 4 (Driver Notes) as completed when notes are saved
+      if (!completedSteps.includes(4)) {
+        setCompletedSteps(prev => [...prev, 4]);
+        console.log("Step 4 (Driver Notes) automatically marked as completed");
+        autoAdvanceStep(4);
+      }
+
       // Refresh stop details
       fetchStopDetails();
     } catch (err) {
@@ -473,6 +516,14 @@ export default function StopDetailPage({
   const handleUploadSuccess = (pdfUrl: string) => {
     // Refresh stop details to get the updated invoice URL and status
     console.log(`Invoice uploaded successfully: ${pdfUrl}`);
+
+    // Automatically mark Step 5 (Image Upload) as completed
+    if (!completedSteps.includes(5)) {
+      setCompletedSteps(prev => [...prev, 5]);
+      console.log("Step 5 (Image Upload) automatically marked as completed");
+      autoAdvanceStep(5);
+    }
+
     fetchStopDetails();
   };
 
@@ -526,6 +577,13 @@ export default function StopDetailPage({
       setPaymentEntries([{amount: "", method: "", notes: ""}]);
       setShowPaymentModal(false);
 
+      // Automatically mark Step 3 (Payment) as completed when payment is saved
+      if (!completedSteps.includes(3)) {
+        setCompletedSteps(prev => [...prev, 3]);
+        console.log("Step 3 (Payment) automatically marked as completed");
+        autoAdvanceStep(3);
+      }
+
       // Refresh stop details
       fetchStopDetails();
     } catch (err) {
@@ -551,6 +609,45 @@ export default function StopDetailPage({
     setPaymentEntries(prev => prev.map((entry, i) =>
       i === index ? {...entry, [field]: value} : entry
     ));
+  };
+
+  // Multi-step navigation functions
+  const nextStep = () => {
+    if (currentStep < steps.length) {
+      // Mark current step as completed if not already
+      if (!completedSteps.includes(currentStep)) {
+        setCompletedSteps(prev => [...prev, currentStep]);
+      }
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const goToStep = (stepId: number) => {
+    setCurrentStep(stepId);
+  };
+
+  const isStepCompleted = (stepId: number) => {
+    return completedSteps.includes(stepId);
+  };
+
+  const canAccessStep = (stepId: number) => {
+    // Can access current step, completed steps, or next step after completed ones
+    return stepId <= currentStep || isStepCompleted(stepId);
+  };
+
+  // Auto-advance to next step when current step is completed
+  const autoAdvanceStep = (completedStepId: number) => {
+    if (completedStepId === currentStep && currentStep < steps.length) {
+      setTimeout(() => {
+        setCurrentStep(currentStep + 1);
+      }, 1000); // Small delay to show completion
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -594,6 +691,68 @@ export default function StopDetailPage({
 
     return false;
   };
+
+  // Multi-step progress indicator component
+  const StepProgressIndicator = () => (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+      <div className="p-4 sm:p-5 border-b border-gray-200">
+        <h2 className="text-lg font-bold text-gray-900">
+          Delivery Process
+        </h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Complete each step to finish the delivery
+        </p>
+      </div>
+      <div className="p-4 sm:p-5">
+        {/* Progress Bar */}
+        <div className="relative mb-6">
+          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+            <div
+              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 transition-all duration-300"
+              style={{ width: `${(completedSteps.length / steps.length) * 100}%` }}
+            ></div>
+          </div>
+          <div className="text-center text-sm text-gray-600">
+            {completedSteps.length} of {steps.length} steps completed
+          </div>
+        </div>
+
+        {/* Step Indicators */}
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+          {steps.map((step) => (
+            <button
+              key={step.id}
+              onClick={() => canAccessStep(step.id) && goToStep(step.id)}
+              disabled={!canAccessStep(step.id)}
+              className={`flex flex-col items-center p-2 sm:p-3 rounded-lg transition-all duration-200 min-w-0 flex-1 max-w-[80px] sm:max-w-none ${
+                currentStep === step.id
+                  ? "bg-blue-100 border-2 border-blue-500 text-blue-700"
+                  : isStepCompleted(step.id)
+                  ? "bg-green-100 border-2 border-green-500 text-green-700"
+                  : canAccessStep(step.id)
+                  ? "bg-gray-50 border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
+                  : "bg-gray-50 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <div className="text-lg sm:text-xl mb-1">
+                {isStepCompleted(step.id) ? "✅" : step.icon}
+              </div>
+              <span className="text-xs font-medium text-center leading-tight">
+                {step.title}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Current Step Title */}
+        <div className="mt-6 text-center">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Step {currentStep}: {steps[currentStep - 1]?.title}
+          </h3>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto pb-24 px-4 sm:px-6 mobile-spacing prevent-pull-refresh">
@@ -771,179 +930,7 @@ export default function StopDetailPage({
                 </div>
               </div>
 
-              {/* Payment Information - Mobile Optimized */}
-              <div className="mt-5 sm:mt-6">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2 sm:mb-3">
-                  Payment Information
-                </h3>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {stop.isCOD && (
-                    <span className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-0.5 sm:mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span className="whitespace-nowrap">COD</span>
-                    </span>
-                  )}
-                  {stop.paymentFlagCash && (
-                    <span className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-0.5 sm:mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                        />
-                      </svg>
-                      <span className="whitespace-nowrap">Cash</span>
-                    </span>
-                  )}
-                  {stop.paymentFlagCheck && (
-                    <span className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-0.5 sm:mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span className="whitespace-nowrap">Check</span>
-                    </span>
-                  )}
-                  {stop.paymentFlagCC && (
-                    <span className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-0.5 sm:mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                        />
-                      </svg>
-                      <span className="whitespace-nowrap">Credit Card</span>
-                    </span>
-                  )}
-                  {stop.paymentFlagNotPaid && (
-                    <span className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-0.5 sm:mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span className="whitespace-nowrap">Not Paid</span>
-                    </span>
-                  )}
-                  {/* Return flag removed from payment information section as it's not a payment method */}
-                </div>
 
-                {/* Payment Recording Section */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-700">Payments Received</h4>
-                      {stop.payments && stop.payments.length > 0 ? (
-                        <div className="mt-2 space-y-2">
-                          {stop.payments.map((payment, index) => (
-                            <div key={payment.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-                              <div className="flex-1">
-                                <div className="text-sm font-medium text-green-600">
-                                  ${payment.amount.toFixed(2)} - {payment.method}
-                                </div>
-                                {payment.notes && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {payment.notes}
-                                  </div>
-                                )}
-                                <div className="text-xs text-gray-400">
-                                  {formatDate(payment.createdAt)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="text-lg font-bold text-green-600 pt-2 border-t border-gray-200">
-                            Total: ${stop.driverPaymentAmount?.toFixed(2) || "0.00"}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500 mt-1">
-                          No payments recorded yet
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        // Pre-populate form with existing payment data when updating
-                        if (stop.payments && stop.payments.length > 0) {
-                          const existingPayments = stop.payments.map(payment => ({
-                            amount: payment.amount.toString(),
-                            method: payment.method,
-                            notes: payment.notes || ""
-                          }));
-                          setPaymentEntries(existingPayments);
-                        } else {
-                          setPaymentEntries([{amount: "", method: "", notes: ""}]);
-                        }
-                        setShowPaymentModal(true);
-                      }}
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation tap-target"
-                    >
-                      <svg
-                        className="h-4 w-4 mr-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                        />
-                      </svg>
-                      {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? "Update Payment" : "Record Payment"}
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               {/* All Instructions - Mobile Optimized */}
               {(stop.initialDriverNotes || (stop.adminNotes && stop.adminNotes.length > 0)) && (
@@ -1175,230 +1162,329 @@ export default function StopDetailPage({
             </div>
           </div>
 
-          {/* Documents to Print - Customer and Stop-Specific */}
-          {((stop.customer.documents && stop.customer.documents.length > 0) ||
-            (stop.stopDocuments && stop.stopDocuments.length > 0)) && (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Documents to Print
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Print these documents for this customer and delivery
-                </p>
-              </div>
-              <div className="p-4 sm:p-5">
-                <div className="space-y-4">
-                  {/* Customer-Level Documents */}
-                  {stop.customer.documents && stop.customer.documents.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                        </svg>
-                        Customer Documents
-                      </h3>
-                      <div className="grid gap-3">
-                        {stop.customer.documents.map((doc) => (
-                          <div key={doc.id} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3 flex-1">
-                                <div className="text-2xl">
-                                  {doc.type === 'INVOICE' ? '📄' :
-                                   doc.type === 'CREDIT_MEMO' ? '💳' :
-                                   doc.type === 'DELIVERY_RECEIPT' ? '📋' :
-                                   doc.type === 'RETURN_FORM' ? '↩️' : '📎'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-medium text-gray-900 truncate">
-                                    {doc.title}
-                                  </h4>
-                                  <p className="text-xs text-gray-600">
-                                    {doc.type.replace('_', ' ')} • {(doc.fileSize / 1024).toFixed(1)} KB
-                                  </p>
-                                  {doc.description && (
-                                    <p className="text-xs text-gray-500 mt-1 truncate">
-                                      {doc.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <a
-                                  href={doc.filePath}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
-                                >
-                                  View & Print
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Stop-Specific Documents */}
-                  {stop.stopDocuments && stop.stopDocuments.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                        </svg>
-                        Stop-Specific Documents
-                      </h3>
-                      <div className="grid gap-3">
-                        {stop.stopDocuments.map((stopDoc) => (
-                          <div key={stopDoc.id} className="border border-green-200 rounded-lg p-3 bg-green-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3 flex-1">
-                                <div className="text-2xl">
-                                  {stopDoc.document.type === 'INVOICE' ? '📄' :
-                                   stopDoc.document.type === 'CREDIT_MEMO' ? '💳' :
-                                   stopDoc.document.type === 'DELIVERY_RECEIPT' ? '📋' :
-                                   stopDoc.document.type === 'RETURN_FORM' ? '↩️' : '📎'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-medium text-gray-900 truncate">
-                                    {stopDoc.document.title}
-                                  </h4>
-                                  <p className="text-xs text-gray-600">
-                                    {stopDoc.document.type.replace('_', ' ')} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
-                                  </p>
-                                  {stopDoc.document.description && (
-                                    <p className="text-xs text-gray-500 mt-1 truncate">
-                                      {stopDoc.document.description}
-                                    </p>
-                                  )}
-                                  {stopDoc.isPrinted && (
-                                    <p className="text-xs text-green-600 mt-1 flex items-center">
-                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                      Printed {stopDoc.printedAt ? new Date(stopDoc.printedAt).toLocaleDateString() : ''}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <a
-                                  href={stopDoc.document.filePath}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
-                                >
-                                  View & Print
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Returns - Enhanced with ReturnManagement Component */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">
-                Product Returns
-              </h2>
-            </div>
-            <div className="p-4 sm:p-5">
-              {(stop.status === "ARRIVED" || stop.status === "COMPLETED") &&
-              token ? (
-                <ReturnManagement
-                  stopId={stop.id}
-                  routeId={stop.route.id}
-                  customerId={stop.customer.id}
-                  token={token}
-                />
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
-                  Returns can only be processed after arriving at the delivery
-                  location.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Driver Notes */}
-          <DriverNotes
-            stopId={stop.id}
-            initialNotes={driverNotes}
-            onSave={handleSaveDriverNotes}
-          />
-
-          {/* Enhanced Invoice Photo Upload - Multiple images with preview */}
+          {/* Multi-Step Delivery Process */}
           {(stop.status === "ARRIVED" || stop.status === "COMPLETED") && (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">
-                  Invoice Upload & Completion
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Upload multiple invoice images, preview them, and generate the delivery PDF
-                </p>
+            <>
+              <StepProgressIndicator />
+
+              {/* Step Content */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-4 sm:p-5">
+                  {currentStep === 1 && (
+                    /* Step 1: Document Printing */
+                    <div>
+                      {((stop.customer.documents && stop.customer.documents.length > 0) ||
+                        (stop.stopDocuments && stop.stopDocuments.length > 0)) ? (
+                        <div className="space-y-4">
+                          {/* Customer-Level Documents */}
+                          {stop.customer.documents && stop.customer.documents.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                                </svg>
+                                Customer Documents
+                              </h3>
+                              <div className="grid gap-3">
+                                {stop.customer.documents.map((doc) => (
+                                  <div key={doc.id} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-3 flex-1">
+                                        <div className="text-2xl">
+                                          {doc.type === 'INVOICE' ? '📄' :
+                                           doc.type === 'CREDIT_MEMO' ? '💳' :
+                                           doc.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                           doc.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="text-sm font-medium text-gray-900 truncate">
+                                            {doc.title}
+                                          </h4>
+                                          <p className="text-xs text-gray-600">
+                                            {doc.type.replace('_', ' ')} • {(doc.fileSize / 1024).toFixed(1)} KB
+                                          </p>
+                                          {doc.description && (
+                                            <p className="text-xs text-gray-500 mt-1 truncate">
+                                              {doc.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <a
+                                          href={doc.filePath}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
+                                        >
+                                          View & Print
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Stop-Specific Documents */}
+                          {stop.stopDocuments && stop.stopDocuments.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                </svg>
+                                Stop-Specific Documents
+                              </h3>
+                              <div className="grid gap-3">
+                                {stop.stopDocuments.map((stopDoc) => (
+                                  <div key={stopDoc.id} className="border border-green-200 rounded-lg p-3 bg-green-50">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-3 flex-1">
+                                        <div className="text-2xl">
+                                          {stopDoc.document.type === 'INVOICE' ? '📄' :
+                                           stopDoc.document.type === 'CREDIT_MEMO' ? '💳' :
+                                           stopDoc.document.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                           stopDoc.document.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="text-sm font-medium text-gray-900 truncate">
+                                            {stopDoc.document.title}
+                                          </h4>
+                                          <p className="text-xs text-gray-600">
+                                            {stopDoc.document.type.replace('_', ' ')} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
+                                          </p>
+                                          {stopDoc.document.description && (
+                                            <p className="text-xs text-gray-500 mt-1 truncate">
+                                              {stopDoc.document.description}
+                                            </p>
+                                          )}
+                                          {stopDoc.isPrinted && (
+                                            <p className="text-xs text-green-600 mt-1 flex items-center">
+                                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                              </svg>
+                                              Printed {stopDoc.printedAt ? new Date(stopDoc.printedAt).toLocaleDateString() : ''}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <a
+                                          href={stopDoc.document.filePath}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
+                                        >
+                                          View & Print
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <p>No documents to print for this delivery</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {currentStep === 2 && (
+                    /* Step 2: Returns */
+                    <div>
+                      <ReturnManagement
+                        stopId={stop.id}
+                        routeId={stop.route.id}
+                        customerId={stop.customer.id}
+                        token={token}
+                      />
+                    </div>
+                  )}
+
+                  {currentStep === 3 && (
+                    /* Step 3: Payment */
+                    <div>
+                      <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <h4 className="text-lg font-medium text-gray-700 mb-2">Payment Information</h4>
+                            {stop.payments && stop.payments.length > 0 ? (
+                              <div className="space-y-2">
+                                {stop.payments.map((payment, index) => (
+                                  <div key={payment.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-green-600">
+                                        ${payment.amount.toFixed(2)} - {payment.method}
+                                      </div>
+                                      {payment.notes && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {payment.notes}
+                                        </div>
+                                      )}
+                                      <div className="text-xs text-gray-400">
+                                        {formatDate(payment.createdAt)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="text-lg font-bold text-green-600 pt-2 border-t border-gray-200">
+                                  Total: ${stop.driverPaymentAmount?.toFixed(2) || "0.00"}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500">
+                                No payments recorded yet
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              // Pre-populate form with existing payment data when updating
+                              if (stop.payments && stop.payments.length > 0) {
+                                const existingPayments = stop.payments.map(payment => ({
+                                  amount: payment.amount.toString(),
+                                  method: payment.method,
+                                  notes: payment.notes || ""
+                                }));
+                                setPaymentEntries(existingPayments);
+                              } else {
+                                setPaymentEntries([{amount: "", method: "", notes: ""}]);
+                              }
+                              setShowPaymentModal(true);
+                            }}
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation tap-target"
+                          >
+                            <svg
+                              className="h-4 w-4 mr-2"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                              />
+                            </svg>
+                            {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? "Update Payment" : "Record Payment"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentStep === 4 && (
+                    /* Step 4: Driver Notes */
+                    <div>
+                      <DriverNotes
+                        stopId={stop.id}
+                        initialNotes={driverNotes}
+                        onSave={handleSaveDriverNotes}
+                      />
+                    </div>
+                  )}
+
+                  {currentStep === 5 && (
+                    /* Step 5: Image Upload */
+                    <div>
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 mb-2">
+                            Invoice Upload & Completion
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Upload multiple invoice images, preview them, and generate the delivery PDF
+                          </p>
+                        </div>
+                        <EnhancedInvoiceUpload
+                          stopId={stop.id}
+                          onUploadSuccess={handleUploadSuccess}
+                          onUploadComplete={() => {
+                            // PDF generated successfully - automatically mark step as completed
+                            console.log("PDF generated successfully");
+
+                            // Automatically mark Step 5 (Image Upload) as completed
+                            if (!completedSteps.includes(5)) {
+                              setCompletedSteps(prev => [...prev, 5]);
+                              console.log("Step 5 (Image Upload) automatically marked as completed via onUploadComplete");
+                              autoAdvanceStep(5);
+                            }
+                          }}
+                        />
+
+                        {/* Manual Completion Button - Only show if PDF has been generated */}
+                        {stop.signedInvoicePdfUrl && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                              <div className="flex-1">
+                                <h3 className="text-base sm:text-lg font-medium text-green-800">
+                                  ✅ Ready to Complete Delivery
+                                </h3>
+                                <p className="text-sm text-green-600 mt-1">
+                                  Invoice PDF has been generated. You can now mark this delivery as completed.
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => updateStatus("COMPLETED")}
+                                disabled={updatingStatus}
+                                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-6 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation"
+                              >
+                                {updatingStatus ? (
+                                  <>
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Completing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Complete Delivery
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step Navigation */}
+                  <div className="flex justify-between mt-6 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={prevStep}
+                      disabled={currentStep === 1}
+                      className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={nextStep}
+                      disabled={currentStep === steps.length}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next Step
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="p-4 sm:p-5">
-                <EnhancedInvoiceUpload
-                  stopId={stop.id}
-                  onUploadSuccess={handleUploadSuccess}
-                  onUploadComplete={() => {
-                    // PDF generated successfully - driver can now manually complete delivery
-                    console.log("PDF generated successfully");
-                  }}
-                />
-              </div>
-            </div>
+            </>
           )}
 
-          {/* Manual Completion Button - Only show if PDF has been generated */}
-          {stop.signedInvoicePdfUrl && stop.status === "ARRIVED" && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-                <div className="flex-1">
-                  <h3 className="text-base sm:text-lg font-medium text-green-800">
-                    ✅ Ready to Complete Delivery
-                  </h3>
-                  <p className="text-sm text-green-600 mt-1">
-                    Invoice PDF has been generated. You can now mark this delivery as completed.
-                  </p>
-                </div>
-                <button
-                  onClick={() => updateStatus("COMPLETED")}
-                  disabled={updatingStatus}
-                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-6 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation"
-                >
-                  {updatingStatus ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Completing...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Complete Delivery
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+
 
         </div>
       ) : (

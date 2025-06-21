@@ -716,10 +716,17 @@ export default function RouteDetailPage({
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           <div className="flex flex-col">
+            {/* Show driver-recorded payment amount if available, otherwise show Excel amount */}
             <div className="text-sm font-bold text-blue-600">
-              ${(stop.totalPaymentAmount || 0).toFixed(2)}
+              ${(stop.driverPaymentAmount || stop.totalPaymentAmount || 0).toFixed(2)}
             </div>
-            {(stop.totalPaymentAmount || 0) > 0 && (
+            {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? (
+              /* Show driver-recorded payment details */
+              <div className="text-xs text-green-600 mt-1">
+                Driver Recorded
+              </div>
+            ) : (stop.totalPaymentAmount || 0) > 0 ? (
+              /* Show Excel payment breakdown */
               <div className="text-xs text-gray-500 mt-1">
                 {stop.paymentAmountCash > 0 && `Cash: $${stop.paymentAmountCash.toFixed(2)}`}
                 {stop.paymentAmountCash > 0 && (stop.paymentAmountCheck > 0 || stop.paymentAmountCC > 0) && ', '}
@@ -727,7 +734,7 @@ export default function RouteDetailPage({
                 {stop.paymentAmountCheck > 0 && stop.paymentAmountCC > 0 && ', '}
                 {stop.paymentAmountCC > 0 && `CC: $${stop.paymentAmountCC.toFixed(2)}`}
               </div>
-            )}
+            ) : null}
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -1550,10 +1557,17 @@ export default function RouteDetailPage({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex flex-col">
+                                {/* Show driver-recorded payment amount if available, otherwise show Excel amount */}
                                 <div className="text-sm font-bold text-blue-600">
-                                  ${(stop.totalPaymentAmount || 0).toFixed(2)}
+                                  ${(stop.driverPaymentAmount || stop.totalPaymentAmount || 0).toFixed(2)}
                                 </div>
-                                {(stop.totalPaymentAmount || 0) > 0 && (
+                                {stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? (
+                                  /* Show driver-recorded payment details */
+                                  <div className="text-xs text-green-600 mt-1">
+                                    Driver Recorded
+                                  </div>
+                                ) : (stop.totalPaymentAmount || 0) > 0 ? (
+                                  /* Show Excel payment breakdown */
                                   <div className="text-xs text-gray-500 mt-1">
                                     {stop.paymentAmountCash > 0 && `Cash: $${stop.paymentAmountCash.toFixed(2)}`}
                                     {stop.paymentAmountCash > 0 && (stop.paymentAmountCheck > 0 || stop.paymentAmountCC > 0) && ', '}
@@ -1561,7 +1575,7 @@ export default function RouteDetailPage({
                                     {stop.paymentAmountCheck > 0 && stop.paymentAmountCC > 0 && ', '}
                                     {stop.paymentAmountCC > 0 && `CC: $${stop.paymentAmountCC.toFixed(2)}`}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
