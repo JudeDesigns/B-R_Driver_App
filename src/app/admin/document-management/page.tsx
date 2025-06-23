@@ -26,6 +26,9 @@ interface Stop {
   id: string;
   sequence: number;
   customerNameFromUpload: string;
+  driverNameFromUpload?: string;
+  status: string;
+  address: string;
   customer: {
     id: string;
     name: string;
@@ -671,7 +674,7 @@ export default function DocumentManagementPage() {
                           <div className="flex items-center space-x-4 text-sm text-gray-500 mb-2">
                             <span>Customer: {stop.customer.name}</span>
                             {stop.customer.groupCode && <span>Group: {stop.customer.groupCode}</span>}
-                            <span>Driver: {stop.route.driver?.fullName || stop.route.driver?.username || 'Unassigned'}</span>
+                            <span>Driver: {stop.driverNameFromUpload || stop.route.driver?.fullName || stop.route.driver?.username || 'Unassigned'}</span>
                           </div>
                           {stop.stopDocuments.length > 0 && (
                             <div className="mt-2">
@@ -903,7 +906,7 @@ export default function DocumentManagementPage() {
                   <div><strong>Route:</strong> {selectedStopForDetails.route.routeNumber}</div>
                   <div><strong>Stop:</strong> {selectedStopForDetails.sequence} - {selectedStopForDetails.customerNameFromUpload}</div>
                   <div><strong>Customer:</strong> {selectedStopForDetails.customer.name}</div>
-                  <div><strong>Driver:</strong> {selectedStopForDetails.route.driver?.fullName || selectedStopForDetails.route.driver?.username || 'Unassigned'}</div>
+                  <div><strong>Driver:</strong> {selectedStopForDetails.driverNameFromUpload || selectedStopForDetails.route.driver?.fullName || selectedStopForDetails.route.driver?.username || 'Unassigned'}</div>
                 </div>
               </div>
 

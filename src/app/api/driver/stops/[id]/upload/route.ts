@@ -277,8 +277,7 @@ export async function POST(
       },
       data: {
         signedInvoicePdfUrl: pdfUrl,
-        // TODO: Add invoiceImageUrls back after Prisma client is properly updated
-        // invoiceImageUrls: imageUrls?.map(img => img.url) || [], // Store image URLs for admin preview
+        invoiceImageUrls: imageUrls?.map(img => img.url) || [], // Store image URLs for admin preview
         // Don't automatically update status here since the client will handle it
         // This allows for better control flow and error handling on the client side
       },

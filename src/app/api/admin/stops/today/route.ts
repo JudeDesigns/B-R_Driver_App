@@ -61,7 +61,13 @@ export async function GET(request: NextRequest) {
         route: routeWhere,
         isDeleted: false,
       },
-      include: {
+      select: {
+        id: true,
+        sequence: true,
+        address: true,
+        customerNameFromUpload: true,
+        driverNameFromUpload: true,
+        status: true,
         customer: {
           select: {
             id: true,

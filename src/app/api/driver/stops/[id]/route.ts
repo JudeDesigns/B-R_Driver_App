@@ -541,6 +541,7 @@ export async function PATCH(
                 },
                 data: {
                   status: "ON_THE_WAY",
+                  onTheWayTime: new Date(), // Set timestamp when automatically updating to ON_THE_WAY
                 },
                 include: {
                   customer: {

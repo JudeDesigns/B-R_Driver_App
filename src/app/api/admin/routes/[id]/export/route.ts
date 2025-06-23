@@ -126,10 +126,10 @@ export async function GET(
         ? stop.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0)
         : 0;
 
-      // Use driver-recorded payments if available, otherwise fall back to Excel amounts
+      // Use driver-recorded payments if available, otherwise fall back to upload amounts
       const finalPaymentAmount = stop.driverPaymentAmount || stop.totalPaymentAmount || 0;
 
-      // Determine payment status with priority: driver payments > Excel flags
+      // Determine payment status with priority: driver payments > upload data
       let paymentStatus = "Unknown";
       if (hasDriverPayments && totalDriverPayments > 0) {
         paymentStatus = "Paid (Driver Recorded)";
@@ -138,9 +138,9 @@ export async function GET(
       } else if (stop.paymentFlagNotPaid) {
         paymentStatus = "Not Paid";
       } else if (stop.paymentFlagCash || stop.paymentFlagCheck || stop.paymentFlagCC) {
-        paymentStatus = "Paid (Excel)";
+        paymentStatus = "Paid (From Upload)";
       } else if (stop.totalPaymentAmount && stop.totalPaymentAmount > 0) {
-        paymentStatus = "Paid (Excel)";
+        paymentStatus = "Paid (From Upload)";
       }
 
       // Format individual driver payments with methods
@@ -199,17 +199,11 @@ export async function GET(
         "Driver Payment Details": driverPaymentDetails,
         "Driver Payment Count": hasDriverPayments ? stop.payments.length : 0,
 
-        // Excel/Upload Payment Information
-        "Excel Total Payment": formatCurrency(stop.totalPaymentAmount || 0),
-        "Excel Cash Amount": formatCurrency(stop.paymentAmountCash || 0),
-        "Excel Check Amount": formatCurrency(stop.paymentAmountCheck || 0),
-        "Excel Credit Card Amount": formatCurrency(stop.paymentAmountCC || 0),
-
-        // Excel Payment Flags
-        "Excel Flag Cash": formatYesNo(stop.paymentFlagCash),
-        "Excel Flag Check": formatYesNo(stop.paymentFlagCheck),
-        "Excel Flag Credit Card": formatYesNo(stop.paymentFlagCC),
-        "Excel Flag Not Paid": formatYesNo(stop.paymentFlagNotPaid),
+        // Upload/Original Payment Information
+        "Upload Total Payment": formatCurrency(stop.totalPaymentAmount || 0),
+        "Upload Cash Amount": formatCurrency(stop.paymentAmountCash || 0),
+        "Upload Check Amount": formatCurrency(stop.paymentAmountCheck || 0),
+        "Upload Credit Card Amount": formatCurrency(stop.paymentAmountCC || 0),
 
         // === DELIVERY TIMING ===
         "Arrival Time": formatDateTime(stop.arrivalTime),
