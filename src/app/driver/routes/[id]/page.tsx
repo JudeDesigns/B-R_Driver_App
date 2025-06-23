@@ -47,6 +47,9 @@ interface Stop {
   returnFlagInitial: boolean;
   driverRemarkInitial: string | null;
   amount: number | null;
+  // Driver-recorded payment information
+  driverPaymentAmount: number | null;
+  driverPaymentMethods: string[];
   customer: Customer;
   adminNotes: AdminNote[];
 }
@@ -288,6 +291,14 @@ export default function DriverRouteDetailPage({
     return stop.adminNotes.some((note) => !note.readByDriver);
   };
 
+  // Calculate total payment amount for the route
+  const getTotalPaymentAmount = () => {
+    if (!route) return 0;
+    return route.stops.reduce((total, stop) => {
+      return total + (stop.driverPaymentAmount || 0);
+    }, 0);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -322,7 +333,7 @@ export default function DriverRouteDetailPage({
               </h2>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">
                     Route Number
@@ -335,6 +346,12 @@ export default function DriverRouteDetailPage({
                   <h3 className="text-sm font-medium text-gray-500">Date</h3>
                   <p className="mt-1 text-lg font-semibold text-gray-900">
                     {formatDate(route.date)}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Total Payments</h3>
+                  <p className="mt-1 text-lg font-semibold text-green-600">
+                    ${getTotalPaymentAmount().toFixed(2)}
                   </p>
                 </div>
                 <div>

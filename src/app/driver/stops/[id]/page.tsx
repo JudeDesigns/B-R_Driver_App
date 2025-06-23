@@ -650,6 +650,19 @@ export default function StopDetailPage({
     }
   };
 
+  // Function to get proper document type label
+  const getDocumentTypeLabel = (type: string) => {
+    const documentTypes = [
+      { value: "INVOICE", label: "Invoice" },
+      { value: "CREDIT_MEMO", label: "Credit Memo" },
+      { value: "DELIVERY_RECEIPT", label: "Statement" },
+      { value: "RETURN_FORM", label: "Return Form" },
+      { value: "OTHER", label: "Other" },
+    ];
+    const docType = documentTypes.find(dt => dt.value === type);
+    return docType ? docType.label : type.replace('_', ' ');
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
 
@@ -1201,7 +1214,7 @@ export default function StopDetailPage({
                                             {doc.title}
                                           </h4>
                                           <p className="text-xs text-gray-600">
-                                            {doc.type.replace('_', ' ')} • {(doc.fileSize / 1024).toFixed(1)} KB
+                                            {getDocumentTypeLabel(doc.type)} • {(doc.fileSize / 1024).toFixed(1)} KB
                                           </p>
                                           {doc.description && (
                                             <p className="text-xs text-gray-500 mt-1 truncate">
@@ -1252,7 +1265,7 @@ export default function StopDetailPage({
                                             {stopDoc.document.title}
                                           </h4>
                                           <p className="text-xs text-gray-600">
-                                            {stopDoc.document.type.replace('_', ' ')} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
+                                            {getDocumentTypeLabel(stopDoc.document.type)} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
                                           </p>
                                           {stopDoc.document.description && (
                                             <p className="text-xs text-gray-500 mt-1 truncate">

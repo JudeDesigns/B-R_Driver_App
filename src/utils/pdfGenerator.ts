@@ -28,7 +28,8 @@ interface ImageUrl {
 export async function generateDeliveryPDF(
   stop: Stop,
   imageUrls: ImageUrl[],
-  returns: ReturnItem[]
+  returns: ReturnItem[],
+  baseUrl?: string
 ): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
@@ -41,7 +42,7 @@ export async function generateDeliveryPDF(
     // Set viewport for consistent rendering
     await page.setViewport({ width: 1200, height: 1600 });
     
-    const htmlContent = createHTMLTemplate(stop, imageUrls, returns);
+    const htmlContent = createHTMLTemplate(stop, imageUrls, returns, baseUrl);
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
     
     const pdfBuffer = await page.pdf({
@@ -61,8 +62,9 @@ export async function generateDeliveryPDF(
   }
 }
 
-function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnItem[]): string {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnItem[], baseUrl?: string): string {
+  // Use provided baseUrl or fallback to environment variable or localhost
+  const finalBaseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
   return `
 <!DOCTYPE html>
@@ -446,7 +448,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
 
         <div class="photo-links">
           ${imageUrls.map((img, index) => `
-            <a href="${baseUrl}${img.url}" class="photo-link">
+            <a href="${finalBaseUrl}${img.url}" class="photo-link">
               📸 View Image ${index + 1}
             </a>
           `).join('')}

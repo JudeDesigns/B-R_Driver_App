@@ -191,6 +191,10 @@ export async function GET(request: NextRequest) {
           "Payment Status": paymentStatus,
           "Driver Recorded Payments": individualPayments,
           "Total Driver Payment Amount": formatCurrency(totalDriverPayments),
+          "Excel Payment Amount (Cash)": formatCurrency(stop.paymentAmountCash || 0),
+          "Excel Payment Amount (Check)": formatCurrency(stop.paymentAmountCheck || 0),
+          "Excel Payment Amount (CC)": formatCurrency(stop.paymentAmountCC || 0),
+          "Excel Total Payment Amount": formatCurrency(stop.totalPaymentAmount || 0),
 
           // Legacy Payment Flags (from Excel upload)
           "Excel Payment Cash": formatYesNo(stop.paymentFlagCash),

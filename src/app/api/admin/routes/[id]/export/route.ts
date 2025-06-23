@@ -120,24 +120,46 @@ export async function GET(
 
     // Prepare clean, organized export data
     const exportData = route.stops.map((stop) => {
-      // Calculate payment status
+      // Calculate payment status and amounts
       const hasDriverPayments = stop.payments && stop.payments.length > 0;
       const totalDriverPayments = hasDriverPayments
         ? stop.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0)
         : 0;
 
-      const paymentStatus = hasDriverPayments ? "Paid" :
-        (stop.paymentFlagNotPaid ? "Not Paid" :
-        (stop.paymentFlagCash || stop.paymentFlagCheck || stop.paymentFlagCC ? "Paid" : "Unknown"));
+      // Use driver-recorded payments if available, otherwise fall back to Excel amounts
+      const finalPaymentAmount = stop.driverPaymentAmount || stop.totalPaymentAmount || 0;
 
-      // Format individual payments
-      const individualPayments = hasDriverPayments
+      // Determine payment status with priority: driver payments > Excel flags
+      let paymentStatus = "Unknown";
+      if (hasDriverPayments && totalDriverPayments > 0) {
+        paymentStatus = "Paid (Driver Recorded)";
+      } else if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
+        paymentStatus = "Paid (Driver Recorded)";
+      } else if (stop.paymentFlagNotPaid) {
+        paymentStatus = "Not Paid";
+      } else if (stop.paymentFlagCash || stop.paymentFlagCheck || stop.paymentFlagCC) {
+        paymentStatus = "Paid (Excel)";
+      } else if (stop.totalPaymentAmount && stop.totalPaymentAmount > 0) {
+        paymentStatus = "Paid (Excel)";
+      }
+
+      // Format individual driver payments with methods
+      const driverPaymentDetails = hasDriverPayments
         ? stop.payments.map((p: any) => `${formatCurrency(p.amount)} (${p.method}${p.notes ? ` - ${p.notes}` : ''})`).join('; ')
         : "";
 
-      // Format returns
+      // Format driver payment methods
+      const driverPaymentMethods = hasDriverPayments
+        ? [...new Set(stop.payments.map((p: any) => p.method))].join(', ')
+        : "";
+
+      // Format returns with SKU and description
       const returnsInfo = stop.returns && stop.returns.length > 0
-        ? stop.returns.map((r: any) => `${r.productDescription || 'Unknown'} (Qty: ${r.quantity || 0})`).join('; ')
+        ? stop.returns.map((r: any) => {
+            const sku = r.product?.sku || r.productSku || 'N/A';
+            const desc = r.product?.description || r.productDescription || 'Unknown Product';
+            return `${sku}: ${desc} (Qty: ${r.quantity || 0})`;
+          }).join('; ')
         : "";
 
       return {
@@ -169,20 +191,25 @@ export async function GET(
 
         // === PAYMENT INFORMATION ===
         "Payment Status": paymentStatus,
-        "Driver Recorded Payments": individualPayments,
-        "Total Driver Payment Amount": formatCurrency(totalDriverPayments),
+        "Final Payment Amount": formatCurrency(finalPaymentAmount),
 
-        // Legacy Payment Flags (from Excel upload)
-        "Excel Payment Cash": formatYesNo(stop.paymentFlagCash),
-        "Excel Payment Check": formatYesNo(stop.paymentFlagCheck),
-        "Excel Payment Credit Card": formatYesNo(stop.paymentFlagCC),
-        "Excel Payment Not Paid": formatYesNo(stop.paymentFlagNotPaid),
+        // Driver-Recorded Payment Details
+        "Driver Payment Amount": formatCurrency(stop.driverPaymentAmount || 0),
+        "Driver Payment Methods": driverPaymentMethods,
+        "Driver Payment Details": driverPaymentDetails,
+        "Driver Payment Count": hasDriverPayments ? stop.payments.length : 0,
 
-        // Legacy Payment Amounts (from Excel upload)
-        "Excel Cash Amount": formatCurrency(stop.paymentAmountCash),
-        "Excel Check Amount": formatCurrency(stop.paymentAmountCheck),
-        "Excel Credit Card Amount": formatCurrency(stop.paymentAmountCC),
-        "Excel Total Payment": formatCurrency(stop.totalPaymentAmount),
+        // Excel/Upload Payment Information
+        "Excel Total Payment": formatCurrency(stop.totalPaymentAmount || 0),
+        "Excel Cash Amount": formatCurrency(stop.paymentAmountCash || 0),
+        "Excel Check Amount": formatCurrency(stop.paymentAmountCheck || 0),
+        "Excel Credit Card Amount": formatCurrency(stop.paymentAmountCC || 0),
+
+        // Excel Payment Flags
+        "Excel Flag Cash": formatYesNo(stop.paymentFlagCash),
+        "Excel Flag Check": formatYesNo(stop.paymentFlagCheck),
+        "Excel Flag Credit Card": formatYesNo(stop.paymentFlagCC),
+        "Excel Flag Not Paid": formatYesNo(stop.paymentFlagNotPaid),
 
         // === DELIVERY TIMING ===
         "Arrival Time": formatDateTime(stop.arrivalTime),
@@ -198,12 +225,25 @@ export async function GET(
           : "",
 
         // === RETURNS INFORMATION ===
-        "Has Returns": formatYesNo(stop.returnFlagInitial),
+        "Has Returns": formatYesNo(stop.returnFlagInitial || (stop.returns && stop.returns.length > 0)),
+        "Return Count": stop.returns ? stop.returns.length : 0,
         "Return Details": returnsInfo,
+        "Return Total Quantity": stop.returns && stop.returns.length > 0
+          ? stop.returns.reduce((sum: number, r: any) => sum + (r.quantity || 0), 0)
+          : 0,
 
         // === DOCUMENTS ===
         "Signed Invoice PDF": stop.signedInvoicePdfUrl ? "Yes" : "No",
         "Invoice Images Count": stop.invoiceImageUrls ? stop.invoiceImageUrls.length : 0,
+        "PDF URL": stop.signedInvoicePdfUrl || "",
+
+        // === DELIVERY PERFORMANCE ===
+        "Delivery Duration (Minutes)": stop.arrivalTime && stop.completionTime
+          ? Math.round((new Date(stop.completionTime).getTime() - new Date(stop.arrivalTime).getTime()) / (1000 * 60))
+          : "",
+        "Travel Time (Minutes)": stop.onTheWayTime && stop.arrivalTime
+          ? Math.round((new Date(stop.arrivalTime).getTime() - new Date(stop.onTheWayTime).getTime()) / (1000 * 60))
+          : "",
 
         // === RECORD TIMESTAMPS ===
         "Stop Created": formatDateTime(stop.createdAt),

@@ -765,10 +765,19 @@ export default function RouteDetailPage({
     return stops.reduce((total, stop) => total + (stop.amount || 0), 0);
   };
 
+  // Calculate total payment amount for a specific driver
+  const getDriverTotalPaymentAmount = (stops: Stop[]) => {
+    return stops.reduce((total, stop) => {
+      // Prioritize driver-recorded payments over Excel amounts
+      return total + (stop.driverPaymentAmount || stop.totalPaymentAmount || 0);
+    }, 0);
+  };
+
   // Droppable Driver Section Component
   const DroppableDriverSection = ({ driverName, stops }: { driverName: string; stops: Stop[] }) => {
     const { setNodeRef, isOver } = useSortable({ id: driverName });
     const driverTotal = getDriverTotalAmount(stops);
+    const driverPaymentTotal = getDriverTotalPaymentAmount(stops);
 
     return (
       <div
@@ -781,8 +790,13 @@ export default function RouteDetailPage({
               Driver: {driverName} ({stops.length} stops)
               {isOver && <span className="ml-2 text-blue-600 font-semibold">Drop here to reassign</span>}
             </h3>
-            <div className="text-md font-bold text-green-600">
-              Total: ${driverTotal.toFixed(2)}
+            <div className="text-right">
+              <div className="text-md font-bold text-green-600">
+                Order Total: ${driverTotal.toFixed(2)}
+              </div>
+              <div className="text-sm font-semibold text-blue-600">
+                Payments: ${driverPaymentTotal.toFixed(2)}
+              </div>
             </div>
           </div>
         </div>
@@ -841,7 +855,7 @@ export default function RouteDetailPage({
                 </td>
                 <td className="px-6 py-3 whitespace-nowrap">
                   <div className="text-md font-bold text-blue-600">
-                    ${stops.reduce((total, stop) => total + (stop.totalPaymentAmount || 0), 0).toFixed(2)}
+                    ${stops.reduce((total, stop) => total + (stop.driverPaymentAmount || stop.totalPaymentAmount || 0), 0).toFixed(2)}
                   </div>
                 </td>
                 <td className="px-6 py-3 text-right text-sm font-bold text-gray-900">
@@ -1623,7 +1637,7 @@ export default function RouteDetailPage({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-lg font-bold text-blue-600">
-                            ${route.stops.reduce((total, stop) => total + (stop.totalPaymentAmount || 0), 0).toFixed(2)}
+                            ${route.stops.reduce((total, stop) => total + (stop.driverPaymentAmount || stop.totalPaymentAmount || 0), 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">

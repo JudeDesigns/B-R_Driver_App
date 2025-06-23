@@ -251,8 +251,15 @@ export async function POST(
 
     console.log(`Generating PDF with Puppeteer...`);
 
+    // Get the base URL from the request headers
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const host = request.headers.get('host') || 'localhost:3000';
+    const baseUrl = `${protocol}://${host}`;
+
+    console.log(`Using base URL for PDF generation: ${baseUrl}`);
+
     // Generate PDF using Puppeteer
-    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returnsData);
+    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returnsData, baseUrl);
 
     console.log(`PDF generated successfully. Size: ${pdfBuffer.length} bytes`);
 

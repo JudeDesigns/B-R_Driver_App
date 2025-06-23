@@ -70,6 +70,12 @@ export default function CustomerDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  // Document management states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -165,6 +171,113 @@ export default function CustomerDetailPage({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  // Document types
+  const documentTypes = [
+    { value: "INVOICE", label: "Invoice" },
+    { value: "CREDIT_MEMO", label: "Credit Memo" },
+    { value: "DELIVERY_RECEIPT", label: "Statement" },
+    { value: "RETURN_FORM", label: "Return Form" },
+    { value: "OTHER", label: "Other" },
+  ];
+
+  // Function to get proper document type label
+  const getDocumentTypeLabel = (type: string) => {
+    const docType = documentTypes.find(dt => dt.value === type);
+    return docType ? docType.label : type.replace('_', ' ');
+  };
+
+  // Document management functions
+  const handleEditDocument = (doc: Document) => {
+    setSelectedDocument(doc);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteDocument = (doc: Document) => {
+    setSelectedDocument(doc);
+    setShowDeleteModal(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!selectedDocument) return;
+
+    const formData = new FormData(e.currentTarget);
+    const title = formData.get('title') as string;
+    const description = formData.get('description') as string;
+    const type = formData.get('type') as string;
+    const isActive = formData.get('isActive') === 'true';
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/documents/${selectedDocument.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          type,
+          isActive,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Update failed');
+      }
+
+      setShowEditModal(false);
+      setSelectedDocument(null);
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating document:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update document');
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedDocument) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/documents/${selectedDocument.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Delete failed');
+      }
+
+      setShowDeleteModal(false);
+      setSelectedDocument(null);
+
+      // Refresh the page data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete document');
+    }
   };
 
   return (
@@ -506,7 +619,7 @@ export default function CustomerDetailPage({
                             <h3 className="font-semibold text-gray-900 mb-1">{doc.title}</h3>
                             <div className="flex items-center space-x-4 text-sm text-gray-500 mb-1">
                               <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                                {doc.type.replace('_', ' ')}
+                                {getDocumentTypeLabel(doc.type)}
                               </span>
                               <span>File: {doc.fileName}</span>
                               <span>Size: {formatFileSize(doc.fileSize)}</span>
@@ -536,6 +649,18 @@ export default function CustomerDetailPage({
                           >
                             Download
                           </a>
+                          <button
+                            onClick={() => handleEditDocument(doc)}
+                            className="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -749,6 +874,133 @@ export default function CustomerDetailPage({
               </svg>
               Back to Customers
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Document Modal */}
+      {showEditModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Document</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Document Title
+                  </label>
+                  <input
+                    type="text"
+                    name="title"
+                    defaultValue={selectedDocument.title}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    defaultValue={selectedDocument.description || ''}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Document Category
+                  </label>
+                  <select
+                    name="type"
+                    defaultValue={selectedDocument.type}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {documentTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Update Document
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Document Modal */}
+      {showDeleteModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Delete Document</h3>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-gray-600">
+                  Are you sure you want to delete the document &quot;{selectedDocument.title}&quot;?
+                </p>
+                <p className="text-sm text-red-600 mt-2">
+                  This action cannot be undone. The document will be permanently removed from the system.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Delete Document
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

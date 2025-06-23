@@ -69,6 +69,12 @@ export default function DocumentsPage() {
     { value: "OTHER", label: "Other" },
   ];
 
+  // Function to get proper document type label
+  const getDocumentTypeLabel = (type: string) => {
+    const docType = documentTypes.find(dt => dt.value === type);
+    return docType ? docType.label : type.replace('_', ' ');
+  };
+
   useEffect(() => {
     if (token && isAuthenticated) {
       fetchTodaysRoutes();
@@ -408,7 +414,7 @@ export default function DocumentsPage() {
                                         {stopDoc.document.title}
                                       </p>
                                       <p className="text-xs text-gray-500">
-                                        {stopDoc.document.type.replace("_", " ")} • {formatFileSize(stopDoc.document.fileSize)}
+                                        {getDocumentTypeLabel(stopDoc.document.type)} • {formatFileSize(stopDoc.document.fileSize)}
                                         {stopDoc.isPrinted && " • Printed"}
                                       </p>
                                     </div>
