@@ -69,10 +69,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize the route date to start of day for consistent comparison
+    const normalizedRouteDate = new Date(routeDate);
+    normalizedRouteDate.setHours(0, 0, 0, 0);
+
+    // Find existing route with same route number and date (within the same day)
+    const startOfDay = new Date(normalizedRouteDate);
+    const endOfDay = new Date(normalizedRouteDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const existingRoute = await prisma.route.findFirst({
       where: {
         routeNumber: routeNumber,
-        date: routeDate, // Check for same route number AND same date
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
         isDeleted: false,
       },
       include: {

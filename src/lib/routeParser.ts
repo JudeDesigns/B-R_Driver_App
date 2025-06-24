@@ -175,6 +175,13 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       customerGroupCode: headerMap.get("Customer GROUP CODE") ?? -1,
       customerEmail: headerMap.get("Customer Email") ?? -1,
       orderNumberWeb: headerMap.get("Order # (Web)") ?? -1,
+      // Try multiple possible column names for date
+      date:
+        headerMap.get("Date") ??
+        headerMap.get("Route Date") ??
+        headerMap.get("Delivery Date") ??
+        headerMap.get("Schedule Date") ??
+        -1,
       // Try multiple possible column names for invoice number
       quickbooksInvoiceNum:
         headerMap.get("Invoice #") ??
@@ -239,11 +246,14 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       return result;
     }
 
-    // Initialize route data
+    // Initialize route data with today's date normalized to start of day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day for consistent comparison
+
     const route: ParsedRoute = {
       routeNumber: "",
       driverName: "",
-      date: new Date(),
+      date: today, // Will be updated from Excel data if available
       stops: [],
     };
 
@@ -269,6 +279,32 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
         // Extract route information from the first valid row
         if (!route.routeNumber && row[columnIndices.routeNumber]) {
           route.routeNumber = row[columnIndices.routeNumber].toString();
+        }
+
+        // Extract route date from Excel if available
+        if (columnIndices.date !== -1 && row[columnIndices.date]) {
+          try {
+            const dateValue = row[columnIndices.date];
+            let parsedDate: Date;
+
+            if (dateValue instanceof Date) {
+              parsedDate = new Date(dateValue);
+            } else if (typeof dateValue === 'number') {
+              // Excel date serial number
+              parsedDate = new Date((dateValue - 25569) * 86400 * 1000);
+            } else {
+              // Try to parse as string
+              parsedDate = new Date(dateValue.toString());
+            }
+
+            // Validate and normalize the parsed date
+            if (!isNaN(parsedDate.getTime())) {
+              parsedDate.setHours(0, 0, 0, 0); // Normalize to start of day
+              route.date = parsedDate;
+            }
+          } catch (error) {
+            console.warn(`Failed to parse date from Excel: ${row[columnIndices.date]}`);
+          }
         }
 
         // Only set the route's driver name if it's not already set and the current row has a valid driver
@@ -652,10 +688,21 @@ export async function saveRouteToDatabase(
     let route: Route | null = null;
 
     if (parsedRoute.routeNumber) {
+      // Normalize the route date for consistent comparison
+      const normalizedRouteDate = new Date(parsedRoute.date);
+      normalizedRouteDate.setHours(0, 0, 0, 0);
+
+      const startOfDay = new Date(normalizedRouteDate);
+      const endOfDay = new Date(normalizedRouteDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
       const existingRoute = await tx.route.findFirst({
         where: {
           routeNumber: parsedRoute.routeNumber,
-          date: parsedRoute.date, // Check for same route number AND same date
+          date: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
           isDeleted: false,
         },
       });
