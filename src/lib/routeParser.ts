@@ -801,25 +801,48 @@ export async function saveRouteToDatabase(
               // Update existing stop with new information
               console.log(`Updating existing stop for ${newStop.customerName} (sequence ${newStop.sequence})`);
 
+              // Preserve existing payment amounts unless they were explicitly changed
+              // Only update payment amounts if they're significantly different (more than 0.01 difference)
+              const shouldUpdatePaymentAmounts =
+                (newStop.paymentAmountCash !== undefined && Math.abs((newStop.paymentAmountCash || 0) - (existingStop.paymentAmountCash || 0)) > 0.01) ||
+                (newStop.paymentAmountCheck !== undefined && Math.abs((newStop.paymentAmountCheck || 0) - (existingStop.paymentAmountCheck || 0)) > 0.01) ||
+                (newStop.paymentAmountCC !== undefined && Math.abs((newStop.paymentAmountCC || 0) - (existingStop.paymentAmountCC || 0)) > 0.01);
+
+              const updateData: any = {
+                sequence: newStop.sequence,
+                customerNameFromUpload: newStop.customerName,
+                driverNameFromUpload: newStop.driverName,
+                // Update invoice numbers only if they're provided and different
+                quickbooksInvoiceNum: newStop.quickbooksInvoiceNum || existingStop.quickbooksInvoiceNum,
+                orderNumberWeb: newStop.orderNumberWeb || existingStop.orderNumberWeb,
+                initialDriverNotes: newStop.initialDriverNotes || existingStop.initialDriverNotes,
+                isCOD: newStop.isCOD,
+                paymentFlagCash: newStop.paymentFlagCash,
+                paymentFlagCheck: newStop.paymentFlagCheck,
+                paymentFlagCC: newStop.paymentFlagCC,
+                paymentFlagNotPaid: newStop.paymentFlagNotPaid,
+                returnFlagInitial: newStop.returnFlagInitial,
+                driverRemarkInitial: newStop.driverRemarkInitial,
+                amount: newStop.amount !== undefined ? newStop.amount : existingStop.amount,
+              };
+
+              // Only update payment amounts if they were actually changed in the Excel file
+              if (shouldUpdatePaymentAmounts) {
+                updateData.paymentAmountCash = newStop.paymentAmountCash || 0;
+                updateData.paymentAmountCheck = newStop.paymentAmountCheck || 0;
+                updateData.paymentAmountCC = newStop.paymentAmountCC || 0;
+                updateData.totalPaymentAmount = (newStop.paymentAmountCash || 0) +
+                                               (newStop.paymentAmountCheck || 0) +
+                                               (newStop.paymentAmountCC || 0);
+                console.log(`Payment amounts updated for ${newStop.customerName}: Cash=${newStop.paymentAmountCash}, Check=${newStop.paymentAmountCheck}, CC=${newStop.paymentAmountCC}`);
+              } else {
+                // Preserve existing payment amounts
+                console.log(`Preserving existing payment amounts for ${newStop.customerName}`);
+              }
+
               await tx.stop.update({
                 where: { id: existingStop.id },
-                data: {
-                  sequence: newStop.sequence,
-                  customerNameFromUpload: newStop.customerName,
-                  driverNameFromUpload: newStop.driverName,
-                  // Update invoice numbers only if they're provided and different
-                  quickbooksInvoiceNum: newStop.quickbooksInvoiceNum || existingStop.quickbooksInvoiceNum,
-                  orderNumberWeb: newStop.orderNumberWeb || existingStop.orderNumberWeb,
-                  initialDriverNotes: newStop.initialDriverNotes || existingStop.initialDriverNotes,
-                  isCOD: newStop.isCOD,
-                  paymentFlagCash: newStop.paymentFlagCash,
-                  paymentFlagCheck: newStop.paymentFlagCheck,
-                  paymentFlagCC: newStop.paymentFlagCC,
-                  paymentFlagNotPaid: newStop.paymentFlagNotPaid,
-                  returnFlagInitial: newStop.returnFlagInitial,
-                  driverRemarkInitial: newStop.driverRemarkInitial,
-                  amount: newStop.amount !== undefined ? newStop.amount : existingStop.amount,
-                },
+                data: updateData,
               });
 
               matchedStopIds.add(existingStop.id);
