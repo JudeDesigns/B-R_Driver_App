@@ -216,16 +216,39 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     columnIndices.driver = 2; // Column C (0-based index)
     console.log("Using column C (index 2) for driver names as specified");
 
-    // Always use specific columns for payment amounts as specified
-    // AK = 36, AL = 37, AM = 38 (0-based indices)
-    columnIndices.paymentAmountCash = 36; // Column AK (0-based index)
-    columnIndices.paymentAmountCheck = 37; // Column AL (0-based index)
-    columnIndices.paymentAmountCC = 38; // Column AM (0-based index)
-    console.log("Using columns AK (36), AL (37), AM (38) for payment amounts as specified");
+    // Fix column mapping: AK is for Amount, AL/AM/AN are for payment amounts
+    // AK = 36 (Amount - invoice total)
+    // AL = 37 (Cash Payment Amount)
+    // AM = 38 (Check Payment Amount)
+    // AN = 39 (Credit Card Payment Amount)
+    columnIndices.amount = 36; // Column AK - Invoice Amount
+    columnIndices.paymentAmountCash = 37; // Column AL - Cash Payment
+    columnIndices.paymentAmountCheck = 38; // Column AM - Check Payment
+    columnIndices.paymentAmountCC = 39; // Column AN - Credit Card Payment
+    console.log("Fixed column mapping: AK=Amount(36), AL=Cash(37), AM=Check(38), AN=CC(39)");
 
     // Log the headers and column indices for debugging
     console.log("Excel Headers:", headers);
     console.log("Column Indices:", columnIndices);
+
+    // CRITICAL DEBUG: Check for column conflicts
+    console.log("=== COLUMN MAPPING DEBUG ===");
+    console.log(`Amount column index: ${columnIndices.amount} (Header: "${headers[columnIndices.amount]}")`);
+    console.log(`Cash payment column index: ${columnIndices.paymentAmountCash} (Header: "${headers[columnIndices.paymentAmountCash]}")`);
+    console.log(`Check payment column index: ${columnIndices.paymentAmountCheck} (Header: "${headers[columnIndices.paymentAmountCheck]}")`);
+    console.log(`CC payment column index: ${columnIndices.paymentAmountCC} (Header: "${headers[columnIndices.paymentAmountCC]}")`);
+
+    // Check for conflicts
+    if (columnIndices.amount === columnIndices.paymentAmountCash) {
+      console.error("🚨 CONFLICT: Amount and Cash Payment are using the same column!");
+    }
+    if (columnIndices.amount === columnIndices.paymentAmountCheck) {
+      console.error("🚨 CONFLICT: Amount and Check Payment are using the same column!");
+    }
+    if (columnIndices.amount === columnIndices.paymentAmountCC) {
+      console.error("🚨 CONFLICT: Amount and Credit Card Payment are using the same column!");
+    }
+    console.log("=== END COLUMN DEBUG ===");
 
     // Validate that we found all required columns
     const requiredColumns = [
@@ -457,25 +480,37 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           amount: row[columnIndices.amount]
             ? parseFloat(row[columnIndices.amount])
             : undefined,
-          // Extract payment amounts from Excel columns AK, AL, AM
+          // Extract payment amounts from Excel columns AL, AM, AN
+          // Only set values if they exist and are greater than 0, otherwise undefined
           paymentAmountCash: (() => {
             const rawValue = row[columnIndices.paymentAmountCash];
-            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            const parsed = rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            return parsed > 0 ? parsed : undefined;
           })(),
           paymentAmountCheck: (() => {
             const rawValue = row[columnIndices.paymentAmountCheck];
-            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            const parsed = rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            return parsed > 0 ? parsed : undefined;
           })(),
           paymentAmountCC: (() => {
             const rawValue = row[columnIndices.paymentAmountCC];
-            return rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            const parsed = rawValue && !isNaN(parseFloat(rawValue)) ? parseFloat(rawValue) : 0;
+            return parsed > 0 ? parsed : undefined;
           })(),
         };
 
-        // Calculate total payment amount
-        stop.totalPaymentAmount = (stop.paymentAmountCash || 0) +
-                                 (stop.paymentAmountCheck || 0) +
-                                 (stop.paymentAmountCC || 0);
+        // Calculate total payment amount only if any payment amounts are defined
+        const hasPaymentAmounts = stop.paymentAmountCash !== undefined ||
+                                 stop.paymentAmountCheck !== undefined ||
+                                 stop.paymentAmountCC !== undefined;
+
+        if (hasPaymentAmounts) {
+          stop.totalPaymentAmount = (stop.paymentAmountCash || 0) +
+                                   (stop.paymentAmountCheck || 0) +
+                                   (stop.paymentAmountCC || 0);
+        } else {
+          stop.totalPaymentAmount = undefined;
+        }
 
         // Calculate paymentFlagNotPaid
         stop.paymentFlagNotPaid =
@@ -802,11 +837,11 @@ export async function saveRouteToDatabase(
               console.log(`Updating existing stop for ${newStop.customerName} (sequence ${newStop.sequence})`);
 
               // Preserve existing payment amounts unless they were explicitly changed
-              // Only update payment amounts if they're significantly different (more than 0.01 difference)
+              // Only update payment amounts if new values are provided and different from existing
               const shouldUpdatePaymentAmounts =
-                (newStop.paymentAmountCash !== undefined && Math.abs((newStop.paymentAmountCash || 0) - (existingStop.paymentAmountCash || 0)) > 0.01) ||
-                (newStop.paymentAmountCheck !== undefined && Math.abs((newStop.paymentAmountCheck || 0) - (existingStop.paymentAmountCheck || 0)) > 0.01) ||
-                (newStop.paymentAmountCC !== undefined && Math.abs((newStop.paymentAmountCC || 0) - (existingStop.paymentAmountCC || 0)) > 0.01);
+                (newStop.paymentAmountCash !== undefined && newStop.paymentAmountCash !== (existingStop.paymentAmountCash || 0)) ||
+                (newStop.paymentAmountCheck !== undefined && newStop.paymentAmountCheck !== (existingStop.paymentAmountCheck || 0)) ||
+                (newStop.paymentAmountCC !== undefined && newStop.paymentAmountCC !== (existingStop.paymentAmountCC || 0));
 
               const updateData: any = {
                 sequence: newStop.sequence,
@@ -828,15 +863,15 @@ export async function saveRouteToDatabase(
 
               // Only update payment amounts if they were actually changed in the Excel file
               if (shouldUpdatePaymentAmounts) {
-                updateData.paymentAmountCash = newStop.paymentAmountCash || 0;
-                updateData.paymentAmountCheck = newStop.paymentAmountCheck || 0;
-                updateData.paymentAmountCC = newStop.paymentAmountCC || 0;
-                updateData.totalPaymentAmount = (newStop.paymentAmountCash || 0) +
-                                               (newStop.paymentAmountCheck || 0) +
-                                               (newStop.paymentAmountCC || 0);
-                console.log(`Payment amounts updated for ${newStop.customerName}: Cash=${newStop.paymentAmountCash}, Check=${newStop.paymentAmountCheck}, CC=${newStop.paymentAmountCC}`);
+                updateData.paymentAmountCash = newStop.paymentAmountCash !== undefined ? newStop.paymentAmountCash : existingStop.paymentAmountCash;
+                updateData.paymentAmountCheck = newStop.paymentAmountCheck !== undefined ? newStop.paymentAmountCheck : existingStop.paymentAmountCheck;
+                updateData.paymentAmountCC = newStop.paymentAmountCC !== undefined ? newStop.paymentAmountCC : existingStop.paymentAmountCC;
+                updateData.totalPaymentAmount = (updateData.paymentAmountCash || 0) +
+                                               (updateData.paymentAmountCheck || 0) +
+                                               (updateData.paymentAmountCC || 0);
+                console.log(`Payment amounts updated for ${newStop.customerName}: Cash=${updateData.paymentAmountCash}, Check=${updateData.paymentAmountCheck}, CC=${updateData.paymentAmountCC}`);
               } else {
-                // Preserve existing payment amounts
+                // Preserve existing payment amounts - don't include them in updateData
                 console.log(`Preserving existing payment amounts for ${newStop.customerName}`);
               }
 
@@ -1067,10 +1102,10 @@ export async function saveRouteToDatabase(
         driverRemarkInitial: parsedStop.driverRemarkInitial,
         amount: parsedStop.amount,
         // Payment amounts from Excel columns AK, AL, AM
-        paymentAmountCash: parsedStop.paymentAmountCash || 0,
-        paymentAmountCheck: parsedStop.paymentAmountCheck || 0,
-        paymentAmountCC: parsedStop.paymentAmountCC || 0,
-        totalPaymentAmount: parsedStop.totalPaymentAmount || 0,
+        paymentAmountCash: parsedStop.paymentAmountCash || null,
+        paymentAmountCheck: parsedStop.paymentAmountCheck || null,
+        paymentAmountCC: parsedStop.paymentAmountCC || null,
+        totalPaymentAmount: parsedStop.totalPaymentAmount || null,
         status: "PENDING" as const,
         // Store the driver name for reference
         driverNameFromUpload: parsedStop.driverName,
