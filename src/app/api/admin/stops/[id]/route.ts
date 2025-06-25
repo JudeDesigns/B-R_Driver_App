@@ -72,6 +72,11 @@ export async function GET(
             },
           },
         },
+        payments: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
       },
     });
 

@@ -33,6 +33,7 @@ interface Stop {
     id: string;
     name: string;
     groupCode: string;
+    documents?: Document[];
   };
   route: {
     id: string;
@@ -337,7 +338,7 @@ export default function DocumentManagementPage() {
         throw new Error(errorData.message || 'Upload failed');
       }
 
-      const result = await response.json();
+      await response.json();
 
       // Show success message
       if (uploadType === 'stop') {
@@ -429,7 +430,6 @@ export default function DocumentManagementPage() {
   };
 
   const customerDocuments = documents.filter(doc => doc.customerId);
-  const stopDocuments = documents.filter(doc => !doc.customerId);
 
   const filteredCustomerDocuments = selectedCustomer 
     ? customerDocuments.filter(doc => doc.customerId === selectedCustomer)
@@ -921,9 +921,9 @@ export default function DocumentManagementPage() {
                     <span className="ml-2 text-sm text-gray-500">(Available for all deliveries to this customer)</span>
                   </h4>
                   <div className="border border-gray-200 rounded-lg">
-                    {selectedStopForDetails.customer.documents?.length > 0 ? (
+                    {selectedStopForDetails.customer.documents && selectedStopForDetails.customer.documents.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {selectedStopForDetails.customer.documents.map(doc => (
+                        {selectedStopForDetails.customer.documents.map((doc: Document) => (
                           <div key={doc.id} className="p-3">
                             <div className="flex items-center justify-between">
                               <div>
@@ -1138,3 +1138,5 @@ export default function DocumentManagementPage() {
     </div>
   );
 }
+
+

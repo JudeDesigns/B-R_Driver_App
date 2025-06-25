@@ -62,6 +62,28 @@ export async function GET(
                 groupCode: true,
               },
             },
+            payments: {
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            adminNotes: {
+              where: {
+                isDeleted: false,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+              include: {
+                admin: {
+                  select: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

@@ -297,15 +297,23 @@ export default function RouteDetailPage({
   };
 
   const getPaymentMethod = (stop: Stop) => {
-    // Check if driver has recorded payments
+    // Check if driver has recorded payments (priority)
+    if (stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0) {
+      return stop.driverPaymentMethods.join(", ");
+    }
+
+    // Check if driver recorded payment amount without methods
     if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
       return "Paid";
     }
 
-    // Check legacy payment flags
-    if (stop.paymentFlagCash) return "Cash";
-    if (stop.paymentFlagCheck) return "Check";
-    if (stop.paymentFlagCC) return "Credit Card";
+    // Check legacy payment flags from Excel
+    const flags = [];
+    if (stop.paymentFlagCash) flags.push("Cash");
+    if (stop.paymentFlagCheck) flags.push("Check");
+    if (stop.paymentFlagCC) flags.push("Credit Card");
+
+    if (flags.length > 0) return flags.join(", ");
     if (stop.paymentFlagNotPaid) return "Not Paid";
     return "Not Paid";
   };

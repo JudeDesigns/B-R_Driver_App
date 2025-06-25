@@ -26,6 +26,7 @@ model User {
   adminNotes   AdminNote[]   @relation("AdminNotes")
   safetyChecks SafetyCheck[] @relation("DriverSafetyChecks")
   documents    Document[]    @relation("DocumentUploads")
+  files        File[]        @relation("FileUploads")
 
   @@index([role])
   @@index([isDeleted])
@@ -409,6 +410,90 @@ enum DocumentType {
   DELIVERY_RECEIPT
   RETURN_FORM
   OTHER
+}
+
+// Enhanced File Management System
+model FileCategory {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?
+  pathPrefix    String   // e.g., "documents/invoices"
+  maxFileSize   Int      @default(10485760) // 10MB default
+  allowedTypes  String[] @default([]) // MIME types
+  retentionDays Int      @default(365) // How long to keep files
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  files File[]
+
+  @@map("file_categories")
+}
+
+model File {
+  id           String       @id @default(uuid())
+  originalName String       // Original filename from upload
+  storedName   String       // Generated filename for storage
+  filePath     String       // Relative path from uploads root
+  fileSize     Int          // File size in bytes
+  mimeType     String       // MIME type
+  categoryId   String?      // Optional category
+  category     FileCategory? @relation(fields: [categoryId], references: [id])
+  uploadedBy   String       // User who uploaded the file
+  uploader     User         @relation("FileUploads", fields: [uploadedBy], references: [id])
+  checksum     String       // SHA256 hash for duplicate detection
+  metadata     Json?        // Additional metadata
+  isArchived   Boolean      @default(false)
+  archivedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  isDeleted    Boolean      @default(false)
+
+  // Relations
+  versions   FileVersion[]
+  thumbnails FileThumbnail[]
+
+  @@index([categoryId])
+  @@index([uploadedBy])
+  @@index([checksum])
+  @@index([isArchived])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("files")
+}
+
+model FileVersion {
+  id            String   @id @default(uuid())
+  fileId        String
+  file          File     @relation(fields: [fileId], references: [id])
+  versionNumber Int      // 1, 2, 3, etc.
+  filePath      String   // Path to this version
+  fileSize      Int      // Size of this version
+  createdAt     DateTime @default(now())
+
+  @@index([fileId])
+  @@map("file_versions")
+}
+
+model FileThumbnail {
+  id        String                    @id @default(uuid())
+  fileId    String
+  file      File                      @relation(fields: [fileId], references: [id])
+  size      ThumbnailSize             // small, medium, large
+  filePath  String                    // Path to thumbnail
+  width     Int
+  height    Int
+  createdAt DateTime                  @default(now())
+
+  @@index([fileId])
+  @@index([size])
+  @@map("file_thumbnails")
+}
+
+enum ThumbnailSize {
+  SMALL
+  MEDIUM
+  LARGE
 }
 
 // Payment model for individual payment entries

@@ -621,6 +621,58 @@ export default function AdminLayout({
                 </Link>
               </li>
 
+              {/* Super Admin Only - File Management */}
+              {userRole === "SUPER_ADMIN" && (
+                <li>
+                  <Link
+                    href="/admin/file-management"
+                    className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                      pathname === "/admin/file-management"
+                        ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                        : "hover:bg-gray-800"
+                    }`}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    {pathname === "/admin/file-management" && (
+                      <span className="absolute left-0 top-0 h-full w-1 bg-pink-500"></span>
+                    )}
+                    <span
+                      className={`absolute inset-0 w-1 bg-pink-500 transition-all duration-300 ${
+                        pathname === "/admin/file-management"
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100"
+                      }`}
+                    ></span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-5 w-5 mr-3 text-pink-500 transition-transform duration-300 ${
+                        pathname === "/admin/file-management"
+                          ? "scale-110"
+                          : "group-hover:scale-110"
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V5a2 2 0 012-2h14a2 2 0 012 2v2"
+                      />
+                    </svg>
+                    <span
+                      className={`font-medium transition-all duration-300 ${
+                        pathname === "/admin/file-management"
+                          ? "text-white"
+                          : "group-hover:translate-x-1"
+                      }`}
+                    >
+                      File Management
+                    </span>
+                  </Link>
+                </li>
+              )}
 
             </ul>
           </nav>

@@ -1076,40 +1076,78 @@ export default function StopDetailPage({
                     <h3 className="text-sm font-medium text-gray-500">
                       Payment Type
                     </h3>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {stop.isCOD && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          COD
-                        </span>
+                    <div className="mt-1 space-y-2">
+                      {/* Driver-recorded payments (priority display) */}
+                      {stop.payments && stop.payments.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-green-700 mb-1">
+                            Driver Recorded:
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {stop.payments.map((payment: any, index: number) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                              >
+                                {payment.method}: ${payment.amount.toFixed(2)}
+                                {payment.notes && ` (${payment.notes})`}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                      {stop.paymentFlagCash && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Cash
-                        </span>
+
+                      {/* Excel payment flags (secondary display) */}
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 mb-1">
+                          Excel Flags:
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {stop.isCOD && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              COD
+                            </span>
+                          )}
+                          {stop.paymentFlagCash && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              Cash Flag
+                            </span>
+                          )}
+                          {stop.paymentFlagCheck && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              Check Flag
+                            </span>
+                          )}
+                          {stop.paymentFlagCC && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              Credit Card Flag
+                            </span>
+                          )}
+                          {stop.paymentFlagNotPaid && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Not Paid Flag
+                            </span>
+                          )}
+                          {!stop.paymentFlagCash &&
+                            !stop.paymentFlagCheck &&
+                            !stop.paymentFlagCC &&
+                            !stop.paymentFlagNotPaid &&
+                            !stop.isCOD && (
+                              <span className="text-xs text-gray-500">
+                                No flags set
+                              </span>
+                            )}
+                        </div>
+                      </div>
+
+                      {/* Show message if no payments recorded */}
+                      {(!stop.payments || stop.payments.length === 0) &&
+                       !stop.paymentFlagCash && !stop.paymentFlagCheck &&
+                       !stop.paymentFlagCC && !stop.paymentFlagNotPaid && !stop.isCOD && (
+                        <div className="text-sm text-gray-500">
+                          No payment information available
+                        </div>
                       )}
-                      {stop.paymentFlagCheck && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Check
-                        </span>
-                      )}
-                      {stop.paymentFlagCC && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          Credit Card
-                        </span>
-                      )}
-                      {stop.paymentFlagNotPaid && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Not Paid
-                        </span>
-                      )}
-                      {!stop.paymentFlagCash &&
-                        !stop.paymentFlagCheck &&
-                        !stop.paymentFlagCC &&
-                        !stop.paymentFlagNotPaid && (
-                          <span className="text-sm text-gray-500">
-                            None specified
-                          </span>
-                        )}
                     </div>
                   </div>
 
