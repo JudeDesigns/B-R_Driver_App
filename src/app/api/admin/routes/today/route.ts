@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getTodayStartUTC, getTodayEndUTC } from "@/lib/timezone";
 
 // GET /api/admin/routes/today - Get all routes for today
 export async function GET(request: NextRequest) {
@@ -24,19 +25,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get today's date range
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get today's date range in PST timezone
+    const todayStart = getTodayStartUTC();
+    const todayEnd = getTodayEndUTC();
 
     // Get all routes for today with stops and documents
     const routes = await prisma.route.findMany({
       where: {
         date: {
-          gte: today,
-          lt: tomorrow,
+          gte: todayStart,
+          lte: todayEnd,
         },
         isDeleted: false,
       },

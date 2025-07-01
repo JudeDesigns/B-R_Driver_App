@@ -8,6 +8,7 @@ import TableActions, { Action } from "@/components/ui/TableActions";
 import Pagination from "@/components/ui/Pagination";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
+import { formatRouteDate } from "@/lib/timezone";
 
 interface Route {
   id: string;
@@ -118,12 +119,7 @@ export default function RoutesPage() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatRouteDate(dateString);
   };
 
   const getStatusBadgeClass = (status: string) => {

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { PrismaClient, User, Customer, Route, Stop } from "@prisma/client";
 import prisma from "./db";
 import { InputValidator } from "./security";
+import { createPSTDate, getPSTDateString } from "./timezone";
 
 // Define the structure for a parsed stop
 export interface ParsedStop {
@@ -269,8 +270,8 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       return result;
     }
 
-    // Initialize route data with today's date normalized to start of day
-    const today = new Date();
+    // Initialize route data with today's date in PST timezone
+    const today = createPSTDate();
     today.setHours(0, 0, 0, 0); // Normalize to start of day for consistent comparison
 
     const route: ParsedRoute = {
@@ -320,9 +321,12 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
               parsedDate = new Date(dateValue.toString());
             }
 
-            // Validate and normalize the parsed date
+            // Validate and normalize the parsed date to PST timezone
             if (!isNaN(parsedDate.getTime())) {
-              parsedDate.setHours(0, 0, 0, 0); // Normalize to start of day
+              // Convert to PST timezone and normalize to start of day
+              const pstDate = createPSTDate(parsedDate.getFullYear(), parsedDate.getMonth() + 1, parsedDate.getDate());
+              pstDate.setHours(0, 0, 0, 0);
+              parsedDate = pstDate;
               route.date = parsedDate;
             }
           } catch (error) {
