@@ -150,10 +150,36 @@ export async function PUT(
         id,
         isDeleted: false,
       },
+      select: {
+        id: true,
+        sequence: true,
+        routeId: true,
+      },
     });
 
     if (!existingStop) {
       return NextResponse.json({ message: "Stop not found" }, { status: 404 });
+    }
+
+    // Handle sequence conflicts if sequence is being changed
+    if (data.sequence !== undefined && data.sequence !== existingStop.sequence) {
+      // Check if the new sequence already exists in the same route
+      const conflictingStop = await prisma.stop.findFirst({
+        where: {
+          routeId: existingStop.routeId,
+          sequence: data.sequence,
+          isDeleted: false,
+          id: { not: id } // Exclude current stop
+        }
+      });
+
+      if (conflictingStop) {
+        // Swap sequences to avoid conflicts
+        await prisma.stop.update({
+          where: { id: conflictingStop.id },
+          data: { sequence: existingStop.sequence }
+        });
+      }
     }
 
     // Update the stop

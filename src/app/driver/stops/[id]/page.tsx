@@ -456,8 +456,16 @@ export default function StopDetailPage({
         }
       }
 
-      // Refresh stop details
-      fetchStopDetails();
+      // If status is COMPLETED, redirect to dashboard after a short delay
+      if (newStatus === "COMPLETED") {
+        console.log("Delivery completed successfully, redirecting to dashboard...");
+        setTimeout(() => {
+          router.push("/driver/dashboard");
+        }, 1500);
+      } else {
+        // Refresh stop details for other status updates
+        fetchStopDetails();
+      }
     } catch (err) {
       console.error("Error updating status:", err);
       setError(err instanceof Error ? err.message : "An error occurred");

@@ -4,6 +4,15 @@ import jwt from "jsonwebtoken";
 import prisma from "./db";
 import { getJwtSecret } from "./env";
 
+// Import session manager with error handling
+let sessionManager: any = null;
+try {
+  const sessionModule = require("./sessionManager");
+  sessionManager = sessionModule.sessionManager;
+} catch (error) {
+  console.warn("Session manager not available, session invalidation disabled");
+}
+
 // Function to authenticate a user
 export async function authenticateUser(username: string, password: string) {
   try {
@@ -130,6 +139,17 @@ export function verifyToken(token: string) {
     // Validate required fields
     if (!decoded.id || !decoded.role || !decoded.username) {
       return null;
+    }
+
+    // Check if user sessions have been invalidated (e.g., password changed)
+    try {
+      if (sessionManager && sessionManager.areUserSessionsInvalidated(decoded.id)) {
+        console.warn(`Security Event: Invalidated session attempt for user ${decoded.id}`);
+        return null;
+      }
+    } catch (sessionError) {
+      // If session management fails, log but don't block login
+      console.warn("Session management check failed, allowing login:", sessionError.message);
     }
 
     return decoded;

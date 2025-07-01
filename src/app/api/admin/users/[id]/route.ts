@@ -3,6 +3,15 @@ import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import * as argon2 from "argon2";
 
+// Import session manager with error handling
+let sessionManager: any = null;
+try {
+  const sessionModule = require("@/lib/sessionManager");
+  sessionManager = sessionModule.sessionManager;
+} catch (error) {
+  console.warn("Session manager not available in admin users API");
+}
+
 // GET /api/admin/users/[id] - Get a specific user
 export async function GET(
   request: NextRequest,
@@ -170,6 +179,12 @@ export async function PATCH(
     // Update password if provided
     if (data.password) {
       updateData.password = await argon2.hash(data.password);
+      // Invalidate all sessions for this user when password is changed
+      try {
+        sessionManager.invalidateUserSessions(id, 'Password changed by admin');
+      } catch (error) {
+        console.warn("Failed to invalidate user sessions:", error.message);
+      }
     }
 
     // Update fullName if provided

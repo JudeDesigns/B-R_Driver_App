@@ -3,6 +3,15 @@ import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
 import * as argon2 from "argon2";
 
+// Import session manager with error handling
+let sessionManager: any = null;
+try {
+  const sessionModule = require("@/lib/sessionManager");
+  sessionManager = sessionModule.sessionManager;
+} catch (error) {
+  console.warn("Session manager not available in super admin users API");
+}
+
 // GET - Get single user
 export async function GET(
   request: NextRequest,
@@ -139,6 +148,12 @@ export async function PUT(
     // Hash new password if provided
     if (password && password.trim() !== "") {
       updateData.password = await argon2.hash(password);
+      // Invalidate all sessions for this user when password is changed
+      try {
+        sessionManager.invalidateUserSessions(userId, 'Password changed by super admin');
+      } catch (error) {
+        console.warn("Failed to invalidate user sessions:", error.message);
+      }
     }
 
     // Update user

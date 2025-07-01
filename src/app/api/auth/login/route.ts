@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateUser, generateToken } from "@/lib/auth";
 
+// Import session manager with error handling
+let sessionManager: any = null;
+try {
+  const sessionModule = require("@/lib/sessionManager");
+  sessionManager = sessionModule.sessionManager;
+} catch (error) {
+  console.warn("Session manager not available in login API");
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Parse the request body
@@ -44,6 +53,13 @@ export async function POST(request: NextRequest) {
         { message: "Invalid username or password" },
         { status: 401 }
       );
+    }
+
+    // Clear any session invalidations for this user (they're logging in with new credentials)
+    try {
+      sessionManager.clearUserInvalidation(userId);
+    } catch (error) {
+      console.warn("Failed to clear user session invalidation:", error.message);
     }
 
     // Generate JWT token

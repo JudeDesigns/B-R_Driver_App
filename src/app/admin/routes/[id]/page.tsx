@@ -129,6 +129,10 @@ export default function RouteDetailPage({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
+  // Sequence editing state
+  const [editingSequence, setEditingSequence] = useState<string | null>(null);
+  const [tempSequence, setTempSequence] = useState<number>(0);
+
   // User role state
   const [userRole, setUserRole] = useState<string | null>(null);
 
@@ -549,6 +553,58 @@ export default function RouteDetailPage({
     setDeleteLoading(false);
   };
 
+  // Function to update stop sequence
+  const updateStopSequence = async (stopId: string, newSequence: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/admin/stops/${stopId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sequence: newSequence,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update sequence");
+      }
+
+      // Refresh the route data
+      fetchRouteDetails();
+      setEditingSequence(null);
+    } catch (err) {
+      console.error("Error updating sequence:", err);
+      alert("Failed to update sequence. Please try again.");
+    }
+  };
+
+  // Handle sequence edit start
+  const startEditingSequence = (stopId: string, currentSequence: number) => {
+    setEditingSequence(stopId);
+    setTempSequence(currentSequence);
+  };
+
+  // Handle sequence edit save
+  const saveSequence = (stopId: string) => {
+    if (tempSequence > 0) {
+      updateStopSequence(stopId, tempSequence);
+    }
+  };
+
+  // Handle sequence edit cancel
+  const cancelEditingSequence = () => {
+    setEditingSequence(null);
+    setTempSequence(0);
+  };
+
   // Add Stop Functions
   const handleAddStop = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -695,7 +751,51 @@ export default function RouteDetailPage({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
               </svg>
             </div>
-            {stop.sequence}
+            {editingSequence === stop.id ? (
+              <div className="flex items-center space-x-1">
+                <input
+                  type="number"
+                  value={tempSequence}
+                  onChange={(e) => setTempSequence(parseInt(e.target.value) || 0)}
+                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="1"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      saveSequence(stop.id);
+                    } else if (e.key === 'Escape') {
+                      cancelEditingSequence();
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => saveSequence(stop.id)}
+                  className="p-1 text-green-600 hover:text-green-800"
+                  title="Save"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={cancelEditingSequence}
+                  className="p-1 text-red-600 hover:text-red-800"
+                  title="Cancel"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <span
+                className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                onClick={() => startEditingSequence(stop.id, stop.sequence)}
+                title="Click to edit sequence"
+              >
+                {stop.sequence}
+              </span>
+            )}
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

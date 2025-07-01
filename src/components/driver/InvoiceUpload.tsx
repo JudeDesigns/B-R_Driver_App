@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import LoadingSpinner from "../ui/LoadingSpinner";
 
 interface InvoiceUploadProps {
@@ -18,6 +19,7 @@ export default function InvoiceUpload({
   markAsCompleted = false, // Changed default to false
   currentStopStatus,
 }: InvoiceUploadProps) {
+  const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,8 +90,13 @@ export default function InvoiceUpload({
         );
       }
 
-      // Refresh the page to show updated status
-      window.location.reload();
+      // Show success message and redirect to dashboard
+      console.log("Delivery completed successfully, redirecting to dashboard...");
+
+      // Small delay to show success state, then redirect
+      setTimeout(() => {
+        router.push("/driver/dashboard");
+      }, 1500);
     } catch (completeErr) {
       console.error("Error marking stop as completed:", completeErr);
       setError(
