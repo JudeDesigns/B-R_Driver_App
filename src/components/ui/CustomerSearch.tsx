@@ -63,24 +63,42 @@ export default function CustomerSearch({
 
   const searchCustomers = async (query: string) => {
     setLoading(true);
+    console.log("🔍 Searching for customers with query:", query);
+
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(query)}`, {
+      if (!token) {
+        console.error("❌ No auth token found");
+        setCustomers([]);
+        setIsOpen(false);
+        setLoading(false);
+        return;
+      }
+
+      const url = `/api/admin/customers/search?q=${encodeURIComponent(query)}`;
+      console.log("📡 Making request to:", url);
+
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
+      console.log("📊 Response status:", response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ Search results:", data);
         setCustomers(data.customers || []);
         setIsOpen(true);
       } else {
+        const errorData = await response.text();
+        console.error("❌ Search failed:", response.status, errorData);
         setCustomers([]);
         setIsOpen(false);
       }
     } catch (error) {
-      console.error("Error searching customers:", error);
+      console.error("❌ Error searching customers:", error);
       setCustomers([]);
       setIsOpen(false);
     } finally {
@@ -183,6 +201,8 @@ export default function CustomerSearch({
             No customers found for "{searchTerm}"
             <br />
             <span className="text-xs">You can still type a custom name</span>
+            <br />
+            <span className="text-xs text-blue-500">Check browser console for debug info</span>
           </div>
         </div>
       )}

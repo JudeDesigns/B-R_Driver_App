@@ -26,10 +26,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
 
+    console.log("🔍 Customer search API called with query:", query);
+
     if (!query || query.length < 2) {
-      return NextResponse.json({ 
+      console.log("❌ Query too short or missing");
+      return NextResponse.json({
         customers: [],
-        message: "Query must be at least 2 characters long" 
+        message: "Query must be at least 2 characters long"
       });
     }
 
@@ -79,6 +82,9 @@ export async function GET(request: NextRequest) {
       ],
       take: 20, // Limit results to prevent overwhelming the UI
     });
+
+    console.log(`✅ Found ${customers.length} customers for query "${query}"`);
+    console.log("📋 Customer results:", customers.map(c => ({ id: c.id, name: c.name })));
 
     return NextResponse.json({
       customers,
