@@ -63,54 +63,22 @@ export async function GET(request: NextRequest) {
     });
     console.log(`📊 Active customers: ${activeCount}`);
 
-    // Now try the search
+    // Use raw SQL to handle NULL values properly
     console.log(`🔍 Searching for customers matching "${query}"...`);
 
-    const customers = await prisma.customer.findMany({
-      where: {
-        isDeleted: false, // Put the filter back
-        OR: [
-          {
-            name: {
-              contains: query,
-              mode: "insensitive",
-            },
-          },
-          {
-            email: {
-              contains: query,
-              mode: "insensitive",
-            },
-          },
-          {
-            groupCode: {
-              contains: query,
-              mode: "insensitive",
-            },
-          },
-          {
-            phone: {
-              contains: query,
-              mode: "insensitive",
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-        groupCode: true,
-      },
-      orderBy: [
-        {
-          name: "asc",
-        },
-      ],
-      take: 20,
-    });
+    const customers = await prisma.$queryRaw`
+      SELECT id, name, email, phone, address, "groupCode"
+      FROM customers
+      WHERE (
+        name ILIKE ${`%${query}%`} OR
+        email ILIKE ${`%${query}%`} OR
+        phone ILIKE ${`%${query}%`} OR
+        "groupCode" ILIKE ${`%${query}%`}
+      )
+      AND ("isDeleted" = false OR "isDeleted" IS NULL)
+      ORDER BY name ASC
+      LIMIT 20
+    `;
 
     console.log(`✅ Search completed: Found ${customers.length} customers`);
 
