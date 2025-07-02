@@ -23,6 +23,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { formatRouteDate } from "@/lib/timezone";
+import CustomerSearch from "@/components/ui/CustomerSearch";
 
 interface Driver {
   id: string;
@@ -115,6 +117,7 @@ export default function RouteDetailPage({
     address: "",
     contactInfo: "",
   });
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [addingStop, setAddingStop] = useState(false);
 
   // Drag and Drop State
@@ -606,6 +609,34 @@ export default function RouteDetailPage({
   };
 
   // Add Stop Functions
+  const handleCustomerSelect = (customerName: string, customer?: any) => {
+    setAddStopForm(prev => ({
+      ...prev,
+      customerNameFromUpload: customerName,
+      // Auto-fill address and contact info if customer is selected
+      address: customer?.address || prev.address,
+      contactInfo: customer?.phone || customer?.email || prev.contactInfo,
+    }));
+    setSelectedCustomer(customer);
+  };
+
+  const handleCloseAddStopModal = () => {
+    setAddStopForm({
+      customerNameFromUpload: "",
+      driverId: "",
+      orderNumberWeb: "",
+      quickbooksInvoiceNum: "",
+      initialDriverNotes: "",
+      isCOD: false,
+      amount: "",
+      address: "",
+      contactInfo: "",
+    });
+    setSelectedCustomer(null);
+    setShowAddStopModal(false);
+    setError("");
+  };
+
   const handleAddStop = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addStopForm.customerNameFromUpload || !addStopForm.driverId) {
@@ -646,6 +677,7 @@ export default function RouteDetailPage({
         address: "",
         contactInfo: "",
       });
+      setSelectedCustomer(null);
       setShowAddStopModal(false);
 
       // Refresh route details
@@ -1820,7 +1852,7 @@ export default function RouteDetailPage({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Add New Stop</h3>
                 <button
-                  onClick={() => setShowAddStopModal(false)}
+                  onClick={handleCloseAddStopModal}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1835,13 +1867,18 @@ export default function RouteDetailPage({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Customer Name *
                     </label>
-                    <input
-                      type="text"
+                    <CustomerSearch
                       value={addStopForm.customerNameFromUpload}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, customerNameFromUpload: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={handleCustomerSelect}
+                      placeholder="Search for a customer or type a new name..."
                       required
                     />
+                    {selectedCustomer && (
+                      <div className="mt-2 text-sm text-green-600">
+                        ✓ Customer found: {selectedCustomer.name}
+                        {selectedCustomer.groupCode && ` (${selectedCustomer.groupCode})`}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1960,7 +1997,7 @@ export default function RouteDetailPage({
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowAddStopModal(false)}
+                    onClick={handleCloseAddStopModal}
                     disabled={addingStop}
                     className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
                   >
