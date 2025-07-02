@@ -24,7 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatRouteDate } from "@/lib/timezone";
-import CustomerSearch from "@/components/ui/CustomerSearch";
+import CustomerDropdown from "@/components/ui/CustomerDropdown";
 
 interface Driver {
   id: string;
@@ -1867,10 +1867,10 @@ export default function RouteDetailPage({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Customer Name *
                     </label>
-                    <CustomerSearch
+                    <CustomerDropdown
                       value={addStopForm.customerNameFromUpload}
                       onChange={handleCustomerSelect}
-                      placeholder="Search for a customer or type a new name..."
+                      placeholder="Select a customer..."
                       required
                     />
                     {selectedCustomer && (
