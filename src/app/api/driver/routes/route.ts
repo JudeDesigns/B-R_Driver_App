@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
 
 // GET /api/driver/routes - Get routes for the logged-in driver
 export async function GET(request: NextRequest) {
@@ -57,11 +58,20 @@ export async function GET(request: NextRequest) {
 
     // Add filters based on query parameters
     if (date) {
-      const dateObj = new Date(date);
-      query.where.date = {
-        gte: new Date(dateObj.setHours(0, 0, 0, 0)),
-        lt: new Date(dateObj.setHours(23, 59, 59, 999)),
-      };
+      if (date === getPSTDateString()) {
+        // For today's date, use PST timezone
+        query.where.date = {
+          gte: getTodayStartUTC(),
+          lte: getTodayEndUTC(),
+        };
+      } else {
+        // For other dates, use the provided date
+        const dateObj = new Date(date);
+        query.where.date = {
+          gte: new Date(dateObj.setHours(0, 0, 0, 0)),
+          lt: new Date(dateObj.setHours(23, 59, 59, 999)),
+        };
+      }
     }
 
     if (status) {

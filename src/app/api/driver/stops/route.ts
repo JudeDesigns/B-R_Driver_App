@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
 
 // GET /api/driver/stops - Get all stops assigned to the driver
 export async function GET(request: NextRequest) {
@@ -67,8 +68,8 @@ export async function GET(request: NextRequest) {
         ...(date ? {
           route: {
             date: {
-              gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-              lt: new Date(new Date(date).setHours(23, 59, 59, 999)),
+              gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
+              lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
             },
           },
         } : {}),

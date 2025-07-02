@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
+import { getPSTDateString } from "@/lib/timezone";
 import { SocketEvents, RouteStatusUpdateData } from "@/lib/socketClient";
 // Performance monitoring removed for cleaner codebase
 
@@ -63,8 +64,8 @@ export default function DriverDashboard() {
     setLoading(true);
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
+      // Get today's date in PST timezone in YYYY-MM-DD format
+      const today = getPSTDateString();
 
       // Fetch routes
       const routesResponse = await fetch(

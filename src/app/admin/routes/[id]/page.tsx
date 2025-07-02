@@ -1872,6 +1872,7 @@ export default function RouteDetailPage({
                       onChange={handleCustomerSelect}
                       placeholder="Search for a customer or type a new name..."
                       required
+                      debug={true}
                     />
                     {selectedCustomer && (
                       <div className="mt-2 text-sm text-green-600">

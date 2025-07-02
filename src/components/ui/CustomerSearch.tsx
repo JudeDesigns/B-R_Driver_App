@@ -17,6 +17,7 @@ interface CustomerSearchProps {
   placeholder?: string;
   required?: boolean;
   className?: string;
+  debug?: boolean; // Add debug mode
 }
 
 export default function CustomerSearch({
@@ -25,6 +26,7 @@ export default function CustomerSearch({
   placeholder = "Search for a customer...",
   required = false,
   className = "",
+  debug = false,
 }: CustomerSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -34,6 +36,11 @@ export default function CustomerSearch({
   
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync external value with internal searchTerm
+  useEffect(() => {
+    setSearchTerm(value);
+  }, [value]);
 
   // Debounced search
   useEffect(() => {
@@ -89,13 +96,18 @@ export default function CustomerSearch({
       if (response.ok) {
         const data = await response.json();
         console.log("✅ Search results:", data);
-        setCustomers(data.customers || []);
-        setIsOpen(true);
+        const customerResults = data.customers || [];
+        setCustomers(customerResults);
+        setIsOpen(true); // Always open dropdown to show results or "no results" message
+
+        if (customerResults.length === 0) {
+          console.log("📭 No customers found for query:", query);
+        }
       } else {
         const errorData = await response.text();
         console.error("❌ Search failed:", response.status, errorData);
         setCustomers([]);
-        setIsOpen(false);
+        setIsOpen(true); // Still open to show error/no results message
       }
     } catch (error) {
       console.error("❌ Error searching customers:", error);
@@ -110,7 +122,8 @@ export default function CustomerSearch({
     const newValue = e.target.value;
     setSearchTerm(newValue);
     setSelectedCustomer(null);
-    onChange(newValue);
+    // Only call onChange when user selects a customer, not on every keystroke
+    // This prevents the parent form from being updated while user is typing
   };
 
   const handleCustomerSelect = (customer: Customer) => {
@@ -119,6 +132,14 @@ export default function CustomerSearch({
     setIsOpen(false);
     onChange(customer.name, customer);
     inputRef.current?.blur();
+  };
+
+  // Handle manual typing (when user types a custom name)
+  const handleInputBlur = () => {
+    // If user typed something but didn't select a customer, treat it as a custom name
+    if (searchTerm && !selectedCustomer) {
+      onChange(searchTerm);
+    }
   };
 
   const handleInputFocus = () => {
@@ -143,6 +164,7 @@ export default function CustomerSearch({
           value={searchTerm}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           required={required}
@@ -164,8 +186,21 @@ export default function CustomerSearch({
         </div>
       </div>
 
+      {/* Loading indicator */}
+      {loading && searchTerm.length >= 2 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+          <div className="px-4 py-3 text-sm text-gray-500 text-center">
+            <svg className="animate-spin h-4 w-4 text-gray-400 inline mr-2" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Searching customers...
+          </div>
+        </div>
+      )}
+
       {/* Dropdown */}
-      {isOpen && customers.length > 0 && (
+      {isOpen && !loading && customers.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
           {customers.map((customer) => (
             <div
@@ -195,7 +230,7 @@ export default function CustomerSearch({
       )}
 
       {/* No results message */}
-      {isOpen && !loading && customers.length === 0 && searchTerm.length >= 2 && (
+      {!loading && customers.length === 0 && searchTerm.length >= 2 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
           <div className="px-4 py-3 text-sm text-gray-500 text-center">
             No customers found for "{searchTerm}"
@@ -204,6 +239,18 @@ export default function CustomerSearch({
             <br />
             <span className="text-xs text-blue-500">Check browser console for debug info</span>
           </div>
+        </div>
+      )}
+
+      {/* Debug info */}
+      {debug && (
+        <div className="mt-2 p-2 bg-gray-100 border border-gray-300 rounded text-xs">
+          <div><strong>Debug Info:</strong></div>
+          <div>Search term: "{searchTerm}" (length: {searchTerm.length})</div>
+          <div>Is open: {isOpen ? 'Yes' : 'No'}</div>
+          <div>Loading: {loading ? 'Yes' : 'No'}</div>
+          <div>Customers found: {customers.length}</div>
+          <div>Selected customer: {selectedCustomer ? selectedCustomer.name : 'None'}</div>
         </div>
       )}
 
