@@ -101,6 +101,7 @@ export async function POST(
         routeId: routeId,
         customerId: customer.id,
         sequence: nextSequence,
+        address: data.address || customer.address || "", // Use provided address or customer's address
         customerNameFromUpload: data.customerNameFromUpload,
         driverNameFromUpload: driver.fullName || driver.username,
         orderNumberWeb: data.orderNumberWeb || null,
