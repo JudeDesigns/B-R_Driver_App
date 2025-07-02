@@ -26,10 +26,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
 
-    console.log("🔍 Customer search API called with query:", query);
-
     if (!query || query.length < 2) {
-      console.log("❌ Query too short or missing");
       return NextResponse.json({
         customers: [],
         message: "Query must be at least 2 characters long"
@@ -37,9 +34,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Search customers by name, email, or group code
+    // First, let's try a broader search to see if the issue is with the isDeleted filter
     const customers = await prisma.customer.findMany({
       where: {
-        isDeleted: false,
+        // Remove isDeleted filter temporarily to test if that's the issue
+        // isDeleted: false,
         OR: [
           {
             name: {
@@ -74,6 +73,7 @@ export async function GET(request: NextRequest) {
         phone: true,
         address: true,
         groupCode: true,
+        isDeleted: true, // Include this to see the actual values
       },
       orderBy: [
         {
@@ -83,12 +83,20 @@ export async function GET(request: NextRequest) {
       take: 20, // Limit results to prevent overwhelming the UI
     });
 
-    console.log(`✅ Found ${customers.length} customers for query "${query}"`);
-    console.log("📋 Customer results:", customers.map(c => ({ id: c.id, name: c.name })));
+    // Filter out deleted customers manually and log what we find
+    const activeCustomers = customers.filter(customer => !customer.isDeleted);
+
+    console.log(`🔍 Search for "${query}": Found ${customers.length} total, ${activeCustomers.length} active`);
+    if (customers.length > 0) {
+      console.log("📋 Sample results:", customers.slice(0, 3).map(c => ({
+        name: c.name,
+        isDeleted: c.isDeleted
+      })));
+    }
 
     return NextResponse.json({
-      customers,
-      total: customers.length,
+      customers: activeCustomers.map(({ isDeleted, ...customer }) => customer), // Remove isDeleted from response
+      total: activeCustomers.length,
     });
 
   } catch (error) {

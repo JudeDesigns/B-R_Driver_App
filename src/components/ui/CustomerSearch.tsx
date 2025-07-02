@@ -17,7 +17,6 @@ interface CustomerSearchProps {
   placeholder?: string;
   required?: boolean;
   className?: string;
-  debug?: boolean; // Add debug mode
 }
 
 export default function CustomerSearch({
@@ -26,7 +25,6 @@ export default function CustomerSearch({
   placeholder = "Search for a customer...",
   required = false,
   className = "",
-  debug = false,
 }: CustomerSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -70,12 +68,11 @@ export default function CustomerSearch({
 
   const searchCustomers = async (query: string) => {
     setLoading(true);
-    console.log("🔍 Searching for customers with query:", query);
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        console.error("❌ No auth token found");
+        console.error("No auth token found");
         setCustomers([]);
         setIsOpen(false);
         setLoading(false);
@@ -83,7 +80,6 @@ export default function CustomerSearch({
       }
 
       const url = `/api/admin/customers/search?q=${encodeURIComponent(query)}`;
-      console.log("📡 Making request to:", url);
 
       const response = await fetch(url, {
         headers: {
@@ -91,26 +87,24 @@ export default function CustomerSearch({
         },
       });
 
-      console.log("📊 Response status:", response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log("✅ Search results:", data);
         const customerResults = data.customers || [];
         setCustomers(customerResults);
         setIsOpen(true); // Always open dropdown to show results or "no results" message
 
+        // Log for debugging if no results found
         if (customerResults.length === 0) {
-          console.log("📭 No customers found for query:", query);
+          console.log(`No customers found for "${query}". Check server logs for more details.`);
         }
       } else {
         const errorData = await response.text();
-        console.error("❌ Search failed:", response.status, errorData);
+        console.error("Customer search failed:", response.status, errorData);
         setCustomers([]);
         setIsOpen(true); // Still open to show error/no results message
       }
     } catch (error) {
-      console.error("❌ Error searching customers:", error);
+      console.error("Error searching customers:", error);
       setCustomers([]);
       setIsOpen(false);
     } finally {
@@ -236,21 +230,7 @@ export default function CustomerSearch({
             No customers found for "{searchTerm}"
             <br />
             <span className="text-xs">You can still type a custom name</span>
-            <br />
-            <span className="text-xs text-blue-500">Check browser console for debug info</span>
           </div>
-        </div>
-      )}
-
-      {/* Debug info */}
-      {debug && (
-        <div className="mt-2 p-2 bg-gray-100 border border-gray-300 rounded text-xs">
-          <div><strong>Debug Info:</strong></div>
-          <div>Search term: "{searchTerm}" (length: {searchTerm.length})</div>
-          <div>Is open: {isOpen ? 'Yes' : 'No'}</div>
-          <div>Loading: {loading ? 'Yes' : 'No'}</div>
-          <div>Customers found: {customers.length}</div>
-          <div>Selected customer: {selectedCustomer ? selectedCustomer.name : 'None'}</div>
         </div>
       )}
 
