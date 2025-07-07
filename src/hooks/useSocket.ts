@@ -152,13 +152,13 @@ export const useSocket = (
         console.log("WebSocket authentication failed - user may need to re-login");
         // Don't set error state to avoid annoying popup
       } else if (err.message.includes("websocket")) {
-        // WebSocket specific error
-        setError(
-          `WebSocket connection error: ${err.message}. Trying to reconnect...`
-        );
+        // WebSocket specific error - log but don't show popup during normal reconnection
+        console.log(`WebSocket connection error: ${err.message}. Trying to reconnect...`);
+        // Don't set error state to avoid popup during normal reconnection attempts
       } else {
-        // Other connection errors
-        setError(`Connection error: ${err.message}. Trying to reconnect...`);
+        // Other connection errors - log but don't show popup during normal reconnection
+        console.log(`Connection error: ${err.message}. Trying to reconnect...`);
+        // Don't set error state to avoid popup during normal reconnection attempts
       }
 
       // We'll clear this error if reconnection succeeds
@@ -192,21 +192,23 @@ export const useSocket = (
         console.log(`Socket reconnection attempt #${attemptNumber}`);
       }
 
-      // Update error message to show reconnection attempt
-      setError(`Connection error - reconnection attempt #${attemptNumber}...`);
+      // Don't show error popup during normal reconnection attempts
+      // setError(`Connection error - reconnection attempt #${attemptNumber}...`);
     });
 
     socket.io.on("reconnect_failed", () => {
       if (process.env.NODE_ENV !== "production") {
         console.error("Socket reconnection failed after all attempts");
       }
-      setError("Connection lost - please click Reconnect or refresh the page");
+      // Only show error if reconnection completely fails after many attempts
+      setError("Connection lost - please refresh the page if issues persist");
     });
 
     // Add error event handler
     socket.on("error", (err: Error) => {
       console.error("Socket error:", err);
-      setError(`Socket error: ${err.message}`);
+      // Don't show popup for general socket errors - just log them
+      // setError(`Socket error: ${err.message}`);
     });
 
     // Store socket reference

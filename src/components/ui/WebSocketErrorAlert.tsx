@@ -14,11 +14,14 @@ export default function WebSocketErrorAlert({
   // Don't show popup for authentication-related errors
   if (!error) return null;
 
-  // Hide authentication errors to prevent annoying popups
+  // Hide authentication errors and reconnection messages to prevent annoying popups
   if (error.includes("authentication") ||
       error.includes("token") ||
       error.includes("Unauthorized") ||
-      error.includes("No authentication token")) {
+      error.includes("No authentication token") ||
+      error.includes("reconnect") ||
+      error.includes("Trying to reconnect") ||
+      error.includes("reconnection attempt")) {
     return null;
   }
 
