@@ -5,6 +5,7 @@ import { useState } from "react";
 interface SimpleEndOfDayChecklistProps {
   onSubmit: (data: SimpleEndOfDayCheckData) => void;
   isSubmitting: boolean;
+  routeDate?: string; // Optional route date to pre-fill the date field
 }
 
 export interface SimpleEndOfDayCheckData {
@@ -36,9 +37,10 @@ export interface SimpleEndOfDayCheckData {
 export default function SimpleEndOfDayChecklist({
   onSubmit,
   isSubmitting,
+  routeDate,
 }: SimpleEndOfDayChecklistProps) {
   const [formData, setFormData] = useState<SimpleEndOfDayCheckData>({
-    date: new Date().toISOString().split("T")[0],
+    date: routeDate || new Date().toISOString().split("T")[0],
     truckNumber: "",
     finalMileage: "",
     fuelLevel: "FULL",
@@ -95,8 +97,6 @@ export default function SimpleEndOfDayChecklist({
               name="date"
               value={formData.date}
               onChange={handleChange}
-              min={new Date().toISOString().split("T")[0]}
-              max={new Date().toISOString().split("T")[0]}
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />
