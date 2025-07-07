@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         vehicleConditionVideo,
         calledWarehouse,
 
-        // Simplified Safety Check fields (Start of Day)
+        // Simplified Safety Check fields
         mileage,
         fuelLevel,
         lightsWorking,
@@ -157,17 +157,6 @@ export async function POST(request: NextRequest) {
         strapsAvailable,
         routeReviewed,
         warehouseContacted,
-
-        // Simple End of Day fields
-        finalMileage,
-        vehicleSecured,
-        lightsOff,
-        equipmentStored,
-        palletJackSecured,
-        dolliesStored,
-        strapsStored,
-        deliveriesCompleted,
-        documentsSubmitted,
 
         // Common fields
         notes,

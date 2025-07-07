@@ -8,28 +8,20 @@ interface SimpleEndOfDayChecklistProps {
 }
 
 export interface SimpleEndOfDayCheckData {
-  // Basic vehicle check
+  // Exactly the same fields as Start of Day
   date: string;
   truckNumber: string;
-  finalMileage: string;
+  mileage: string;
   fuelLevel: string;
-  
-  // End of day safety items
-  vehicleSecured: boolean;
-  lightsOff: boolean;
-  equipmentStored: boolean;
+  lightsWorking: boolean;
+  tiresCondition: boolean;
+  braksWorking: boolean;
   vehicleClean: boolean;
-  
-  // Equipment check
-  palletJackSecured: boolean;
-  dolliesStored: boolean;
-  strapsStored: boolean;
-  
-  // End of day tasks
-  deliveriesCompleted: boolean;
-  documentsSubmitted: boolean;
-  
-  // Notes
+  palletJackWorking: boolean;
+  dolliesSecured: boolean;
+  strapsAvailable: boolean;
+  routeReviewed: boolean;
+  warehouseContacted: boolean;
   notes: string;
 }
 
@@ -40,17 +32,17 @@ export default function SimpleEndOfDayChecklist({
   const [formData, setFormData] = useState<SimpleEndOfDayCheckData>({
     date: new Date().toISOString().split("T")[0],
     truckNumber: "",
-    finalMileage: "",
+    mileage: "",
     fuelLevel: "FULL",
-    vehicleSecured: false,
-    lightsOff: false,
-    equipmentStored: false,
+    lightsWorking: false,
+    tiresCondition: false,
+    braksWorking: false,
     vehicleClean: false,
-    palletJackSecured: false,
-    dolliesStored: false,
-    strapsStored: false,
-    deliveriesCompleted: false,
-    documentsSubmitted: false,
+    palletJackWorking: false,
+    dolliesSecured: false,
+    strapsAvailable: false,
+    routeReviewed: false,
+    warehouseContacted: false,
     notes: "",
   });
 
@@ -118,14 +110,14 @@ export default function SimpleEndOfDayChecklist({
           </div>
 
           <div>
-            <label htmlFor="finalMileage" className="block text-sm font-medium text-gray-700 mb-1">
-              Final Mileage
+            <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
+              Mileage
             </label>
             <input
               type="text"
-              id="finalMileage"
-              name="finalMileage"
-              value={formData.finalMileage}
+              id="mileage"
+              name="mileage"
+              value={formData.mileage}
               onChange={handleChange}
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
@@ -154,71 +146,21 @@ export default function SimpleEndOfDayChecklist({
         </div>
       </div>
 
-      {/* Vehicle Security Check */}
+      {/* Safety Checklist - Exactly same as Start of Day */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Vehicle Security</h3>
-        
-        <div className="space-y-3">
-          {[
-            { key: "vehicleSecured", label: "Vehicle properly secured and locked" },
-            { key: "lightsOff", label: "All lights turned off" },
-            { key: "equipmentStored", label: "All equipment properly stored" },
-            { key: "vehicleClean", label: "Vehicle cleaned and organized" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                id={item.key}
-                name={item.key}
-                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
-                onChange={handleChange}
-                required
-                className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
-              />
-              <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Safety Checklist</h3>
 
-      {/* Equipment Storage */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Equipment Storage</h3>
-        
         <div className="space-y-3">
           {[
-            { key: "palletJackSecured", label: "Pallet jack secured and stored" },
-            { key: "dolliesStored", label: "Dollies properly stored" },
-            { key: "strapsStored", label: "Straps organized and stored" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                id={item.key}
-                name={item.key}
-                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
-                onChange={handleChange}
-                required
-                className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
-              />
-              <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* End of Day Tasks */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">End of Day Tasks</h3>
-        
-        <div className="space-y-3">
-          {[
-            { key: "deliveriesCompleted", label: "All deliveries completed successfully" },
-            { key: "documentsSubmitted", label: "All required documents submitted" },
+            { key: "lightsWorking", label: "All lights working properly" },
+            { key: "tiresCondition", label: "Tires in good condition" },
+            { key: "braksWorking", label: "Brakes working properly" },
+            { key: "vehicleClean", label: "Vehicle is clean and presentable" },
+            { key: "palletJackWorking", label: "Pallet jack working properly" },
+            { key: "dolliesSecured", label: "Dollies secured and in good condition" },
+            { key: "strapsAvailable", label: "Straps available and in good condition" },
+            { key: "routeReviewed", label: "Route reviewed and understood" },
+            { key: "warehouseContacted", label: "Warehouse contacted if needed" },
           ].map((item) => (
             <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
               <input
@@ -265,7 +207,7 @@ export default function SimpleEndOfDayChecklist({
           disabled={isSubmitting}
           className="bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-3 px-8 rounded-lg transition duration-200 touch-manipulation mobile-button"
         >
-          {isSubmitting ? "Submitting..." : "Complete End-of-Day Check"}
+          {isSubmitting ? "Submitting..." : "Submit Safety Check"}
         </button>
       </div>
     </form>
