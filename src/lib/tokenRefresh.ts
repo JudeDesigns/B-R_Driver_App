@@ -1,5 +1,5 @@
 // Token refresh utility for maintaining long driver sessions
-import { jwtDecode } from 'jwt-decode';
+import jwt from 'jsonwebtoken';
 
 interface TokenPayload {
   id: string;
@@ -17,10 +17,12 @@ class TokenManager {
   // Check if token is expired or will expire soon (within 5 minutes)
   isTokenExpiringSoon(token: string): boolean {
     try {
-      const decoded = jwtDecode<TokenPayload>(token);
+      const decoded = jwt.decode(token) as TokenPayload;
+      if (!decoded || !decoded.exp) return true;
+
       const currentTime = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = decoded.exp - currentTime;
-      
+
       // Return true if token expires within 5 minutes (300 seconds)
       return timeUntilExpiry < 300;
     } catch (error) {
@@ -32,7 +34,9 @@ class TokenManager {
   // Check if token is completely expired
   isTokenExpired(token: string): boolean {
     try {
-      const decoded = jwtDecode<TokenPayload>(token);
+      const decoded = jwt.decode(token) as TokenPayload;
+      if (!decoded || !decoded.exp) return true;
+
       const currentTime = Math.floor(Date.now() / 1000);
       return decoded.exp < currentTime;
     } catch (error) {
@@ -44,7 +48,9 @@ class TokenManager {
   // Get time until token expires (in seconds)
   getTimeUntilExpiry(token: string): number {
     try {
-      const decoded = jwtDecode<TokenPayload>(token);
+      const decoded = jwt.decode(token) as TokenPayload;
+      if (!decoded || !decoded.exp) return 0;
+
       const currentTime = Math.floor(Date.now() / 1000);
       return Math.max(0, decoded.exp - currentTime);
     } catch (error) {
