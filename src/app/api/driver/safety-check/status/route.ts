@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
     const driverName = driver.fullName || driver.username;
 
     // Get all routes where the driver is either the primary driver or assigned to stops
+    // Use more precise matching to prevent cross-driver safety check issues
     const driverRoutes = await prisma.route.findMany({
       where: {
         OR: [
@@ -71,11 +72,16 @@ export async function GET(request: NextRequest) {
                 }
               : {}),
           },
-          // Routes where the driver is assigned to stops
+          // Routes where the driver is assigned to stops - use exact matching
           {
             stops: {
               some: {
-                driverNameFromUpload: driverName,
+                OR: [
+                  // Match by exact username
+                  { driverNameFromUpload: driver.username },
+                  // Match by exact full name if it exists
+                  ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+                ],
                 isDeleted: false,
               },
             },
@@ -191,6 +197,9 @@ export async function GET(request: NextRequest) {
     // Log detailed information for debugging in development only
     if (process.env.NODE_ENV !== "production") {
       console.log("Safety check status API response:", {
+        driverId: decoded.id,
+        driverUsername: driver.username,
+        driverFullName: driver.fullName,
         allRouteIds: routeIds,
         completedStartOfDayIds: Array.from(completedRouteIds),
         completedEndOfDayIds: Array.from(completedEndOfDayRouteIds),
@@ -199,7 +208,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       hasCompletedChecks: routesNeedingStartChecks.length === 0,
       completedRouteIds: Array.from(completedRouteIds),
       completedEndOfDayRouteIds: Array.from(completedEndOfDayRouteIds),
@@ -207,6 +216,13 @@ export async function GET(request: NextRequest) {
       routesNeedingEndOfDayChecks: routesNeedingEndDetails,
       allRouteIds: routeIds,
     });
+
+    // Add cache control headers to prevent stale data
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error) {
     console.error("Error checking safety check status:", error);
     return NextResponse.json(

@@ -94,6 +94,11 @@ export async function POST(
             date: true,
           },
         },
+        payments: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
 
@@ -237,7 +242,14 @@ export async function POST(
       arrivalTime: stop.arrivalTime?.toISOString() || null,
       completionTime: stop.completionTime?.toISOString() || null,
       driverNotes: stop.driverNotes,
-      adminNotes: null // Admin notes not included in this query
+      adminNotes: null, // Admin notes not included in this query
+      orderNumberWeb: stop.orderNumberWeb,
+      quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
+      amount: stop.amount,
+      driverPaymentAmount: stop.driverPaymentAmount,
+      driverPaymentMethods: stop.driverPaymentMethods,
+      paymentFlagNotPaid: stop.paymentFlagNotPaid,
+      payments: stop.payments
     };
 
     // Prepare returns data for PDF

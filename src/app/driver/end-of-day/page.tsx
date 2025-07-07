@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import EnhancedSafetyChecklist, {
-  SafetyCheckData,
-} from "@/components/driver/EnhancedSafetyChecklist";
+import SimpleEndOfDayChecklist, {
+  SimpleEndOfDayCheckData,
+} from "@/components/driver/SimpleEndOfDayChecklist";
 
 export default function EndOfDayCheckPage() {
   const [loading, setLoading] = useState(false);
@@ -216,7 +216,7 @@ export default function EndOfDayCheckPage() {
     fetchCompletedRoutes();
   }, [token]);
 
-  const handleSubmit = async (safetyData: SafetyCheckData) => {
+  const handleSubmit = async (safetyData: SimpleEndOfDayCheckData) => {
     if (!selectedRouteId) {
       setError("Please select a route");
       return;
@@ -346,10 +346,9 @@ export default function EndOfDayCheckPage() {
               </div>
 
               {selectedRouteId && (
-                <EnhancedSafetyChecklist
+                <SimpleEndOfDayChecklist
                   onSubmit={handleSubmit}
                   isSubmitting={submitting}
-                  checklistType="END_OF_DAY"
                 />
               )}
             </>

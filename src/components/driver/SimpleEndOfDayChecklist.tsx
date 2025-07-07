@@ -2,62 +2,60 @@
 
 import { useState } from "react";
 
-interface SimpleSafetyChecklistProps {
-  onSubmit: (data: SimpleSafetyCheckData) => void;
+interface SimpleEndOfDayChecklistProps {
+  onSubmit: (data: SimpleEndOfDayCheckData) => void;
   isSubmitting: boolean;
 }
 
-export interface SimpleSafetyCheckData {
+export interface SimpleEndOfDayCheckData {
   // Basic vehicle check
   date: string;
   truckNumber: string;
-  mileage: string;
+  finalMileage: string;
   fuelLevel: string;
   
-  // Essential safety items
-  lightsWorking: boolean;
-  tiresCondition: boolean;
-  braksWorking: boolean;
+  // End of day safety items
+  vehicleSecured: boolean;
+  lightsOff: boolean;
+  equipmentStored: boolean;
   vehicleClean: boolean;
   
   // Equipment check
-  palletJackWorking: boolean;
-  dolliesSecured: boolean;
-  strapsAvailable: boolean;
+  palletJackSecured: boolean;
+  dolliesStored: boolean;
+  strapsStored: boolean;
   
-  // Pre-departure
-  routeReviewed: boolean;
-  warehouseContacted: boolean;
+  // End of day tasks
+  deliveriesCompleted: boolean;
+  documentsSubmitted: boolean;
   
   // Notes
   notes: string;
 }
 
-export default function SimpleSafetyChecklist({
+export default function SimpleEndOfDayChecklist({
   onSubmit,
   isSubmitting,
-}: SimpleSafetyChecklistProps) {
-  const [formData, setFormData] = useState<SimpleSafetyCheckData>({
+}: SimpleEndOfDayChecklistProps) {
+  const [formData, setFormData] = useState<SimpleEndOfDayCheckData>({
     date: new Date().toISOString().split("T")[0],
     truckNumber: "",
-    mileage: "",
+    finalMileage: "",
     fuelLevel: "FULL",
-    lightsWorking: false,
-    tiresCondition: false,
-    braksWorking: false,
+    vehicleSecured: false,
+    lightsOff: false,
+    equipmentStored: false,
     vehicleClean: false,
-    palletJackWorking: false,
-    dolliesSecured: false,
-    strapsAvailable: false,
-    routeReviewed: false,
-    warehouseContacted: false,
+    palletJackSecured: false,
+    dolliesStored: false,
+    strapsStored: false,
+    deliveriesCompleted: false,
+    documentsSubmitted: false,
     notes: "",
   });
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
 
@@ -82,12 +80,10 @@ export default function SimpleSafetyChecklist({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Basic Vehicle Info */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          🚛 Vehicle Information
-        </h3>
-
+      {/* Basic Information */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
@@ -117,23 +113,21 @@ export default function SimpleSafetyChecklist({
               value={formData.truckNumber}
               onChange={handleChange}
               required
-              placeholder="e.g., T-001"
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />
           </div>
 
           <div>
-            <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
-              Current Mileage
+            <label htmlFor="finalMileage" className="block text-sm font-medium text-gray-700 mb-1">
+              Final Mileage
             </label>
             <input
               type="text"
-              id="mileage"
-              name="mileage"
-              value={formData.mileage}
+              id="finalMileage"
+              name="finalMileage"
+              value={formData.finalMileage}
               onChange={handleChange}
               required
-              placeholder="e.g., 125,432"
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />
           </div>
@@ -151,34 +145,32 @@ export default function SimpleSafetyChecklist({
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             >
               <option value="FULL">Full</option>
-              <option value="THREE_QUARTERS">3/4</option>
-              <option value="HALF">1/2</option>
-              <option value="QUARTER">1/4</option>
-              <option value="LOW">Low - Need Fuel</option>
+              <option value="3/4">3/4</option>
+              <option value="1/2">1/2</option>
+              <option value="1/4">1/4</option>
+              <option value="EMPTY">Empty</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Safety Checks */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          ✅ Safety Inspection
-        </h3>
-
+      {/* Vehicle Security Check */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Vehicle Security</h3>
+        
         <div className="space-y-3">
           {[
-            { key: "lightsWorking", label: "All lights working (headlights, taillights, signals)" },
-            { key: "tiresCondition", label: "Tires in good condition (no visible damage)" },
-            { key: "braksWorking", label: "Brakes working properly" },
-            { key: "vehicleClean", label: "Vehicle is clean and presentable" },
+            { key: "vehicleSecured", label: "Vehicle properly secured and locked" },
+            { key: "lightsOff", label: "All lights turned off" },
+            { key: "equipmentStored", label: "All equipment properly stored" },
+            { key: "vehicleClean", label: "Vehicle cleaned and organized" },
           ].map((item) => (
             <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
               <input
                 type="checkbox"
                 id={item.key}
                 name={item.key}
-                checked={formData[item.key as keyof SimpleSafetyCheckData] as boolean}
+                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
                 onChange={handleChange}
                 required
                 className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
@@ -191,24 +183,22 @@ export default function SimpleSafetyChecklist({
         </div>
       </div>
 
-      {/* Equipment Check */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          🔧 Equipment Check
-        </h3>
-
+      {/* Equipment Storage */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Equipment Storage</h3>
+        
         <div className="space-y-3">
           {[
-            { key: "palletJackWorking", label: "Pallet jack working properly" },
-            { key: "dolliesSecured", label: "Dollies secured and in good condition" },
-            { key: "strapsAvailable", label: "Straps available and in good condition" },
+            { key: "palletJackSecured", label: "Pallet jack secured and stored" },
+            { key: "dolliesStored", label: "Dollies properly stored" },
+            { key: "strapsStored", label: "Straps organized and stored" },
           ].map((item) => (
             <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
               <input
                 type="checkbox"
                 id={item.key}
                 name={item.key}
-                checked={formData[item.key as keyof SimpleSafetyCheckData] as boolean}
+                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
                 onChange={handleChange}
                 required
                 className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
@@ -221,23 +211,21 @@ export default function SimpleSafetyChecklist({
         </div>
       </div>
 
-      {/* Pre-Departure */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          📋 Pre-Departure
-        </h3>
-
+      {/* End of Day Tasks */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">End of Day Tasks</h3>
+        
         <div className="space-y-3">
           {[
-            { key: "routeReviewed", label: "Route reviewed and understood" },
-            { key: "warehouseContacted", label: "Warehouse contacted if needed" },
+            { key: "deliveriesCompleted", label: "All deliveries completed successfully" },
+            { key: "documentsSubmitted", label: "All required documents submitted" },
           ].map((item) => (
             <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
               <input
                 type="checkbox"
                 id={item.key}
                 name={item.key}
-                checked={formData[item.key as keyof SimpleSafetyCheckData] as boolean}
+                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
                 onChange={handleChange}
                 required
                 className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
@@ -251,30 +239,35 @@ export default function SimpleSafetyChecklist({
       </div>
 
       {/* Notes */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          📝 Additional Notes
-        </h3>
-
-        <textarea
-          id="notes"
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          rows={3}
-          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
-          placeholder="Any concerns or additional notes..."
-        />
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Notes</h3>
+        
+        <div>
+          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+            Notes (Optional)
+          </label>
+          <textarea
+            id="notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            rows={3}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
+            placeholder="Any additional notes or observations..."
+          />
+        </div>
       </div>
 
       {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-button text-base"
-      >
-        {isSubmitting ? "Submitting..." : "✅ Complete Start-of-Day Check"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-3 px-8 rounded-lg transition duration-200 touch-manipulation mobile-button"
+        >
+          {isSubmitting ? "Submitting..." : "Complete End-of-Day Check"}
+        </button>
+      </div>
     </form>
   );
 }

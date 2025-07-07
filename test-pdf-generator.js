@@ -1,95 +1,68 @@
-import puppeteer from 'puppeteer';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+const fs = require('fs');
+const path = require('path');
 
-interface Stop {
-  id: string;
-  customerName: string;
-  customerAddress: string;
-  routeNumber: string;
-  arrivalTime: string | null;
-  completionTime: string | null;
-  driverNotes: string | null;
-  adminNotes: string | null;
-  orderNumberWeb: string | null;
-  quickbooksInvoiceNum: string | null;
-  amount: number | null;
-  driverPaymentAmount: number | null;
-  driverPaymentMethods: string[];
-  paymentFlagNotPaid: boolean;
-  payments?: Payment[];
-}
+// Sample data that matches your PDF generator interface
+const sampleStopData = {
+  id: 'test-stop-123',
+  customerName: 'Customer Name',
+  customerAddress: '123 Main Street, Los Angeles, CA 90210',
+  routeNumber: 'R001',
+  arrivalTime: new Date().toISOString(),
+  completionTime: new Date().toISOString(),
+  driverNotes: 'Delivery completed successfully. Customer was very satisfied.',
+  adminNotes: 'Special handling required for fragile items.',
+  orderNumberWeb: '12345',
+  quickbooksInvoiceNum: '12345',
+  amount: 5678.00,
+  driverPaymentAmount: 5678.00,
+  driverPaymentMethods: ['Cash', 'Check', 'Card'],
+  paymentFlagNotPaid: false,
+  payments: [
+    {
+      id: 'payment-1',
+      amount: 3000.00,
+      method: 'Cash',
+      notes: 'Cash payment received'
+    },
+    {
+      id: 'payment-2',
+      amount: 2678.00,
+      method: 'Check',
+      notes: 'Check #1234'
+    }
+  ]
+};
 
-interface Payment {
-  id: string;
-  amount: number;
-  method: string;
-  notes: string | null;
-}
-
-interface ReturnItem {
-  id: string;
-  productSku: string;
-  productDescription: string;
-  quantity: number;
-  reasonCode: string;
-}
-
-interface ImageUrl {
-  url: string;
-  name: string;
-}
-
-export async function generateDeliveryPDF(
-  stop: Stop,
-  imageUrls: ImageUrl[],
-  returns: ReturnItem[],
-  baseUrl?: string
-): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu'
-    ]
-  });
-
-  try {
-    const page = await browser.newPage();
-    
-    // Set viewport for consistent rendering
-    await page.setViewport({ width: 1200, height: 1600 });
-    
-    const htmlContent = createHTMLTemplate(stop, imageUrls, returns, baseUrl);
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        bottom: '20px',
-        left: '20px',
-        right: '20px'
-      }
-    });
-
-    return Buffer.from(pdfBuffer);
-  } finally {
-    await browser.close();
+const sampleImageUrls = [
+  {
+    url: '/uploads/sample-image-1.jpg',
+    name: 'Delivery Photo 1'
+  },
+  {
+    url: '/uploads/sample-image-2.jpg',
+    name: 'Delivery Photo 2'
   }
-}
+];
 
-function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnItem[], baseUrl?: string): string {
-  // Use provided baseUrl or fallback to environment variable or localhost
-  const finalBaseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+const sampleReturns = [
+  {
+    id: 'return-1',
+    productSku: 'SKU-001',
+    productDescription: 'Premium Organic Vegetables',
+    quantity: 2,
+    reasonCode: 'Customer requested different variety'
+  },
+  {
+    id: 'return-2',
+    productSku: 'SKU-002',
+    productDescription: 'Fresh Dairy Products',
+    quantity: 1,
+    reasonCode: 'Packaging damaged during transport'
+  }
+];
 
-  // Calculate payment information
+// Copy of your PDF generator HTML template function
+function createHTMLTemplate(stop, imageUrls, returns, baseUrl = 'http://localhost:3000') {
   const totalPaymentAmount = stop.driverPaymentAmount || 0;
   const paymentMethods = stop.driverPaymentMethods || [];
   const paymentStatus = stop.paymentFlagNotPaid ? 'Not paid' : 'Paid';
@@ -283,7 +256,6 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
       body { -webkit-print-color-adjust: exact; }
       .container { padding: 10mm; }
     }
-
   </style>
 </head>
 <body>
@@ -306,7 +278,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     <div class="invoice-section">
       <div class="invoice-number">INVOICE # ${invoiceNumber}</div>
       <div class="total-amount">TOTAL AMOUNT: $${totalAmount.toFixed(2)}</div>
-
+      
       <div class="company-signature">
         Thank you,<br>
         <strong>B&R Food Services</strong>
@@ -351,7 +323,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     <div class="document-links">
       <div style="margin-bottom: 15px; font-weight: bold;">Click here for your signed invoice 👉</div>
       ${imageUrls.map((img, index) => `
-        <a href="${finalBaseUrl}${img.url}" class="document-link">
+        <a href="${baseUrl}${img.url}" class="document-link">
           Image ${index + 1}
         </a>
       `).join('')}
@@ -368,4 +340,35 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
   </div>
 </body>
 </html>`;
+}
+
+// Function to generate HTML preview
+function generateTestHTML() {
+  console.log('Generating HTML preview...');
+
+  const htmlContent = createHTMLTemplate(sampleStopData, sampleImageUrls, sampleReturns);
+
+  // Save the HTML to the current directory
+  const outputPath = path.join(__dirname, 'test-delivery-confirmation.html');
+  fs.writeFileSync(outputPath, htmlContent);
+
+  console.log(`✅ HTML preview generated successfully!`);
+  console.log(`📄 File saved as: ${outputPath}`);
+  console.log(`🌐 Open this file in your browser to see the PDF design!`);
+
+  return htmlContent;
+}
+
+// Run the test
+try {
+  generateTestHTML();
+  console.log('\n🎉 Test completed successfully!');
+  console.log('📋 Next steps:');
+  console.log('   1. Open "test-delivery-confirmation.html" in your browser');
+  console.log('   2. Use browser Print Preview (Ctrl/Cmd + P) to see PDF layout');
+  console.log('   3. You can also print to PDF from the browser');
+  console.log('\n💡 This shows exactly what your customers will receive!');
+} catch (error) {
+  console.error('❌ Error generating HTML:', error);
+  process.exit(1);
 }

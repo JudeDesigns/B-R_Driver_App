@@ -66,11 +66,12 @@ export default function DriverLayout({
       const today = new Date().toISOString().split("T")[0];
 
       const response = await fetch(
-        `/api/driver/safety-check/status?date=${today}`,
+        `/api/driver/safety-check/status?date=${today}&t=${Date.now()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          cache: "no-store",
         }
       );
 

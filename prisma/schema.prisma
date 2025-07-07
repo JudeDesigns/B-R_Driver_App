@@ -232,6 +232,17 @@ model SafetyCheck {
   strapsAvailable    Boolean? // Straps available and in good condition
   routeReviewed      Boolean? // Route reviewed and understood
 
+  // Simple End of Day fields
+  finalMileage       String?  // Final mileage reading
+  vehicleSecured     Boolean? // Vehicle properly secured and locked
+  lightsOff          Boolean? // All lights turned off
+  equipmentStored    Boolean? // All equipment properly stored
+  palletJackSecured  Boolean? // Pallet jack secured and stored
+  dolliesStored      Boolean? // Dollies properly stored
+  strapsStored       Boolean? // Straps organized and stored
+  deliveriesCompleted Boolean? // All deliveries completed successfully
+  documentsSubmitted Boolean? // All required documents submitted
+
   responses Json // Keep original responses for backward compatibility
   timestamp DateTime @default(now())
   createdAt DateTime @default(now())

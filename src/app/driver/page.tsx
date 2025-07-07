@@ -106,13 +106,13 @@ export default function DriverDashboard() {
 
       // Check if any safety checks are completed
       const safetyChecksResponse = await fetch(
-        `/api/driver/safety-check/status?date=${today}`,
+        `/api/driver/safety-check/status?date=${today}&t=${Date.now()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          // Add cache control for better performance
-          cache: isMobile ? "force-cache" : "default",
+          // Disable caching for safety check status to prevent cross-driver issues
+          cache: "no-store",
         }
       );
 

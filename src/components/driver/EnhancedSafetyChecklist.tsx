@@ -137,6 +137,8 @@ export default function EnhancedSafetyChecklist({
               name="date"
               value={formData.date}
               onChange={handleChange}
+              min={new Date().toISOString().split("T")[0]}
+              max={new Date().toISOString().split("T")[0]}
               required
               className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />

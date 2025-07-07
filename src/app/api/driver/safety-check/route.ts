@@ -71,10 +71,13 @@ export async function POST(request: NextRequest) {
 
     const driverName = driver.fullName || driver.username;
 
-    // Check if the driver is assigned to this route
+    // Check if the driver is assigned to this route - use precise matching
     const isDriverAssigned =
       route.driverId === decoded.id ||
-      route.stops.some((stop) => stop.driverNameFromUpload === driverName);
+      route.stops.some((stop) =>
+        stop.driverNameFromUpload === driver.username ||
+        (driver.fullName && stop.driverNameFromUpload === driver.fullName)
+      );
 
     if (!isDriverAssigned) {
       return NextResponse.json(
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
         vehicleConditionVideo,
         calledWarehouse,
 
-        // Simplified Safety Check fields
+        // Simplified Safety Check fields (Start of Day)
         mileage,
         fuelLevel,
         lightsWorking,
@@ -154,6 +157,17 @@ export async function POST(request: NextRequest) {
         strapsAvailable,
         routeReviewed,
         warehouseContacted,
+
+        // Simple End of Day fields
+        finalMileage,
+        vehicleSecured,
+        lightsOff,
+        equipmentStored,
+        palletJackSecured,
+        dolliesStored,
+        strapsStored,
+        deliveriesCompleted,
+        documentsSubmitted,
 
         // Common fields
         notes,
@@ -238,12 +252,15 @@ export async function POST(request: NextRequest) {
       });
     } else if (type === "END_OF_DAY" && route.status === "IN_PROGRESS") {
       // If this is an end of day safety check and the route is in progress, update it to completed
-      // First check if all stops are completed
+      // First check if all stops are completed - use precise driver matching
       const stops = await prisma.stop.findMany({
         where: {
           routeId,
           isDeleted: false,
-          driverNameFromUpload: driverName,
+          OR: [
+            { driverNameFromUpload: driver.username },
+            ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+          ],
         },
       });
 
