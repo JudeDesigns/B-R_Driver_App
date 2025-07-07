@@ -137,10 +137,24 @@ export async function GET(request: NextRequest) {
     });
     
     // Convert map to array and sort by date
-    const allRoutes = Array.from(routeMap.values()).sort((a, b) => 
+    const allRoutes = Array.from(routeMap.values()).sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-    
+
+    // Log detailed information for debugging in development only
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Assigned routes API response:", {
+        driverId: decoded.id,
+        driverUsername: driver.username,
+        driverFullName: driver.fullName,
+        requestedDate: date,
+        directlyAssignedCount: directlyAssignedRoutes.length,
+        stopAssignedCount: routesWithAssignedStops.length,
+        totalRoutesFound: allRoutes.length,
+        routeDates: allRoutes.map(r => ({ id: r.id, date: r.date, routeNumber: r.routeNumber })),
+      });
+    }
+
     // Apply pagination
     const paginatedRoutes = allRoutes.slice(offset, offset + limit);
     
