@@ -2,6 +2,14 @@ import nodemailer from 'nodemailer';
 import prisma from './db';
 import { generateDeliveryPDF } from '@/utils/pdfGenerator';
 
+// Email configuration flags
+export const EMAIL_CONFIG = {
+  // Set to true to send emails to customers, false to send to office
+  SEND_TO_CUSTOMERS: false,
+  // Office email address
+  OFFICE_EMAIL: process.env.OFFICE_EMAIL || 'infobrfood@gmail.com',
+};
+
 // Configure the email transporter
 const createTransporter = () => {
   console.log(`Creating email transporter for environment: ${process.env.NODE_ENV}`);
@@ -217,7 +225,8 @@ export const sendDeliveryConfirmationEmail = async (
   deliveryTime: string,
   stopData: any, // Full stop data for PDF generation
   imageUrls: any[], // Image URLs for PDF
-  returns: any[] // Return items for PDF
+  returns: any[], // Return items for PDF
+  sendToCustomer: boolean = false // New parameter to control customer vs office email
 ) => {
   try {
     // Generate the delivery confirmation PDF
@@ -232,12 +241,19 @@ export const sendDeliveryConfirmationEmail = async (
       deliveryTime
     );
 
+    // Determine email recipient and subject based on configuration
+    const shouldSendToCustomer = sendToCustomer && EMAIL_CONFIG.SEND_TO_CUSTOMERS;
+    const actualRecipient = shouldSendToCustomer ? customerEmail : EMAIL_CONFIG.OFFICE_EMAIL;
+    const emailSubject = shouldSendToCustomer
+      ? 'Your order has been delivered!'
+      : `Delivery Completed - ${customerName} - Order ${orderNumber}`;
+
     // Create the email record in the database
     const emailRecord = await prisma.customerEmail.create({
       data: {
         stopId,
-        customerEmail,
-        subject: 'Your order has been delivered!',
+        customerEmail: actualRecipient, // Store actual recipient
+        subject: emailSubject,
         body: emailHtml,
         signedInvoiceUrl: '', // Not needed since we're attaching PDF
         originalInvoiceUrl: '', // Not needed since we're attaching PDF
@@ -252,13 +268,14 @@ export const sendDeliveryConfirmationEmail = async (
     const pdfFilename = `delivery-confirmation-${orderNumber.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}.pdf`;
 
     // Send the email with PDF attachment
-    console.log(`Attempting to send email to: ${customerEmail}`);
+    console.log(`Attempting to send email to: ${actualRecipient} (${shouldSendToCustomer ? 'customer' : 'office'})`);
     console.log(`PDF attachment size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+    console.log(`Email configuration - SEND_TO_CUSTOMERS: ${EMAIL_CONFIG.SEND_TO_CUSTOMERS}`);
 
     const info = await transporter.sendMail({
-      from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'noreply@brfoodservices.com'}>`,
-      to: customerEmail,
-      subject: 'Your order has been delivered!',
+      from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'infobrfood@gmail.com'}>`,
+      to: actualRecipient,
+      subject: emailSubject,
       html: emailRecord.body,
       attachments: [
         {

@@ -50,21 +50,12 @@ export async function GET(request: NextRequest) {
 
     const driverName = driver.fullName || driver.username;
 
-    // Find all stops assigned to this driver (exclude completed stops unless specifically requested)
-    const stops = await prisma.stop.findMany({
+    // SAFETY CHECK ENFORCEMENT: Get routes that have completed safety checks
+    const completedSafetyCheckRoutes = await prisma.safetyCheck.findMany({
       where: {
-        OR: [
-          { driverNameFromUpload: driverName },
-          {
-            AND: [
-              { driverNameFromUpload: null },
-              { route: { driverId: decoded.id } }
-            ]
-          }
-        ],
+        driverId: decoded.id,
+        type: "START_OF_DAY",
         isDeleted: false,
-        // Hide completed stops from driver view unless specifically requested
-        ...(status === "COMPLETED" ? {} : { status: { not: "COMPLETED" } }),
         ...(date ? {
           route: {
             date: {
@@ -73,7 +64,63 @@ export async function GET(request: NextRequest) {
             },
           },
         } : {}),
-        ...(status ? { status } : {}),
+      },
+      select: {
+        routeId: true,
+      },
+    });
+
+    const safetyCompletedRouteIds = completedSafetyCheckRoutes.map(check => check.routeId);
+
+    // Log safety check enforcement for debugging
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Stops API - Safety Check Enforcement:", {
+        driverId: decoded.id,
+        driverUsername: driver.username,
+        requestedDate: date,
+        safetyCompletedRouteIds,
+        safetyChecksFound: completedSafetyCheckRoutes.length,
+      });
+    }
+
+    // Find all stops assigned to this driver (exclude completed stops unless specifically requested)
+    // ONLY return stops from routes where safety checks have been completed
+    const stops = await prisma.stop.findMany({
+      where: {
+        AND: [
+          // Driver assignment check
+          {
+            OR: [
+              { driverNameFromUpload: driver.username },
+              ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+              {
+                AND: [
+                  { driverNameFromUpload: null },
+                  { route: { driverId: decoded.id } }
+                ]
+              }
+            ],
+          },
+          // SAFETY CHECK ENFORCEMENT: Only show stops from routes with completed safety checks
+          {
+            routeId: {
+              in: safetyCompletedRouteIds.length > 0 ? safetyCompletedRouteIds : ['no-routes-available'],
+            },
+          },
+          // Other filters
+          { isDeleted: false },
+          // Hide completed stops from driver view unless specifically requested
+          ...(status === "COMPLETED" ? {} : [{ status: { not: "COMPLETED" } }]),
+          ...(date ? [{
+            route: {
+              date: {
+                gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
+                lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
+              },
+            },
+          }] : []),
+          ...(status ? [{ status }] : []),
+        ],
       },
       include: {
         customer: {

@@ -96,7 +96,8 @@ export async function POST(
       name: `Invoice Image ${index + 1}`,
     }));
 
-    // Send the email with PDF attachment
+    // Send the email with PDF attachment (to office by default, can be changed to customer)
+    const sendToCustomer = false; // Set to true when you want to send to customers
     const emailResult = await sendDeliveryConfirmationEmail(
       stopId,
       stop.customer.email,
@@ -105,7 +106,8 @@ export async function POST(
       deliveryTime,
       stopDataForPdf,
       imageUrls,
-      stop.returns
+      stop.returns,
+      sendToCustomer
     );
 
     if (!emailResult.success) {

@@ -344,7 +344,8 @@ export async function PATCH(
                 name: `Invoice Image ${index + 1}`,
               }));
 
-              // Send the email with PDF attachment
+              // Send the email with PDF attachment (to office by default)
+              const sendToCustomer = false; // Set to true when you want to send to customers
               await sendDeliveryConfirmationEmail(
                 updatedStop.id,
                 customer.email,
@@ -353,7 +354,8 @@ export async function PATCH(
                 deliveryTime,
                 stopDataForPdf,
                 imageUrls,
-                returns
+                returns,
+                sendToCustomer
               );
 
               console.log(
