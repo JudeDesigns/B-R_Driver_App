@@ -110,18 +110,17 @@ export async function authenticateUser(username: string, password: string) {
 }
 
 // Function to generate a JWT token
-export function generateToken(payload: Record<string, unknown>) {
+export function generateToken(payload: Record<string, unknown>, expiresIn: string = "24h") {
   const secret = getJwtSecret();
-  // Reduced token expiration to 24 hours for better security
   return jwt.sign(payload, secret, {
-    expiresIn: "24h",
+    expiresIn,
     issuer: "br-food-services",
     audience: "br-food-services-users",
   });
 }
 
 // Function to verify a JWT token
-export function verifyToken(token: string) {
+export function verifyToken(token: string, options: { ignoreExpiration?: boolean } = {}) {
   if (!token || typeof token !== "string") {
     return null;
   }
@@ -132,6 +131,7 @@ export function verifyToken(token: string) {
     const decoded = jwt.verify(token, secret, {
       issuer: "br-food-services",
       audience: "br-food-services-users",
+      ignoreExpiration: options.ignoreExpiration || false,
     }) as any;
 
     // Keep original roles (SUPER_ADMIN, ADMIN, DRIVER) for proper role separation

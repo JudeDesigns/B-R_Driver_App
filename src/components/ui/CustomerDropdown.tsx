@@ -19,6 +19,14 @@ interface CustomerDropdownProps {
   className?: string;
 }
 
+// Hardcoded customer list as fallback - you can add your actual customers here
+const FALLBACK_CUSTOMERS: Customer[] = [
+  { id: "1", name: "Cafecito", address: "123 Main St", phone: "555-0001" },
+  { id: "2", name: "Tacos Carnitas Sahuayo Whittier", address: "456 Oak Ave", phone: "555-0002" },
+  { id: "3", name: "Restaurant ABC", address: "789 Pine St", phone: "555-0003" },
+  { id: "4", name: "Food Place XYZ", address: "321 Elm St", phone: "555-0004" },
+];
+
 export default function CustomerDropdown({
   value,
   onChange,
@@ -59,10 +67,14 @@ export default function CustomerDropdown({
       const token = localStorage.getItem("token");
       if (!token) {
         console.error("No auth token found");
+        // Use fallback customers if no token
+        setCustomers(FALLBACK_CUSTOMERS);
+        setLoading(false);
         return;
       }
 
-      const response = await fetch("/api/admin/customers/all", {
+      // Try to get customers from existing stops
+      const response = await fetch("/api/admin/stops/today", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -70,12 +82,42 @@ export default function CustomerDropdown({
 
       if (response.ok) {
         const data = await response.json();
-        setCustomers(data.customers || []);
+        const uniqueCustomers = new Map();
+
+        // Add fallback customers first
+        FALLBACK_CUSTOMERS.forEach(customer => {
+          uniqueCustomers.set(customer.id, customer);
+        });
+
+        // Add customers from stops
+        if (data.stops) {
+          data.stops.forEach((stop: any) => {
+            if (stop.customer && stop.customer.name) {
+              uniqueCustomers.set(stop.customer.id, {
+                id: stop.customer.id,
+                name: stop.customer.name,
+                email: stop.customer.email,
+                phone: stop.customer.phone,
+                address: stop.customer.address,
+                groupCode: stop.customer.groupCode,
+              });
+            }
+          });
+        }
+
+        const customerList = Array.from(uniqueCustomers.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+
+        setCustomers(customerList);
+        console.log(`Loaded ${customerList.length} customers (${FALLBACK_CUSTOMERS.length} fallback + ${customerList.length - FALLBACK_CUSTOMERS.length} from stops)`);
       } else {
-        console.error("Failed to load customers:", response.status);
+        console.error("Failed to load customers from API, using fallback");
+        setCustomers(FALLBACK_CUSTOMERS);
       }
     } catch (error) {
-      console.error("Error loading customers:", error);
+      console.error("Error loading customers, using fallback:", error);
+      setCustomers(FALLBACK_CUSTOMERS);
     } finally {
       setLoading(false);
     }

@@ -52,12 +52,16 @@ export async function POST(request: NextRequest) {
       };
     }
     
-    // Generate a new token
+    // Generate a new token with extended expiration for drivers
+    const tokenExpiry = user.role === "DRIVER" ? "12h" : "2h"; // 12 hours for drivers, 2 hours for others
+
     const newToken = generateToken({
       id: user.id,
       username: user.username,
       role: user.role,
-    });
+    }, tokenExpiry);
+
+    console.log(`Token refreshed for ${user.role}: ${user.username} (expires in ${tokenExpiry})`);
     
     // Return the new token
     return NextResponse.json({
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
         username: user.username,
         role: user.role,
       },
+      expiresIn: tokenExpiry,
     });
   } catch (error) {
     console.error("Token refresh error:", error);

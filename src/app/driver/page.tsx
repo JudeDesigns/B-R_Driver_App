@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
 import { getPSTDateString } from "@/lib/timezone";
 import { SocketEvents, RouteStatusUpdateData } from "@/lib/socketClient";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 // Performance monitoring removed for cleaner codebase
 
 export default function DriverDashboard() {
@@ -13,6 +14,17 @@ export default function DriverDashboard() {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const [route, setRoute] = useState(null);
+
+  // Initialize automatic token refresh for drivers
+  useTokenRefresh({
+    enabled: true,
+    onTokenRefreshed: (newToken) => {
+      console.log('Driver token refreshed successfully');
+    },
+    onRefreshFailed: () => {
+      console.log('Driver token refresh failed, will redirect to login');
+    },
+  });
   const [loading, setLoading] = useState(true);
   const [error] = useState("");
   const [safetyCheckCompleted, setSafetyCheckCompleted] = useState(false);

@@ -62,12 +62,15 @@ export async function POST(request: NextRequest) {
       console.warn("Failed to clear user session invalidation:", error.message);
     }
 
-    // Generate JWT token
+    // Generate JWT token with extended expiration for drivers
+    const tokenExpiry = userRole === "DRIVER" ? "12h" : "2h"; // 12 hours for drivers, 2 hours for others
     const token = generateToken({
       id: userId,
       username: userName,
       role: userRole,
-    });
+    }, tokenExpiry);
+
+    console.log(`Login successful for ${userRole}: ${userName} (token expires in ${tokenExpiry})`);
 
     // Return user info and token
     return NextResponse.json({

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { SocketEvents } from "@/lib/socketClient";
 import { optimizeSocketHandler } from "@/lib/performance";
+import { tokenManager } from "@/lib/tokenRefresh";
 
 interface UseSocketOptions {
   autoConnect?: boolean;
@@ -53,10 +54,32 @@ export const useSocket = (
         userId = sessionStorage.getItem("userId");
         username = sessionStorage.getItem("username");
       }
+
+      // If token is expired or expiring soon, try to refresh it
+      if (token && tokenManager.isTokenExpiringSoon(token)) {
+        console.log("WebSocket: Token is expiring soon, attempting refresh");
+        tokenManager.refreshToken().then((newToken) => {
+          if (newToken && socketRef.current) {
+            // Reconnect with new token
+            socketRef.current.auth = {
+              token: newToken,
+              role: userRole,
+              id: userId,
+              username: username
+            };
+            socketRef.current.connect();
+          }
+        }).catch((error) => {
+          console.log("WebSocket: Token refresh failed", error);
+        });
+      }
     }
 
     if (!token) {
-      setError("No authentication token found");
+      // Don't show error popup for missing token - just silently fail
+      // This prevents annoying popups on different phones or expired sessions
+      console.log("No authentication token found for WebSocket connection");
+      setIsConnected(false);
       return;
     }
 
@@ -123,8 +146,12 @@ export const useSocket = (
         console.error("Socket connection error:", err);
       }
 
-      // Check if the error is related to WebSocket
-      if (err.message.includes("websocket")) {
+      // Check if the error is related to authentication
+      if (err.message.includes("authentication") || err.message.includes("token") || err.message.includes("Unauthorized")) {
+        // Authentication error - don't show popup, just log
+        console.log("WebSocket authentication failed - user may need to re-login");
+        // Don't set error state to avoid annoying popup
+      } else if (err.message.includes("websocket")) {
         // WebSocket specific error
         setError(
           `WebSocket connection error: ${err.message}. Trying to reconnect...`

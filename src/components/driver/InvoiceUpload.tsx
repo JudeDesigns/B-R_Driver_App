@@ -95,7 +95,15 @@ export default function InvoiceUpload({
 
       // Small delay to show success state, then redirect
       setTimeout(() => {
-        router.push("/driver/dashboard");
+        // Check if token is still valid before redirecting
+        const currentToken = sessionStorage.getItem("token") || localStorage.getItem("token");
+        if (currentToken) {
+          router.push("/driver/dashboard");
+        } else {
+          // Token expired, redirect to login
+          console.log("Token expired during delivery, redirecting to login");
+          router.push("/login");
+        }
       }, 1500);
     } catch (completeErr) {
       console.error("Error marking stop as completed:", completeErr);
