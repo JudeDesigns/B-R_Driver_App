@@ -5,7 +5,6 @@ import { useState } from "react";
 interface SimpleSafetyChecklistProps {
   onSubmit: (data: SimpleSafetyCheckData) => void;
   isSubmitting: boolean;
-  routeDate?: string; // Optional route date to pre-fill the date field
 }
 
 export interface SimpleSafetyCheckData {
@@ -37,10 +36,9 @@ export interface SimpleSafetyCheckData {
 export default function SimpleSafetyChecklist({
   onSubmit,
   isSubmitting,
-  routeDate,
 }: SimpleSafetyChecklistProps) {
   const [formData, setFormData] = useState<SimpleSafetyCheckData>({
-    date: routeDate || new Date().toISOString().split("T")[0],
+    date: new Date().toISOString().split("T")[0],
     truckNumber: "",
     mileage: "",
     fuelLevel: "FULL",
@@ -101,6 +99,8 @@ export default function SimpleSafetyChecklist({
               name="date"
               value={formData.date}
               onChange={handleChange}
+              min={new Date().toISOString().split("T")[0]}
+              max={new Date().toISOString().split("T")[0]}
               required
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />

@@ -81,11 +81,17 @@ export async function GET(request: NextRequest) {
     });
     
     // Get routes where the driver is assigned to stops via driverNameFromUpload
+    // Use precise matching to prevent cross-driver issues
     const routesWithAssignedStops = await prisma.route.findMany({
       where: {
         stops: {
           some: {
-            driverNameFromUpload: driverName,
+            OR: [
+              // Match by exact username
+              { driverNameFromUpload: driver.username },
+              // Match by exact full name if it exists
+              ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+            ],
             isDeleted: false,
           },
         },
@@ -103,7 +109,10 @@ export async function GET(request: NextRequest) {
           select: {
             stops: {
               where: {
-                driverNameFromUpload: driverName,
+                OR: [
+                  { driverNameFromUpload: driver.username },
+                  ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+                ],
                 isDeleted: false,
               },
             },
@@ -135,12 +144,19 @@ export async function GET(request: NextRequest) {
     // Apply pagination
     const paginatedRoutes = allRoutes.slice(offset, offset + limit);
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       routes: paginatedRoutes,
       totalCount: allRoutes.length,
       limit,
       offset,
     });
+
+    // Add cache control headers to prevent stale data
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error) {
     console.error("Error fetching driver assigned routes:", error);
     return NextResponse.json(

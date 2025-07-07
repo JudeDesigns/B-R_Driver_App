@@ -6,7 +6,6 @@ interface EnhancedSafetyChecklistProps {
   onSubmit: (data: SafetyCheckData) => void;
   isSubmitting: boolean;
   checklistType: "START_OF_DAY" | "END_OF_DAY";
-  routeDate?: string; // Optional route date to pre-fill the date field
 }
 
 export interface SafetyCheckData {
@@ -47,12 +46,11 @@ export default function EnhancedSafetyChecklist({
   onSubmit,
   isSubmitting,
   checklistType,
-  routeDate,
 }: EnhancedSafetyChecklistProps) {
   // Initialize form state with default values
   const [formData, setFormData] = useState<SafetyCheckData>({
     // Vehicle & Fuel Check fields
-    date: routeDate || new Date().toISOString().split("T")[0],
+    date: new Date().toISOString().split("T")[0],
     mileage1: "",
     mileage2: "",
     dieselLevel: "FULL",
@@ -139,6 +137,8 @@ export default function EnhancedSafetyChecklist({
               name="date"
               value={formData.date}
               onChange={handleChange}
+              min={new Date().toISOString().split("T")[0]}
+              max={new Date().toISOString().split("T")[0]}
               required
               className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
             />

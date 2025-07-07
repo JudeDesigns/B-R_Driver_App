@@ -349,9 +349,6 @@ export default function EndOfDayCheckPage() {
                 <SimpleEndOfDayChecklist
                   onSubmit={handleSubmit}
                   isSubmitting={submitting}
-                  routeDate={routes.find(r => r.id === selectedRouteId)?.date ?
-                    new Date(routes.find(r => r.id === selectedRouteId)?.date).toISOString().split("T")[0] :
-                    undefined}
                 />
               )}
             </>

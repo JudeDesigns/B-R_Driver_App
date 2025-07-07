@@ -81,13 +81,13 @@ export default function DriverDashboard() {
 
       // Fetch routes
       const routesResponse = await fetch(
-        `/api/driver/assigned-routes?date=${today}`,
+        `/api/driver/assigned-routes?date=${today}&t=${Date.now()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          // Add cache control for better performance
-          cache: isMobile ? "force-cache" : "default",
+          // Disable caching to prevent stale route data
+          cache: "no-store",
         }
       );
 
