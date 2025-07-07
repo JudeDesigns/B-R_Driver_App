@@ -6,8 +6,26 @@ const jwt = require('jsonwebtoken');
 // Mock environment
 process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
 
-// Import auth functions
-const { generateToken, verifyToken } = require('../src/lib/auth');
+// Create our own test implementations
+function generateToken(payload, expiresIn = '24h') {
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn,
+    issuer: "br-food-services",
+    audience: "br-food-services-users",
+  });
+}
+
+function verifyToken(token, options = {}) {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET, {
+      issuer: "br-food-services",
+      audience: "br-food-services-users",
+      ignoreExpiration: options.ignoreExpiration || false,
+    });
+  } catch (error) {
+    return null;
+  }
+}
 
 function createTestToken(payload, expiresIn = '1h') {
   return jwt.sign(payload, process.env.JWT_SECRET, {

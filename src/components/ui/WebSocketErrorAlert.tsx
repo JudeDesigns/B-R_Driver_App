@@ -11,7 +11,16 @@ export default function WebSocketErrorAlert({
   error,
   onReconnect,
 }: WebSocketErrorAlertProps) {
+  // Don't show popup for authentication-related errors
   if (!error) return null;
+
+  // Hide authentication errors to prevent annoying popups
+  if (error.includes("authentication") ||
+      error.includes("token") ||
+      error.includes("Unauthorized") ||
+      error.includes("No authentication token")) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-md bg-red-50 border border-red-200 rounded-lg shadow-lg p-4">

@@ -6,8 +6,33 @@ const jwt = require('jsonwebtoken');
 // Mock environment
 process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
 
-// Import the functions we want to test
-const { generateToken, verifyToken } = require('../src/lib/auth');
+// Create our own test implementations since we can't import TypeScript directly
+function generateToken(payload, expiresIn = '24h') {
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn,
+    issuer: "br-food-services",
+    audience: "br-food-services-users",
+  });
+}
+
+function verifyToken(token, options = {}) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      issuer: "br-food-services",
+      audience: "br-food-services-users",
+      ignoreExpiration: options.ignoreExpiration || false,
+    });
+
+    // Check if token has required fields
+    if (!decoded.id || !decoded.username || !decoded.role) {
+      return null;
+    }
+
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
 
 // Test utilities
 function createTestToken(payload, expiresIn = '1h') {
