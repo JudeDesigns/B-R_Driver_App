@@ -314,12 +314,11 @@ export default function DriverStopsPage() {
           setShowSafetyModal(false);
           fetchStops();
         } else {
-          // If any safety check is not completed, show modal
+          // If any safety check is not completed, show modal and DO NOT fetch stops
           setShowSafetyModal(true);
-
-          // Still fetch stops to show the ones for routes that have completed safety checks
-          fetchStops();
           setLoading(false);
+          // Clear any existing stops to prevent access
+          setStops([]);
         }
       }
     } catch (error) {

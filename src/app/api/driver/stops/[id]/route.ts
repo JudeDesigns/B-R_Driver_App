@@ -29,6 +29,24 @@ export async function GET(
     // Get the stop ID from the URL
     const id = await params.id;
 
+    // Get the driver's username for safety check verification
+    const driver = await prisma.user.findUnique({
+      where: {
+        id: decoded.id,
+      },
+      select: {
+        username: true,
+        fullName: true,
+      },
+    });
+
+    if (!driver) {
+      return NextResponse.json(
+        { message: "Driver not found" },
+        { status: 404 }
+      );
+    }
+
     // Get the stop
     const stop = await prisma.stop.findFirst({
       where: {
@@ -124,6 +142,27 @@ export async function GET(
 
     if (!stop) {
       return NextResponse.json({ message: "Stop not found" }, { status: 404 });
+    }
+
+    // SAFETY CHECK ENFORCEMENT: Check if driver has completed safety check for this route
+    const safetyCheck = await prisma.safetyCheck.findFirst({
+      where: {
+        routeId: stop.routeId,
+        driverId: decoded.id,
+        type: "START_OF_DAY",
+        isDeleted: false,
+      },
+    });
+
+    if (!safetyCheck) {
+      return NextResponse.json(
+        {
+          message: "Safety check must be completed before accessing stop details",
+          requiresSafetyCheck: true,
+          routeId: stop.routeId
+        },
+        { status: 403 }
+      );
     }
 
     // Mark any unread admin notes as read
@@ -247,6 +286,27 @@ export async function PATCH(
       return NextResponse.json(
         { message: "Stop not found or not assigned to you" },
         { status: 404 }
+      );
+    }
+
+    // SAFETY CHECK ENFORCEMENT: Check if driver has completed safety check for this route
+    const safetyCheck = await prisma.safetyCheck.findFirst({
+      where: {
+        routeId: stop.routeId,
+        driverId: decoded.id,
+        type: "START_OF_DAY",
+        isDeleted: false,
+      },
+    });
+
+    if (!safetyCheck) {
+      return NextResponse.json(
+        {
+          message: "Safety check must be completed before updating stop details",
+          requiresSafetyCheck: true,
+          routeId: stop.routeId
+        },
+        { status: 403 }
       );
     }
 
