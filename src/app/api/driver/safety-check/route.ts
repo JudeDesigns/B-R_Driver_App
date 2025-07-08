@@ -228,18 +228,9 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    // Update route status based on safety check type
-    if (type === "START_OF_DAY" && route.status === "PENDING") {
-      // If this is a start of day safety check and the route is pending, update it to in progress
-      await prisma.route.update({
-        where: {
-          id: routeId,
-        },
-        data: {
-          status: "IN_PROGRESS",
-        },
-      });
-    } else if (type === "END_OF_DAY" && route.status === "IN_PROGRESS") {
+    // Update route status based on safety check type - but only for END_OF_DAY checks
+    // START_OF_DAY checks should not update route status as multiple drivers may be assigned
+    if (type === "END_OF_DAY" && route.status === "IN_PROGRESS") {
       // If this is an end of day safety check and the route is in progress, update it to completed
       // First check if all stops are completed - use precise driver matching
       const stops = await prisma.stop.findMany({

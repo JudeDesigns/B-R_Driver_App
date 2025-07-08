@@ -97,12 +97,7 @@ export default function DriverDashboard() {
       }
 
       const routesData = await routesResponse.json();
-      setRoutes(routesData.routes || []);
-
-      // If there's at least one route, set the first one as the current route
-      if (routesData.routes && routesData.routes.length > 0) {
-        setRoute(routesData.routes[0]);
-      }
+      // Don't set routes here - wait for safety check data to set proper status
 
       // Check if any safety checks are completed
       const safetyChecksResponse = await fetch(
@@ -119,6 +114,30 @@ export default function DriverDashboard() {
       if (safetyChecksResponse.ok) {
         const safetyData = await safetyChecksResponse.json();
         setSafetyCheckCompleted(safetyData.hasCompletedChecks || false);
+
+        // Update route status based on driver-specific safety check completion
+        if (routesData.routes && routesData.routes.length > 0) {
+          const updatedRoutes = routesData.routes.map((route: any) => ({
+            ...route,
+            status: safetyData.completedRouteIds.includes(route.id) ? "IN_PROGRESS" : "PENDING"
+          }));
+          setRoutes(updatedRoutes);
+
+          // Update the current route as well
+          if (updatedRoutes.length > 0) {
+            setRoute(updatedRoutes[0]);
+          }
+        }
+      } else {
+        // If safety check API fails, set routes with default PENDING status
+        if (routesData.routes && routesData.routes.length > 0) {
+          const routesWithStatus = routesData.routes.map((route: any) => ({
+            ...route,
+            status: "PENDING"
+          }));
+          setRoutes(routesWithStatus);
+          setRoute(routesWithStatus[0]);
+        }
       }
 
       // Fetch document counts

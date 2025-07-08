@@ -107,6 +107,8 @@ export async function POST(
           completionTime: stop.completionTime,
           driverNotes: stop.driverNotes,
           adminNotes: null,
+          orderNumberWeb: stop.orderNumberWeb,
+          quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
         };
 
         // Prepare image URLs for PDF (from invoice images)

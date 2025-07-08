@@ -364,7 +364,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     <!-- Footer Section -->
     <div class="footer-section">
       <div class="footer-contact">
-        24/7 customer service | (323) 456-0897 | customer.service@brfood.us
+        24/7 customer service | (323) 366-0887 | customer.services@brfood.us
       </div>
     </div>
   </div>

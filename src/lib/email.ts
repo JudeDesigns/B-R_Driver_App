@@ -49,6 +49,7 @@ const createTransporter = () => {
 const createDeliveryConfirmationEmail = (
   customerName: string,
   orderNumber: string,
+  invoiceNumber: string,
   deliveryTime: string
 ) => {
   return `
@@ -155,6 +156,10 @@ const createDeliveryConfirmationEmail = (
             <span class="detail-value">${orderNumber}</span>
           </div>
           <div class="detail-row">
+            <span class="detail-label">Invoice number:</span>
+            <span class="detail-value">${invoiceNumber}</span>
+          </div>
+          <div class="detail-row">
             <span class="detail-label">Delivered to:</span>
             <span class="detail-value">${customerName}</span>
           </div>
@@ -201,9 +206,11 @@ export const sendDeliveryConfirmationEmail = async (
     console.log(`📄 PDF generated with base URL: ${baseUrl}`);
 
     // Create the email HTML content
+    const invoiceNumber = stopData.quickbooksInvoiceNum || stopData.orderNumberWeb || 'N/A';
     const emailHtml = createDeliveryConfirmationEmail(
       customerName,
       orderNumber,
+      invoiceNumber,
       deliveryTime
     );
 

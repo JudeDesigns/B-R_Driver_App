@@ -397,6 +397,8 @@ export async function PATCH(
                 completionTime: updatedStop.completionTime,
                 driverNotes: updatedStop.driverNotes,
                 adminNotes: null, // Will be populated if needed
+                orderNumberWeb: updatedStop.orderNumberWeb,
+                quickbooksInvoiceNum: updatedStop.quickbooksInvoiceNum,
               };
 
               // Prepare image URLs for PDF (from invoice images)
