@@ -193,10 +193,12 @@ export const sendDeliveryConfirmationEmail = async (
   sendToCustomer: boolean = false // New parameter to control customer vs office email
 ) => {
   try {
-    // Generate the delivery confirmation PDF
+    // Generate the delivery confirmation PDF with correct domain
     console.log('Generating delivery confirmation PDF...');
-    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returns);
+    const baseUrl = 'https://delivery.brfood.us';
+    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returns, baseUrl);
     console.log(`PDF generated successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+    console.log(`📄 PDF generated with base URL: ${baseUrl}`);
 
     // Create the email HTML content
     const emailHtml = createDeliveryConfirmationEmail(

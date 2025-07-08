@@ -86,8 +86,10 @@ export async function generateDeliveryPDF(
 }
 
 function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnItem[], baseUrl?: string): string {
-  // Use provided baseUrl or fallback to environment variable or localhost
-  const finalBaseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // Use provided baseUrl or fallback to production domain
+  const finalBaseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'https://delivery.brfood.us';
+
+  console.log(`📄 PDF Generator - Using base URL: ${finalBaseUrl}`);
 
   // Calculate payment information
   const totalPaymentAmount = stop.driverPaymentAmount || 0;

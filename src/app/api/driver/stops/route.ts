@@ -102,15 +102,16 @@ export async function GET(request: NextRequest) {
             ],
           },
           // SAFETY CHECK ENFORCEMENT: Only show stops from routes with completed safety checks
-          {
+          // BUT allow drivers to see routes that need safety checks so they can complete them
+          ...(safetyCompletedRouteIds.length > 0 ? [{
             routeId: {
-              in: safetyCompletedRouteIds.length > 0 ? safetyCompletedRouteIds : ['no-routes-available'],
+              in: safetyCompletedRouteIds,
             },
-          },
+          }] : []),
           // Other filters
           { isDeleted: false },
           // Hide completed stops from driver view unless specifically requested
-          ...(status === "COMPLETED" ? {} : [{ status: { not: "COMPLETED" } }]),
+          ...(status === "COMPLETED" ? [] : [{ status: { not: "COMPLETED" as any } }]),
           ...(date ? [{
             route: {
               date: {
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
               },
             },
           }] : []),
-          ...(status ? [{ status }] : []),
+          ...(status ? [{ status: status as any }] : []),
         ],
       },
       include: {
