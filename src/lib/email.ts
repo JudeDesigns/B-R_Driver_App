@@ -43,7 +43,7 @@ const createTransporter = () => {
   return nodemailer.createTransport(transporterConfig);
 };
 
-// Create HTML email template for delivery confirmation - matching the clean design
+// Create simple, professional HTML email template for delivery confirmation
 const createDeliveryConfirmationEmail = (
   customerName: string,
   orderNumber: string,
@@ -55,159 +55,121 @@ const createDeliveryConfirmationEmail = (
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Your order has been delivered!</title>
+      <title>Delivery Confirmation - B&R Food Services</title>
       <style>
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          font-family: Arial, sans-serif;
           line-height: 1.6;
-          color: #333;
+          color: #000000;
           margin: 0;
           padding: 0;
-          background-color: #f5f5f5;
+          background-color: #ffffff;
         }
         .container {
           max-width: 600px;
-          margin: 40px auto;
+          margin: 0 auto;
+          padding: 40px 20px;
           background-color: #ffffff;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .header {
           text-align: center;
-          padding: 40px 40px 20px 40px;
-          background-color: #ffffff;
+          margin-bottom: 40px;
         }
         .company-logo {
-          font-size: 28px;
+          font-size: 24px;
           font-weight: bold;
-          color: #1a1a1a;
-          margin-bottom: 24px;
+          color: #000000;
+          margin-bottom: 30px;
           letter-spacing: 1px;
         }
         .title {
-          font-size: 24px;
-          font-weight: 600;
-          color: #1a1a1a;
-          margin: 0 0 12px 0;
+          font-size: 22px;
+          font-weight: bold;
+          color: #000000;
+          margin: 0 0 20px 0;
         }
-        .subtitle {
+        .message {
           font-size: 16px;
-          color: #666;
-          margin: 0;
+          color: #000000;
+          margin: 0 0 40px 0;
+          line-height: 1.5;
         }
-        .content {
-          padding: 20px 40px 40px 40px;
-        }
-        .details-section {
-          background-color: #f8f9fa;
-          border-radius: 8px;
-          padding: 24px;
-          margin: 24px 0;
+        .details {
+          margin: 30px 0;
+          padding: 0;
         }
         .detail-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 0;
-          border-bottom: 1px solid #e9ecef;
-        }
-        .detail-row:last-child {
-          border-bottom: none;
+          margin: 15px 0;
+          font-size: 16px;
+          color: #000000;
         }
         .detail-label {
-          font-weight: 500;
-          color: #495057;
+          font-weight: bold;
+          display: inline-block;
+          width: 140px;
         }
         .detail-value {
-          color: #1a1a1a;
-          font-weight: 500;
+          color: #000000;
         }
-
+        .attachment-note {
+          margin: 40px 0;
+          padding: 20px;
+          border: 1px solid #000000;
+          text-align: center;
+          font-size: 16px;
+          color: #000000;
+        }
         .footer {
           text-align: center;
-          padding: 24px 40px;
-          background-color: #f8f9fa;
-          border-top: 1px solid #e9ecef;
+          margin-top: 50px;
+          padding-top: 30px;
+          border-top: 1px solid #000000;
         }
         .footer-text {
           font-size: 14px;
-          color: #6c757d;
+          color: #000000;
           margin: 0;
         }
         .company-name {
-          font-weight: 600;
-          color: #495057;
-        }
-        .help-section {
-          margin-top: 32px;
-          padding: 20px;
-          text-align: center;
-        }
-        .help-title {
-          font-size: 18px;
-          font-weight: 600;
-          color: #1a1a1a;
-          margin: 0 0 8px 0;
-        }
-        .help-text {
-          font-size: 14px;
-          color: #666;
-          margin: 0;
-        }
-        .attachment-note {
-          background-color: #e3f2fd;
-          border-radius: 8px;
-          padding: 16px;
-          margin: 20px 0;
-          border-left: 4px solid #2196f3;
-        }
-        .attachment-text {
-          font-size: 14px;
-          color: #1565c0;
-          margin: 0;
-          font-weight: 500;
+          font-weight: bold;
+          color: #000000;
         }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <div class="company-logo">B&R Food Services</div>
+          <div class="company-logo">B&R FOOD SERVICES</div>
           <h1 class="title">Your order has been delivered!</h1>
-          <p class="subtitle">Good news! According to our records, your order has been delivered to you.</p>
+          <p class="message">
+            Thank you for your patronage. Your order has been successfully delivered.
+            Attached to this email is the PDF containing important information about your delivery.
+          </p>
         </div>
 
-        <div class="content">
-          <div class="details-section">
-            <div class="detail-row">
-              <span class="detail-label">Order number:</span>
-              <span class="detail-value">${orderNumber}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Delivered to:</span>
-              <span class="detail-value">${customerName}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Time:</span>
-              <span class="detail-value">${deliveryTime}</span>
-            </div>
+        <div class="details">
+          <div class="detail-row">
+            <span class="detail-label">Order number:</span>
+            <span class="detail-value">${orderNumber}</span>
           </div>
+          <div class="detail-row">
+            <span class="detail-label">Delivered to:</span>
+            <span class="detail-value">${customerName}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Delivery time:</span>
+            <span class="detail-value">${deliveryTime}</span>
+          </div>
+        </div>
 
-          <div class="attachment-note">
-            <p class="attachment-text">📎 Your delivery confirmation document is attached to this email for your records.</p>
-          </div>
-
-          <div class="help-section">
-            <h3 class="help-title">Need help?</h3>
-            <p class="help-text">If you have any questions, please contact us by email at support@brfoodservices.com</p>
-          </div>
+        <div class="attachment-note">
+          <p>📎 Delivery confirmation document attached</p>
         </div>
 
         <div class="footer">
           <p class="footer-text">
             <span class="company-name">B&R Food Services</span><br>
-            Professional Food Distribution & Delivery Solutions
+            Thank you for choosing our services
           </p>
         </div>
       </div>
