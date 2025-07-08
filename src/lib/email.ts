@@ -12,12 +12,14 @@ export const EMAIL_CONFIG = {
 
 // Configure the email transporter
 const createTransporter = () => {
-  console.log(`Creating email transporter for environment: ${process.env.NODE_ENV}`);
-  console.log(`EMAIL_HOST: ${process.env.EMAIL_HOST}`);
-  console.log(`EMAIL_PORT: ${process.env.EMAIL_PORT}`);
-  console.log(`EMAIL_SECURE: ${process.env.EMAIL_SECURE}`);
-  console.log(`EMAIL_USER: ${process.env.EMAIL_USER}`);
-  console.log(`EMAIL_FROM: ${process.env.EMAIL_FROM}`);
+  console.log(`🔧 Creating email transporter for environment: ${process.env.NODE_ENV}`);
+  console.log(`📧 EMAIL_HOST: ${process.env.EMAIL_HOST}`);
+  console.log(`📧 EMAIL_PORT: ${process.env.EMAIL_PORT}`);
+  console.log(`📧 EMAIL_SECURE: ${process.env.EMAIL_SECURE}`);
+  console.log(`📧 EMAIL_USER: ${process.env.EMAIL_USER}`);
+  console.log(`📧 EMAIL_FROM: ${process.env.EMAIL_FROM}`);
+  console.log(`📧 OFFICE_EMAIL: ${process.env.OFFICE_EMAIL}`);
+  console.log(`📧 EMAIL_PASS configured: ${!!process.env.EMAIL_PASS}`);
 
   // Always use production SMTP settings for Brevo
   const transporterConfig = {
