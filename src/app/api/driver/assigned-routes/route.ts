@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
-import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
+
 
 // GET /api/driver/assigned-routes - Get routes where the driver is assigned to stops
 export async function GET(request: NextRequest) {
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
         isDeleted: false,
         ...(date ? {
           date: {
-            gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
-            lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
+            gte: new Date(date + 'T00:00:00'),
+            lte: new Date(date + 'T23:59:59'),
           },
         } : {}),
         ...(status ? { status } : {}),
@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
         isDeleted: false,
         ...(date ? {
           date: {
-            gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
-            lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
+            gte: new Date(date + 'T00:00:00'),
+            lte: new Date(date + 'T23:59:59'),
           },
         } : {}),
         ...(status ? { status } : {}),
