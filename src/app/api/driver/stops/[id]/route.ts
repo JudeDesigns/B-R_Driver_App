@@ -58,9 +58,10 @@ export async function GET(
             {
               stops: {
                 some: {
-                  driverNameFromUpload: {
-                    equals: decoded.username,
-                  },
+                  OR: [
+                    { driverNameFromUpload: driver.username },
+                    { driverNameFromUpload: driver.fullName },
+                  ],
                 },
               },
             },
@@ -213,6 +214,24 @@ export async function PATCH(
     // Get the stop ID from the URL
     const id = await params.id;
 
+    // Get the driver's username for access verification
+    const driver = await prisma.user.findUnique({
+      where: {
+        id: decoded.id,
+      },
+      select: {
+        username: true,
+        fullName: true,
+      },
+    });
+
+    if (!driver) {
+      return NextResponse.json(
+        { message: "Driver not found" },
+        { status: 404 }
+      );
+    }
+
     // Get the update data from the request body
     const data = await request.json();
 
@@ -270,9 +289,10 @@ export async function PATCH(
             {
               stops: {
                 some: {
-                  driverNameFromUpload: {
-                    equals: decoded.username,
-                  },
+                  OR: [
+                    { driverNameFromUpload: driver.username },
+                    { driverNameFromUpload: driver.fullName },
+                  ],
                 },
               },
             },

@@ -30,6 +30,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the driver's username for access verification
+    const driver = await prisma.user.findUnique({
+      where: {
+        id: decoded.id,
+      },
+      select: {
+        username: true,
+        fullName: true,
+      },
+    });
+
+    if (!driver) {
+      return NextResponse.json(
+        { message: "Driver not found" },
+        { status: 404 }
+      );
+    }
+
     // Check if the stop exists and belongs to the driver
     const stop = await prisma.stop.findFirst({
       where: {
@@ -42,9 +60,10 @@ export async function POST(request: NextRequest) {
             {
               stops: {
                 some: {
-                  driverNameFromUpload: {
-                    equals: decoded.username,
-                  },
+                  OR: [
+                    { driverNameFromUpload: driver.username },
+                    { driverNameFromUpload: driver.fullName },
+                  ],
                 },
               },
             },
