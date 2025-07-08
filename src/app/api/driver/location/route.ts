@@ -105,12 +105,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Get driver info
-    const driver = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { username: true, fullName: true },
-    });
-
     // Emit location update event
     emitDriverLocationUpdate({
       driverId: decoded.id,
