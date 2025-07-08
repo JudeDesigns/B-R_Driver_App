@@ -318,7 +318,7 @@ function createHTMLTemplate(stop: Stop, imageUrls: ImageUrl[], returns: ReturnIt
     <!-- Payment Section -->
     <div class="payment-section">
       <div class="payment-received">Payment received at the time of the delivery</div>
-      <div class="payment-methods">${paymentMethods.length > 0 ? paymentMethods.join(' / ') : 'Cash / Check / Card / Zelle'}</div>
+      <div class="payment-methods">$${totalPaymentAmount.toFixed(2)}</div>
     </div>
 
     <!-- Returns Section -->
