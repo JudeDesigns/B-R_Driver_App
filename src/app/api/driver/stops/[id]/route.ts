@@ -300,8 +300,9 @@ export async function PATCH(
               select: { email: true, name: true },
             });
 
-            // Only send email if customer has an email address
-            if (customer && customer.email) {
+            // Send email to office for every completed delivery (customer email not required)
+            if (customer) {
+              console.log(`📧 Sending automatic delivery confirmation to office for: ${customer.name}`);
               // Get returns for this stop
               const returns = await prisma.return.findMany({
                 where: {
@@ -344,11 +345,11 @@ export async function PATCH(
                 name: `Invoice Image ${index + 1}`,
               }));
 
-              // Send the email with PDF attachment (to office by default)
-              const sendToCustomer = false; // Set to true when you want to send to customers
-              await sendDeliveryConfirmationEmail(
+              // Send the email with PDF attachment (to office automatically)
+              const sendToCustomer = false; // Always false - sending to office email
+              const emailResult = await sendDeliveryConfirmationEmail(
                 updatedStop.id,
-                customer.email,
+                customer.email || '', // Customer email for record keeping (not used for actual sending)
                 customer.name,
                 updatedStop.orderNumberWeb || "N/A",
                 deliveryTime,
@@ -358,20 +359,23 @@ export async function PATCH(
                 sendToCustomer
               );
 
-              console.log(
-                `Delivery confirmation email sent to ${customer.email}`
-              );
+              if (emailResult.success) {
+                console.log(`✅ Automatic delivery confirmation email sent to office for: ${customer.name}`);
+                console.log(`📧 Message ID: ${emailResult.messageId}`);
+              } else {
+                console.error(`❌ Failed to send automatic email for ${customer.name}: ${emailResult.error}`);
+              }
             } else {
               console.log(
-                `Customer ${updatedStop.customerId} does not have an email address`
+                `❌ Customer not found for stop ${updatedStop.customerId} - cannot send automatic email`
               );
             }
           } catch (emailError) {
             console.error(
-              "Error sending delivery confirmation email:",
+              "❌ Error sending automatic delivery confirmation email to office:",
               emailError
             );
-            // Continue execution even if email sending fails
+            // Continue execution even if email sending fails - don't break stop completion
           }
         }
       } catch (error) {

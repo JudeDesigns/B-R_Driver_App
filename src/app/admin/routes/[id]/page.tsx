@@ -107,6 +107,7 @@ export default function RouteDetailPage({
   const [isSendingEmails, setIsSendingEmails] = useState(false);
   const [emailResults, setEmailResults] = useState<any>(null);
   const [showEmailResults, setShowEmailResults] = useState(false);
+  const [suppressErrors, setSuppressErrors] = useState(false);
 
   // Add Stop Modal State
   const [showAddStopModal, setShowAddStopModal] = useState(false);
@@ -162,30 +163,68 @@ export default function RouteDetailPage({
   const fetchRouteDetails = useCallback(async () => {
     if (!token) return;
 
+    // Don't fetch route details while sending emails to avoid conflicts
+    if (isSendingEmails) {
+      console.log("🔍 Skipping route details fetch while sending emails");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
+      console.log("🔍 Fetching route details for:", routeId);
+
       const response = await fetch(`/api/admin/routes/${routeId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         cache: "no-store",
       });
 
+      console.log("🔍 Route details response status:", response.status);
+      console.log("🔍 Route details content-type:", response.headers.get("content-type"));
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        console.error("🔍 Non-JSON response for route details:", textResponse.substring(0, 200));
+        throw new Error("Server returned an invalid response for route details. Please refresh the page.");
+      }
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch route details");
+        throw new Error(errorData.message || `Failed to fetch route details (${response.status})`);
       }
 
       const data = await response.json();
+      console.log("🔍 Route details loaded successfully");
       setRoute(data);
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      console.error("🔍 Error fetching route details:", err);
+
+      let errorMessage = "An error occurred while loading route details";
+      if (err instanceof Error) {
+        if (err.message.includes("JSON")) {
+          errorMessage = "Server response error. Please refresh the page or check server logs.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      // Only set error if we're not suppressing errors (during email operations)
+      if (!suppressErrors) {
+        setError(errorMessage);
+      } else {
+        console.log("🔍 Suppressing error during email operation:", errorMessage);
+      }
     } finally {
       setLoading(false);
     }
-  }, [token, routeId]);
+  }, [token, routeId, isSendingEmails, suppressErrors]);
 
   useEffect(() => {
     // Get the token and role from localStorage/sessionStorage
@@ -471,6 +510,7 @@ export default function RouteDetailPage({
     setEmailResults(null);
     setShowEmailResults(false);
     setError(""); // Clear any previous errors
+    setSuppressErrors(true); // Suppress errors during email operation
 
     try {
       console.log("📧 Starting bulk email send for route:", routeId);
@@ -501,17 +541,20 @@ export default function RouteDetailPage({
         throw new Error(data.message || `Server error: ${response.status}`);
       }
 
-      // Show success message even if modal fails
+      // Show success message
       const completedCount = route.stops.filter(s => s.status === 'COMPLETED').length;
       const successMessage = `✅ Bulk email sending completed! ${data.results?.sent || 0}/${completedCount} emails sent successfully.`;
 
       setEmailResults(data);
       setShowEmailResults(true);
 
-      // Also show a simple success message
+      // Show success alert
       alert(successMessage);
 
       console.log("📧 Bulk email results:", data);
+
+      // DO NOT refresh route data here - it's causing the JSON error
+      // The route data doesn't need to be refreshed after sending emails
 
     } catch (err) {
       console.error("📧 Error sending bulk emails:", err);
@@ -533,6 +576,8 @@ export default function RouteDetailPage({
 
     } finally {
       setIsSendingEmails(false);
+      // Re-enable error display after a short delay
+      setTimeout(() => setSuppressErrors(false), 2000);
     }
   };
 
