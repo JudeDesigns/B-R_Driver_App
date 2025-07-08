@@ -173,8 +173,9 @@ export async function POST(
     console.log(`   Sent: ${emailResults.sent}`);
     console.log(`   Failed: ${emailResults.failed}`);
 
-    // Return comprehensive results
-    return NextResponse.json({
+    // Return comprehensive results with proper JSON headers
+    const responseData = {
+      success: true,
       message: `Email sending completed for route ${route.routeNumber || routeId}`,
       route: {
         id: route.id,
@@ -182,16 +183,57 @@ export async function POST(
       },
       results: emailResults,
       summary: `${emailResults.sent}/${emailResults.total} emails sent successfully`
+    };
+
+    console.log("📧 Returning success response:", JSON.stringify(responseData, null, 2));
+
+    return NextResponse.json(responseData, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      }
     });
 
   } catch (error) {
-    console.error("Error sending bulk emails:", error);
-    return NextResponse.json(
-      { 
-        message: "Failed to send emails",
-        error: error instanceof Error ? error.message : "Unknown error"
-      },
-      { status: 500 }
-    );
+    console.error("❌ Error in bulk email API:", error);
+
+    // Ensure we always return JSON
+    try {
+      return NextResponse.json(
+        {
+          message: "Failed to send emails",
+          error: error instanceof Error ? error.message : "Unknown error",
+          route: { id: routeId },
+          results: {
+            total: 0,
+            sent: 0,
+            failed: 0,
+            errors: [error instanceof Error ? error.message : "Unknown error"],
+            details: []
+          }
+        },
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    } catch (jsonError) {
+      console.error("❌ Error creating JSON response:", jsonError);
+      // Fallback to basic response
+      return new Response(
+        JSON.stringify({
+          message: "Internal server error",
+          error: "Failed to process request"
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+    }
   }
 }

@@ -470,28 +470,67 @@ export default function RouteDetailPage({
     setIsSendingEmails(true);
     setEmailResults(null);
     setShowEmailResults(false);
+    setError(""); // Clear any previous errors
 
     try {
+      console.log("📧 Starting bulk email send for route:", routeId);
+
       const response = await fetch(`/api/admin/routes/${routeId}/send-emails`, {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
 
+      console.log("📧 Response status:", response.status);
+      console.log("📧 Response headers:", response.headers.get("content-type"));
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        console.error("📧 Non-JSON response received:", textResponse.substring(0, 200));
+        throw new Error("Server returned an invalid response. Please check the server logs.");
+      }
+
       const data = await response.json();
+      console.log("📧 Response data:", data);
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to send emails");
+        throw new Error(data.message || `Server error: ${response.status}`);
       }
+
+      // Show success message even if modal fails
+      const completedCount = route.stops.filter(s => s.status === 'COMPLETED').length;
+      const successMessage = `✅ Bulk email sending completed! ${data.results?.sent || 0}/${completedCount} emails sent successfully.`;
 
       setEmailResults(data);
       setShowEmailResults(true);
+
+      // Also show a simple success message
+      alert(successMessage);
+
       console.log("📧 Bulk email results:", data);
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send emails");
-      console.error("Error sending bulk emails:", err);
+      console.error("📧 Error sending bulk emails:", err);
+
+      // More detailed error message
+      let errorMessage = "Failed to send emails";
+      if (err instanceof Error) {
+        if (err.message.includes("JSON")) {
+          errorMessage = "Server response error. Emails may have been sent - check your office email and server logs.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
+
+      // Show error alert
+      alert(`❌ Error: ${errorMessage}`);
+
     } finally {
       setIsSendingEmails(false);
     }
