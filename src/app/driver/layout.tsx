@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getPSTDateString } from "@/lib/timezone";
 
 export default function DriverLayout({
   children,
@@ -62,8 +63,8 @@ export default function DriverLayout({
     if (!token) return;
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
+      // Get today's date in PST timezone in YYYY-MM-DD format
+      const today = getPSTDateString();
 
       const response = await fetch(
         `/api/driver/safety-check/status?date=${today}&t=${Date.now()}`,

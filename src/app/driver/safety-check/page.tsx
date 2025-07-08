@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SimpleSafetyChecklist, {
   SimpleSafetyCheckData,
 } from "@/components/driver/SimpleSafetyChecklist";
+import { getPSTDateString } from "@/lib/timezone";
 
 export default function SafetyCheckPage() {
   const [loading, setLoading] = useState(false);
@@ -106,8 +107,8 @@ export default function SafetyCheckPage() {
     setLoading(true);
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
+      // Get today's date in PST timezone in YYYY-MM-DD format
+      const today = getPSTDateString();
 
       // First, check which routes need safety checks
       const safetyResponse = await fetch(

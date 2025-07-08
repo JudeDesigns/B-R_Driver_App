@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getPSTDate, getPSTDateString } from "@/lib/timezone";
 
 // GET /api/driver/safety-check/status - Check if driver has completed any safety checks
 export async function GET(request: NextRequest) {
@@ -22,16 +23,21 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const date = url.searchParams.get("date");
 
-    // Build date filter
-    let dateFilter = {};
+    // Build PST date filter
+    let pstStartDate: Date | undefined;
+    let pstEndDate: Date | undefined;
+
     if (date) {
-      const dateObj = new Date(date);
-      dateFilter = {
-        timestamp: {
-          gte: new Date(dateObj.setHours(0, 0, 0, 0)),
-          lt: new Date(dateObj.setHours(23, 59, 59, 999)),
-        },
-      };
+      // Parse the date and create PST timezone boundaries
+      const inputDate = new Date(date + 'T00:00:00');
+
+      // Create start of day in PST
+      pstStartDate = new Date(inputDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+      pstStartDate.setHours(0, 0, 0, 0);
+
+      // Create end of day in PST
+      pstEndDate = new Date(inputDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+      pstEndDate.setHours(23, 59, 59, 999);
     }
 
     // Get the driver's username
@@ -63,11 +69,11 @@ export async function GET(request: NextRequest) {
           {
             driverId: decoded.id,
             isDeleted: false,
-            ...(date
+            ...(pstStartDate && pstEndDate
               ? {
                   date: {
-                    gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-                    lt: new Date(new Date(date).setHours(23, 59, 59, 999)),
+                    gte: pstStartDate,
+                    lt: pstEndDate,
                   },
                 }
               : {}),
@@ -86,11 +92,11 @@ export async function GET(request: NextRequest) {
               },
             },
             isDeleted: false,
-            ...(date
+            ...(pstStartDate && pstEndDate
               ? {
                   date: {
-                    gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-                    lt: new Date(new Date(date).setHours(23, 59, 59, 999)),
+                    gte: pstStartDate,
+                    lt: pstEndDate,
                   },
                 }
               : {}),

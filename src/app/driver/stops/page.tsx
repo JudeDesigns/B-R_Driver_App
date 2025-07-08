@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSocket } from "@/hooks/useSocket";
 import { SocketEvents } from "@/lib/socketClient";
 import Image from "next/image";
+import { getPSTDateString } from "@/lib/timezone";
 
 interface Customer {
   id: string;
@@ -284,8 +285,8 @@ export default function DriverStopsPage() {
     if (!token) return;
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
+      // Get today's date in PST timezone in YYYY-MM-DD format
+      const today = getPSTDateString();
 
       const response = await fetch(
         `/api/driver/safety-check/status?date=${today}`,
@@ -334,8 +335,8 @@ export default function DriverStopsPage() {
     setError("");
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
+      // Get today's date in PST timezone in YYYY-MM-DD format
+      const today = getPSTDateString();
 
       const response = await fetch(`/api/driver/stops?date=${today}`, {
         headers: {
