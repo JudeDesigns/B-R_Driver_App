@@ -10,12 +10,14 @@ import {
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import Notification from "@/components/ui/Notification";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
-import StatusBadge from "@/components/ui/StatusBadge";
-import StatusButton from "@/components/driver/StatusButton";
 import DriverNotes from "@/components/driver/DriverNotes";
-import InvoiceUpload from "@/components/driver/InvoiceUpload";
 import EnhancedInvoiceUpload from "@/components/driver/EnhancedInvoiceUpload";
 import ReturnManagement from "@/components/driver/ReturnManagement";
+import { getPSTDate } from "@/lib/timezone";
+import StopHeader from "@/components/driver/stops/StopHeader";
+import CustomerInfoCard from "@/components/driver/stops/CustomerInfoCard";
+import StatusUpdateCard from "@/components/driver/stops/StatusUpdateCard";
+import PaymentModal from "@/components/driver/stops/PaymentModal";
 
 interface Document {
   id: string;
@@ -424,14 +426,14 @@ export default function StopDetailPage({
         status: newStatus,
       };
 
-      // Set arrival time if status is ARRIVED
+      // Set arrival time if status is ARRIVED (using PST timezone)
       if (newStatus === "ARRIVED" && !stop.arrivalTime) {
-        updateData.arrivalTime = new Date().toISOString();
+        updateData.arrivalTime = getPSTDate().toISOString();
       }
 
-      // Set completion time if status is COMPLETED
+      // Set completion time if status is COMPLETED (using PST timezone)
       if (newStatus === "COMPLETED" && !stop.completionTime) {
-        updateData.completionTime = new Date().toISOString();
+        updateData.completionTime = getPSTDate().toISOString();
       }
 
       const response = await fetch(`/api/driver/stops/${unwrappedParams.id}`, {
@@ -790,33 +792,7 @@ export default function StopDetailPage({
       />
 
       {/* Enhanced Header with Status Badge - Mobile Optimized */}
-      <div className="bg-white shadow-md rounded-lg mb-6 sticky top-0 z-10">
-        <div className="p-4 flex items-center justify-between">
-          <button
-            onClick={() => router.push("/driver/stops")}
-            className="flex items-center text-gray-600 hover:text-black transition-colors touch-manipulation tap-target"
-            aria-label="Back to stops list"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-1"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span className="hidden sm:inline">Back</span>
-            <span className="sm:hidden">Back</span>
-          </button>
-          {stop && (
-            <StatusBadge status={stop.status} className="text-sm px-3 py-1" />
-          )}
-        </div>
-      </div>
+      <StopHeader stop={stop} />
 
       {loading ? (
         <div className="flex justify-center items-center h-60 bg-white rounded-lg shadow-md">
@@ -847,341 +823,17 @@ export default function StopDetailPage({
       ) : stop ? (
         <div className="space-y-6">
           {/* Customer Information Card - Mobile Optimized */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-gray-200">
-              <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
-                    {stop.customer.name}
-                  </h1>
-                  <div className="flex items-start sm:items-center mt-1 text-gray-600">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 mr-1 flex-shrink-0 mt-0.5 sm:mt-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    <p className="text-sm break-words">
-                      {stop.customer.address}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-row sm:flex-col justify-between sm:items-end bg-gray-50 sm:bg-transparent p-2 rounded-lg sm:p-0">
-                  <div className="flex items-center">
-                    <span className="text-xs sm:text-sm font-medium text-gray-500 mr-1 sm:mr-2">
-                      Route:
-                    </span>
-                    <span className="text-xs sm:text-sm font-bold">
-                      {stop.route.routeNumber || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-xs sm:text-sm font-medium text-gray-500 mr-1 sm:mr-2">
-                      Date:
-                    </span>
-                    <span className="text-xs sm:text-sm">
-                      {formatDate(stop.route.date)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-5">
-              {/* Delivery Details - Mobile Optimized */}
-              <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                      Invoice #
-                    </span>
-                    <span className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                      {stop.quickbooksInvoiceNum &&
-                      stop.quickbooksInvoiceNum.trim() !== ""
-                        ? stop.quickbooksInvoiceNum
-                        : "N/A"}
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                      Order # (Web)
-                    </span>
-                    <span className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                      {stop.orderNumberWeb && stop.orderNumberWeb.trim() !== ""
-                        ? stop.orderNumberWeb
-                        : "N/A"}
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-1">
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                      Sequence
-                    </span>
-                    <span className="font-medium text-gray-900 text-sm sm:text-base">
-                      {stop.sequence}
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-1">
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                      Amount
-                    </span>
-                    <span className="font-medium text-gray-900 text-sm sm:text-base">
-                      {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-
-
-              {/* All Instructions - Mobile Optimized */}
-              {(stop.initialDriverNotes || (stop.adminNotes && stop.adminNotes.length > 0)) && (
-                <div className="mt-5 sm:mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mt-0.5"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-2 sm:ml-3 w-full">
-                      <h3 className="text-sm font-medium text-blue-800">
-                        All Instructions
-                      </h3>
-
-                      {/* Admin Notes */}
-                      {stop.adminNotes && stop.adminNotes.length > 0 && (
-                        <div className="mt-2 sm:mt-3">
-                          <h4 className="text-xs font-semibold text-red-900 uppercase tracking-wide mb-2 flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                            Admin Instructions:
-                          </h4>
-                          <div className="space-y-2">
-                            {stop.adminNotes.map((note, index) => (
-                              <div key={note.id} className="bg-red-100 border border-red-300 rounded p-2 text-sm">
-                                <p className="text-red-800 font-medium whitespace-pre-wrap break-words">
-                                  {note.note}
-                                </p>
-                                <p className="text-xs text-red-600 mt-1">
-                                  — {note.admin.fullName || note.admin.username} ({new Date(note.createdAt).toLocaleDateString()})
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Driver Instructions */}
-                      {stop.initialDriverNotes && (
-                        <div className="mt-2 sm:mt-3">
-                          <h4 className="text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1 flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Delivery Instructions:
-                          </h4>
-                          <div className="bg-blue-100 border border-blue-300 rounded p-2 text-sm text-blue-800">
-                            <p className="whitespace-pre-wrap break-words">{stop.initialDriverNotes}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <CustomerInfoCard stop={stop} formatDate={formatDate} />
 
           {/* Status Update - Mobile Optimized */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">
-                Delivery Status
-              </h2>
-            </div>
-            <div className="p-4 sm:p-5">
-              {/* Progress Indicator - Mobile Optimized */}
-              <div className="relative mb-6 sm:mb-8">
-                <div className="overflow-hidden h-2 mb-3 sm:mb-4 text-xs flex rounded bg-gray-200">
-                  <div
-                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
-                      stop.status === "PENDING"
-                        ? "bg-gray-400 w-0"
-                        : stop.status === "ON_THE_WAY"
-                        ? "bg-blue-500 w-1/3"
-                        : stop.status === "ARRIVED"
-                        ? "bg-yellow-500 w-2/3"
-                        : "bg-green-500 w-full"
-                    }`}
-                  ></div>
-                </div>
-                <div className="flex justify-between">
-                  <div
-                    className={`text-xs font-medium ${
-                      stop.status === "PENDING"
-                        ? "text-gray-900"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    Pending
-                  </div>
-                  <div
-                    className={`text-xs font-medium ${
-                      stop.status === "ON_THE_WAY"
-                        ? "text-blue-600"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    <span className="hidden xs:inline">On The Way</span>
-                    <span className="xs:hidden">On Way</span>
-                  </div>
-                  <div
-                    className={`text-xs font-medium ${
-                      stop.status === "ARRIVED"
-                        ? "text-yellow-600"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    Arrived
-                  </div>
-                  <div
-                    className={`text-xs font-medium ${
-                      stop.status === "COMPLETED"
-                        ? "text-green-600"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    Done
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Buttons - Mobile Optimized */}
-              <div className="flex flex-col space-y-3">
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  <StatusButton
-                    status={stop.status}
-                    targetStatus="ON_THE_WAY"
-                    currentStatus="PENDING"
-                    isUpdating={updatingStatus}
-                    isDisabled={isStatusButtonDisabled("ON_THE_WAY")}
-                    onClick={() => updateStatus("ON_THE_WAY")}
-                    label="Start Delivery"
-                    className="h-10 sm:h-12 text-sm sm:text-base touch-manipulation mobile-button"
-                  />
-                  <StatusButton
-                    status={stop.status}
-                    targetStatus="ARRIVED"
-                    currentStatus="ON_THE_WAY"
-                    isUpdating={updatingStatus}
-                    isDisabled={isStatusButtonDisabled("ARRIVED")}
-                    onClick={() => updateStatus("ARRIVED")}
-                    label="Mark as Arrived"
-                    className="h-10 sm:h-12 text-sm sm:text-base touch-manipulation mobile-button"
-                  />
-                </div>
-                {/* Complete Delivery button removed - now handled by the InvoiceUpload component */}
-              </div>
-
-              {/* Delivery Timer - Mobile Optimized */}
-              {deliveryTimer !== null && (
-                <div className="mt-5 sm:mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                  <div className="flex items-center">
-                    <svg
-                      className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-1.5 sm:mr-2"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <h3 className="text-sm font-medium text-blue-800">
-                      {stop.status === "ON_THE_WAY"
-                        ? "Delivery Time"
-                        : stop.status === "ARRIVED"
-                        ? "Travel Duration"
-                        : "Service Duration"}
-                    </h3>
-                  </div>
-                  <div className="mt-2 text-center">
-                    <div className="text-xl sm:text-2xl font-bold text-blue-700">
-                      {Math.floor(deliveryTimer / 3600)
-                        .toString()
-                        .padStart(2, "0")}
-                      :
-                      {Math.floor((deliveryTimer % 3600) / 60)
-                        .toString()
-                        .padStart(2, "0")}
-                      :
-                      {Math.floor(deliveryTimer % 60)
-                        .toString()
-                        .padStart(2, "0")}
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">
-                      {stop.status === "ON_THE_WAY"
-                        ? "Time since starting delivery"
-                        : stop.status === "ARRIVED"
-                        ? "Time from start to arrival"
-                        : "Time at customer location"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Timestamps - Mobile Optimized */}
-              <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="bg-gray-50 rounded-lg p-2 sm:p-3">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                    Arrival Time
-                  </span>
-                  <p className="font-medium text-gray-900 mt-1 text-sm sm:text-base truncate">
-                    {formatDate(stop.arrivalTime)}
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 sm:p-3">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                    Completion Time
-                  </span>
-                  <p className="font-medium text-gray-900 mt-1 text-sm sm:text-base truncate">
-                    {formatDate(stop.completionTime)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <StatusUpdateCard
+            stop={stop}
+            updatingStatus={updatingStatus}
+            deliveryTimer={deliveryTimer}
+            isStatusButtonDisabled={isStatusButtonDisabled}
+            updateStatus={updateStatus}
+            formatDate={formatDate}
+          />
 
           {/* Multi-Step Delivery Process */}
           {(stop.status === "ARRIVED" || stop.status === "COMPLETED") && (
@@ -1325,7 +977,7 @@ export default function StopDetailPage({
                         stopId={stop.id}
                         routeId={stop.route.id}
                         customerId={stop.customer.id}
-                        token={token}
+                        token={token!}
                       />
                     </div>
                   )}
@@ -1339,7 +991,7 @@ export default function StopDetailPage({
                             <h4 className="text-lg font-medium text-gray-700 mb-2">Payment Information</h4>
                             {stop.payments && stop.payments.length > 0 ? (
                               <div className="space-y-2">
-                                {stop.payments.map((payment, index) => (
+                                {stop.payments.map((payment) => (
                                   <div key={payment.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                                     <div className="flex-1">
                                       <div className="text-sm font-medium text-green-600">
@@ -1516,159 +1168,24 @@ export default function StopDetailPage({
       )}
 
       {/* Payment Recording Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {stop && stop.driverPaymentAmount && stop.driverPaymentAmount > 0 ? "Update Payment" : "Record Payment Received"}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowPaymentModal(false);
-                    setPaymentError("");
-                    setPaymentEntries([{amount: "", method: "", notes: ""}]);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-gray-700">Payment Entries</h4>
-                  <button
-                    type="button"
-                    onClick={addPaymentEntry}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    + Add Another Payment
-                  </button>
-                </div>
-
-                {paymentEntries.map((entry, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
-                        Payment {index + 1}
-                      </span>
-                      {paymentEntries.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removePaymentEntry(index)}
-                          className="text-sm text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={entry.amount}
-                          onChange={(e) => updatePaymentEntry(index, 'amount', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.00"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Method
-                        </label>
-                        <select
-                          value={entry.method}
-                          onChange={(e) => updatePaymentEntry(index, 'method', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Select method</option>
-                          <option value="Cash">Cash</option>
-                          <option value="Check">Check</option>
-                          <option value="Credit Card">Credit Card</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Notes (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={entry.notes}
-                        onChange={(e) => updatePaymentEntry(index, 'notes', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Check number, reference, etc."
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-sm font-medium text-gray-700">
-                    Total Amount: $
-                    {paymentEntries
-                      .filter(entry => entry.amount && parseFloat(entry.amount) > 0)
-                      .reduce((sum, entry) => sum + parseFloat(entry.amount), 0)
-                      .toFixed(2)
-                    }
-                  </div>
-                </div>
-
-                {/* Error Message */}
-                {paymentError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                    {paymentError}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex space-x-3 pt-4">
-                  <button
-                    onClick={() => {
-                      setShowPaymentModal(false);
-                      setPaymentError("");
-                      setPaymentEntries([{amount: "", method: "", notes: ""}]);
-                    }}
-                    disabled={savingPayment}
-                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSavePayment}
-                    disabled={savingPayment || paymentEntries.filter(entry => entry.amount && parseFloat(entry.amount) > 0 && entry.method).length === 0}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
-                  >
-                    {savingPayment ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Payment"
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PaymentModal
+        show={showPaymentModal}
+        stop={stop}
+        paymentEntries={paymentEntries}
+        paymentError={paymentError}
+        savingPayment={savingPayment}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setPaymentError("");
+          setPaymentEntries([{amount: "", method: "", notes: ""}]);
+        }}
+        addPaymentEntry={addPaymentEntry}
+        removePaymentEntry={removePaymentEntry}
+        updatePaymentEntry={updatePaymentEntry}
+        handleSavePayment={handleSavePayment}
+        setPaymentError={setPaymentError}
+        setPaymentEntries={setPaymentEntries}
+      />
     </div>
   );
 }

@@ -6,9 +6,12 @@ import path from "path";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params before using its properties (Next.js 15 requirement)
+    const { id } = await params;
+
     // Verify authentication
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -24,7 +27,7 @@ export async function GET(
 
     const document = await prisma.document.findFirst({
       where: {
-        id: params.id,
+        id: id,
         isDeleted: false,
       },
       include: {
@@ -75,9 +78,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params before using its properties (Next.js 15 requirement)
+    const { id } = await params;
+
     // Verify authentication
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -96,7 +102,7 @@ export async function PUT(
 
     const document = await prisma.document.findFirst({
       where: {
-        id: params.id,
+        id: id,
         isDeleted: false,
       },
     });
@@ -107,7 +113,7 @@ export async function PUT(
 
     const updatedDocument = await prisma.document.update({
       where: {
-        id: params.id,
+        id: id,
       },
       data: {
         title: title || document.title,
@@ -141,9 +147,18 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params before using its properties (Next.js 15 requirement)
+    const { id } = await params;
+
+    // Basic UUID validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ message: "Invalid document ID format" }, { status: 400 });
+    }
+
     // Verify authentication
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -159,19 +174,56 @@ export async function DELETE(
 
     const document = await prisma.document.findFirst({
       where: {
-        id: params.id,
+        id: id,
         isDeleted: false,
+      },
+      include: {
+        stopDocuments: {
+          where: {
+            isDeleted: false,
+          },
+        },
       },
     });
 
+
+
     if (!document) {
+      // Check if the document exists but is already deleted
+      const deletedDocument = await prisma.document.findFirst({
+        where: {
+          id: id,
+        },
+        include: {
+          stopDocuments: true,
+        },
+      });
+
+      if (deletedDocument && deletedDocument.isDeleted) {
+        // Document is already deleted, return success
+        return NextResponse.json({
+          message: "Document already deleted",
+        });
+      }
+
       return NextResponse.json({ message: "Document not found" }, { status: 404 });
     }
 
-    // Soft delete the document
+    // First, soft delete any related stop documents
+    await prisma.stopDocument.updateMany({
+      where: {
+        documentId: id,
+        isDeleted: false,
+      },
+      data: {
+        isDeleted: true,
+      },
+    });
+
+    // Then soft delete the document itself
     await prisma.document.update({
       where: {
-        id: params.id,
+        id: id,
       },
       data: {
         isDeleted: true,

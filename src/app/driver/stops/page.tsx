@@ -636,10 +636,11 @@ export default function DriverStopsPage() {
 
   // Safety modal component
   const SafetyCheckModal = () => {
-    // Format date for display
+    // Format date for display in PST timezone
     const formatRouteDate = (dateString: string) => {
       const date = new Date(dateString);
       return date.toLocaleDateString("en-US", {
+        timeZone: "America/Los_Angeles",
         year: "numeric",
         month: "short",
         day: "numeric",

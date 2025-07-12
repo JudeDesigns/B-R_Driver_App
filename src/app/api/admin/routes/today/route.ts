@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
             stopDocuments: {
               where: {
                 isDeleted: false,
+                document: {
+                  isDeleted: false, // Filter out deleted documents
+                },
               },
               include: {
                 document: {

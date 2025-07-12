@@ -152,7 +152,12 @@ export default function CustomerDetailPage({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("en-US", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   const formatFileSize = (bytes: number) => {
@@ -164,12 +169,14 @@ export default function CustomerDetailPage({
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleString('en-US', {
+      timeZone: "America/Los_Angeles",
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true,
     });
   };
 

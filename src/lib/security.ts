@@ -147,9 +147,26 @@ export class InputValidator {
       throw new Error("Input must be a string");
     }
 
-    // Remove potentially dangerous characters
+    // Remove potentially dangerous characters but preserve business-relevant characters
     const sanitized = input
-      .replace(/[<>\"'&]/g, "") // Remove HTML/script injection characters
+      .replace(/[<>\"]/g, "") // Remove HTML/script injection characters (but keep & and ')
+      .replace(/[\x00-\x1f\x7f]/g, "") // Remove control characters
+      .trim()
+      .substring(0, maxLength);
+
+    return sanitized;
+  }
+
+  // New method specifically for customer names that preserves business characters
+  static sanitizeCustomerName(input: string, maxLength: number = 255): string {
+    if (typeof input !== "string") {
+      throw new Error("Input must be a string");
+    }
+
+    // For customer names, only remove truly dangerous characters
+    // Preserve ampersands (&), apostrophes ('), and other business-relevant characters
+    const sanitized = input
+      .replace(/[<>\"]/g, "") // Remove only HTML/script injection characters
       .replace(/[\x00-\x1f\x7f]/g, "") // Remove control characters
       .trim()
       .substring(0, maxLength);

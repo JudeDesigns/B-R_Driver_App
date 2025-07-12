@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
-import { getPSTDate, getPSTDateString } from "@/lib/timezone";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
 
 // GET /api/driver/safety-check/status - Check if driver has completed any safety checks
 export async function GET(request: NextRequest) {
@@ -28,16 +28,15 @@ export async function GET(request: NextRequest) {
     let pstEndDate: Date | undefined;
 
     if (date) {
-      // Parse the date and create PST timezone boundaries
-      const inputDate = new Date(date + 'T00:00:00');
-
-      // Create start of day in PST
-      pstStartDate = new Date(inputDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-      pstStartDate.setHours(0, 0, 0, 0);
-
-      // Create end of day in PST
-      pstEndDate = new Date(inputDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-      pstEndDate.setHours(23, 59, 59, 999);
+      if (date === getPSTDateString()) {
+        // For "today", use PST timezone-aware date range
+        pstStartDate = getTodayStartUTC();
+        pstEndDate = getTodayEndUTC();
+      } else {
+        // For other dates, create proper UTC boundaries
+        pstStartDate = new Date(date + 'T00:00:00Z');
+        pstEndDate = new Date(date + 'T23:59:59Z');
+      }
     }
 
     // Get the driver's username

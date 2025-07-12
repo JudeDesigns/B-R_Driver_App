@@ -5,10 +5,9 @@ import { verifyToken } from "@/lib/auth";
 // PATCH /api/admin/stops/[id]/reassign - Reassign a stop to a different driver
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const params = await context.params;
-  const { id: stopId } = params;
+  const { id: stopId } = await params;
 
   try {
     // Verify authentication

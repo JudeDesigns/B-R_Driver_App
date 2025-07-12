@@ -236,6 +236,7 @@ export default function DriverRouteDetailPage({
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
+      timeZone: "America/Los_Angeles",
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -245,12 +246,14 @@ export default function DriverRouteDetailPage({
   const formatDateTime = (dateString: string | null) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "numeric",
+      hour12: true,
     });
   };
 

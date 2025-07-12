@@ -594,12 +594,14 @@ export default function StopDetailPage({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: true,
     });
   };
 

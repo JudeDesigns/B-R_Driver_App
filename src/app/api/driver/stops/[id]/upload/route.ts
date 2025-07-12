@@ -38,12 +38,11 @@ function calculateImageSize(image: any, maxWidth: number, maxHeight: number) {
 // POST /api/driver/stops/[id]/upload - Upload an invoice image and convert to PDF
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // In Next.js 14, params is a Promise that needs to be awaited
-    const params = await context.params;
-    const { id } = params;
+    // Await params before using its properties (Next.js 15 requirement)
+    const { id } = await params;
     // Verify authentication
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -289,8 +288,13 @@ export async function POST(
 
     console.log(`Using base URL for PDF generation: ${baseUrl}`);
 
-    // Generate PDF using Puppeteer
-    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returnsData, baseUrl);
+    // Generate PDF using Puppeteer with extended timeout for large images
+    const pdfBuffer = await Promise.race([
+      generateDeliveryPDF(stopData, imageUrls, returnsData, baseUrl),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PDF generation timeout after 5 minutes')), 300000)
+      )
+    ]);
 
     console.log(`PDF generated successfully. Size: ${pdfBuffer.length} bytes`);
 

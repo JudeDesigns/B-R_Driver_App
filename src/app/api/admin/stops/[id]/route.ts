@@ -5,7 +5,7 @@ import { verifyToken } from "@/lib/auth";
 // GET /api/admin/stops/[id] - Get stop details
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication first
@@ -25,12 +25,8 @@ export async function GET(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // In Next.js 14, params is a Promise that needs to be awaited
-    const params = await context.params;
-    const { id } = params;
-
-    // We already extracted the ID from context.params above
-    // const { id } = await params;
+    // Await params before using its properties (Next.js 15 requirement)
+    const { id } = await params;
 
     // Get the stop with all related data
     const stop = await prisma.stop.findUnique({
@@ -107,11 +103,10 @@ export async function GET(
 // PUT /api/admin/stops/[id] - Update stop details
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  // In Next.js 14, params is a Promise that needs to be awaited
-  const params = await context.params;
-  const { id } = params;
+  // Await params before using its properties (Next.js 15 requirement)
+  const { id } = await params;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");
@@ -130,8 +125,7 @@ export async function PUT(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // We already extracted the ID from context.params above
-    // const id = params.id;
+
 
     // Get the update data from the request body
     const data = await request.json();
@@ -245,10 +239,10 @@ export async function PUT(
 // POST /api/admin/stops/[id]/notes - Add admin note to stop
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  // In Next.js 14, params is accessed directly from context
-  const { id } = context.params;
+  // Await params before using its properties (Next.js 15 requirement)
+  const { id } = await params;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");
@@ -267,8 +261,7 @@ export async function POST(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // We already extracted the ID from context.params above
-    // const id = params.id;
+
 
     // Get the note data from the request body
     const data = await request.json();
@@ -339,11 +332,10 @@ export async function POST(
 // PATCH /api/admin/stops/[id]/notes/[noteId] - Update an admin note
 export async function PATCH(
   request: NextRequest,
-  context: { params: { id: string; noteId: string } }
+  { params }: { params: Promise<{ id: string; noteId: string }> }
 ) {
-  // In Next.js 14, params is a Promise that needs to be awaited
-  const params = await context.params;
-  const { id: stopId, noteId } = params;
+  // Await params before using its properties (Next.js 15 requirement)
+  const { id: stopId, noteId } = await params;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");
@@ -362,9 +354,7 @@ export async function PATCH(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // We already extracted the IDs from context.params above
-    // const stopId = params.id;
-    // const noteId = params.noteId;
+
 
     // Get the note data from the request body
     const data = await request.json();

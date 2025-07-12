@@ -101,6 +101,10 @@ export async function POST(request: NextRequest) {
     const customerId = formData.get("customerId") as string;
     const stopId = formData.get("stopId") as string;
 
+    // Invoice-specific fields for stop documents
+    const invoiceNumber = formData.get("invoiceNumber") as string;
+    const invoiceAmount = formData.get("invoiceAmount") as string;
+
     if (!file || !title || !type) {
       return NextResponse.json(
         { message: "File, title, and type are required" },
@@ -190,6 +194,32 @@ export async function POST(request: NextRequest) {
           documentId: document.id,
         },
       });
+
+      // If this is an invoice document with invoice data, update the stop's invoice information
+      if (type === 'INVOICE' && (invoiceNumber || invoiceAmount)) {
+        const updateData: any = {};
+
+        if (invoiceNumber && invoiceNumber.trim()) {
+          updateData.quickbooksInvoiceNum = invoiceNumber.trim();
+        }
+
+        if (invoiceAmount && invoiceAmount.trim()) {
+          const amount = parseFloat(invoiceAmount);
+          if (!isNaN(amount)) {
+            updateData.amount = amount;
+          }
+        }
+
+        // Only update if we have data to update
+        if (Object.keys(updateData).length > 0) {
+          await prisma.stop.update({
+            where: { id: stopId },
+            data: updateData,
+          });
+
+          console.log(`Updated stop ${stopId} with invoice data:`, updateData);
+        }
+      }
     }
 
     return NextResponse.json({

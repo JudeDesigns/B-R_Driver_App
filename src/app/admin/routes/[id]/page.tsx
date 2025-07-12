@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
@@ -23,13 +23,20 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { formatRouteDate } from "@/lib/timezone";
-import CustomerDropdown from "@/components/ui/CustomerDropdown";
+import { formatDateTime, getStatusBadgeClass, getPaymentMethod, getTotalAmount, getTotalPaymentAmount } from "@/utils/routeUtils";
+import { useRouteDetails } from "@/hooks/useRouteDetails";
+import RouteSummary from "@/components/admin/routes/RouteSummary";
+import AddStopModal from "@/components/admin/routes/AddStopModal";
+import DeleteRouteDialog from "@/components/admin/routes/DeleteRouteDialog";
+import EmailResultsModal from "@/components/admin/routes/EmailResultsModal";
+
+import { exportRoute, generateImageReport, generateImagePDF, sendBulkEmails, deleteRoute } from "@/services/routeOperations";
+import { addStop, updateStopSequence, fetchDrivers } from "@/services/stopOperations";
 
 interface Driver {
   id: string;
   username: string;
-  fullName?: string;
+  fullName: string | null;
 }
 
 interface Customer {
@@ -63,36 +70,41 @@ interface Stop {
   driverRemarkInitial: string | null;
   amount: number | null;
   customer: Customer;
+  // Payment amounts from Excel
+  paymentAmountCash?: number;
+  paymentAmountCheck?: number;
+  paymentAmountCC?: number;
+  totalPaymentAmount?: number;
+  // Driver-recorded payment information
+  driverPaymentAmount?: number;
+  driverPaymentMethods?: string[];
+  invoiceImageUrls?: string[];
 }
 
-interface Driver {
-  id: string;
-  username: string;
-  fullName: string | null;
-}
 
-interface Route {
-  id: string;
-  routeNumber: string | null;
-  date: string;
-  status: string;
-  driver: Driver;
-  stops: Stop[];
-}
 
 export default function RouteDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   // Unwrap the params object using React.use()
   const unwrappedParams = use(params);
   const routeId = unwrappedParams.id;
 
-  const [route, setRoute] = useState<Route | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  // Use custom hook for route data management
+  const {
+    route,
+    setRoute,
+    loading,
+    error,
+    setError,
+    token,
+    userRole,
+    setSuppressErrors,
+    fetchRouteDetails
+  } = useRouteDetails(routeId);
+
   const [groupByDriver, setGroupByDriver] = useState(true); // State to toggle grouping by driver
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -107,7 +119,10 @@ export default function RouteDetailPage({
   const [isSendingEmails, setIsSendingEmails] = useState(false);
   const [emailResults, setEmailResults] = useState<any>(null);
   const [showEmailResults, setShowEmailResults] = useState(false);
-  const [suppressErrors, setSuppressErrors] = useState(false);
+
+  // Image report generation state
+  const [isGeneratingImageReport, setIsGeneratingImageReport] = useState(false);
+  const [isGeneratingImagePDF, setIsGeneratingImagePDF] = useState(false);
 
   // Add Stop Modal State
   const [showAddStopModal, setShowAddStopModal] = useState(false);
@@ -142,9 +157,6 @@ export default function RouteDetailPage({
   const [editingSequence, setEditingSequence] = useState<string | null>(null);
   const [tempSequence, setTempSequence] = useState<number>(0);
 
-  // User role state
-  const [userRole, setUserRole] = useState<string | null>(null);
-
   const router = useRouter();
 
   // Drag and Drop Sensors
@@ -157,118 +169,26 @@ export default function RouteDetailPage({
   );
 
   // Initialize socket connection
-  const { isConnected, joinRoom, socketError, reconnect } = useSocket();
+  const { isConnected, joinRoom, error: socketError, reconnect } = useSocket();
 
-  // Define fetchRouteDetails as a useCallback to avoid dependency issues
-  const fetchRouteDetails = useCallback(async () => {
-    if (!token) return;
-
-    // Don't fetch route details while sending emails to avoid conflicts
-    if (isSendingEmails) {
-      console.log("🔍 Skipping route details fetch while sending emails");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      console.log("🔍 Fetching route details for:", routeId);
-
-      const response = await fetch(`/api/admin/routes/${routeId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
-      });
-
-      console.log("🔍 Route details response status:", response.status);
-      console.log("🔍 Route details content-type:", response.headers.get("content-type"));
-
-      // Check if response is JSON before parsing
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textResponse = await response.text();
-        console.error("🔍 Non-JSON response for route details:", textResponse.substring(0, 200));
-        throw new Error("Server returned an invalid response for route details. Please refresh the page.");
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to fetch route details (${response.status})`);
-      }
-
-      const data = await response.json();
-      console.log("🔍 Route details loaded successfully");
-      setRoute(data);
-
-    } catch (err) {
-      console.error("🔍 Error fetching route details:", err);
-
-      let errorMessage = "An error occurred while loading route details";
-      if (err instanceof Error) {
-        if (err.message.includes("JSON")) {
-          errorMessage = "Server response error. Please refresh the page or check server logs.";
-        } else {
-          errorMessage = err.message;
-        }
-      }
-
-      // Only set error if we're not suppressing errors (during email operations)
-      if (!suppressErrors) {
-        setError(errorMessage);
-      } else {
-        console.log("🔍 Suppressing error during email operation:", errorMessage);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [token, routeId, isSendingEmails, suppressErrors]);
-
-  useEffect(() => {
-    // Get the token and role from localStorage/sessionStorage
-    let storedToken = localStorage.getItem("token");
-    let storedRole = localStorage.getItem("userRole");
-
-    // If not found in localStorage, check sessionStorage
-    if (!storedToken) {
-      storedToken = sessionStorage.getItem("token");
-      storedRole = sessionStorage.getItem("userRole");
-    }
-
-    if (!storedToken || !["ADMIN", "SUPER_ADMIN"].includes(storedRole || "")) {
-      router.push("/login");
-      return;
-    }
-
-    setToken(storedToken);
-    setUserRole(storedRole);
-  }, [router]);
+  // Use the fetchRouteDetails from the hook
 
   useEffect(() => {
     if (token) {
-      fetchRouteDetails();
-      fetchDrivers();
+      handleFetchDrivers();
     }
-  }, [token, fetchRouteDetails]);
+  }, [token]);
 
   // Fetch drivers for the dropdown
-  const fetchDrivers = async () => {
-    if (!token) return;
-
+  const handleFetchDrivers = async () => {
     try {
-      const response = await fetch("/api/admin/drivers", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDrivers(data);
-      }
+      const data = await fetchDrivers();
+      setDrivers(data);
     } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
       console.error("Error fetching drivers:", error);
     }
   };
@@ -306,68 +226,6 @@ export default function RouteDetailPage({
       // No cleanup needed for subscriptions as they're handled by the hooks
     };
   }, [isConnected, joinRoom, routeId]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-    });
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "bg-yellow-100 text-yellow-800";
-      case "ON_THE_WAY":
-        return "bg-blue-100 text-blue-800";
-      case "ARRIVED":
-        return "bg-purple-100 text-purple-800";
-      case "COMPLETED":
-        return "bg-green-100 text-green-800";
-      case "CANCELLED":
-        return "bg-red-100 text-red-800";
-      case "FAILED":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPaymentMethod = (stop: Stop) => {
-    // Check if driver has recorded payments (priority)
-    if (stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0) {
-      return stop.driverPaymentMethods.join(", ");
-    }
-
-    // Check if driver recorded payment amount without methods
-    if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
-      return "Paid";
-    }
-
-    // Check legacy payment flags from Excel
-    const flags = [];
-    if (stop.paymentFlagCash) flags.push("Cash");
-    if (stop.paymentFlagCheck) flags.push("Check");
-    if (stop.paymentFlagCC) flags.push("Credit Card");
-
-    if (flags.length > 0) return flags.join(", ");
-    if (stop.paymentFlagNotPaid) return "Not Paid";
-    return "Not Paid";
-  };
 
   // Sorting function
   const handleSort = (field: string) => {
@@ -411,12 +269,6 @@ export default function RouteDetailPage({
     });
   };
 
-  // Calculate total amount
-  const getTotalAmount = () => {
-    if (!route) return 0;
-    return route.stops.reduce((total, stop) => total + (stop.amount || 0), 0);
-  };
-
   // Export route data
   const handleExportRoute = async (format: 'csv' | 'json' = 'csv') => {
     if (!route) return;
@@ -425,58 +277,142 @@ export default function RouteDetailPage({
     setExportError("");
 
     try {
-      // Check both localStorage and sessionStorage
-      let token = localStorage.getItem("token");
-
-      // If not found in localStorage, check sessionStorage
-      if (!token) {
-        token = sessionStorage.getItem("token");
+      await exportRoute(route, format);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
       }
+      setExportError(err instanceof Error ? err.message : "An error occurred during export");
+    } finally {
+      setExporting(false);
+    }
+  };
 
-      if (!token) {
+  // Generate and download route image archive
+  const handleGenerateImageReport = async () => {
+    if (!route) return;
+
+    // Check if route has any images
+    const totalImages = route.stops.reduce((total, stop) => total + (stop.invoiceImageUrls?.length || 0), 0);
+
+    if (totalImages === 0) {
+      alert("❌ No images found for this route. Complete some deliveries with image uploads first.");
+      return;
+    }
+
+    // Confirm archive creation
+    const confirmed = confirm(
+      `📦 Create image archive for Route ${route.routeNumber}?\n\n` +
+      `This will:\n` +
+      `• Generate a ZIP file with ${totalImages} images\n` +
+      `• Include an HTML report for offline viewing\n` +
+      `• Schedule server cleanup in 3 days\n\n` +
+      `Continue?`
+    );
+
+    if (!confirmed) return;
+
+    setIsGeneratingImageReport(true);
+
+    try {
+      await generateImageReport(route);
+
+      // Show success message with cleanup info
+      alert(
+        `✅ Image archive created successfully!\n\n` +
+        ` Server cleanup scheduled: 3 days from now\n` +
+        `🛑 To cancel cleanup, contact system administrator\n\n` +
+        `The ZIP contains:\n` +
+        `• HTML report for offline viewing\n` +
+        `• All ${totalImages} images in original quality\n` +
+        `• README with instructions`
+      );
+
+    } catch (err) {
+      console.error("📦 Error generating image archive:", err);
+
+      if (err instanceof Error && err.message === "Authentication required") {
         router.push("/login");
         return;
       }
 
-      const response = await fetch(`/api/admin/routes/${route.id}/export?format=${format}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to export route");
+      let errorMessage = "Failed to generate image archive";
+      if (err instanceof Error) {
+        errorMessage = err.message;
       }
 
-      if (format === 'json') {
-        // For JSON, download as file
-        const data = await response.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `route-${route.routeNumber || route.id}-${new Date(route.date).toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        // For CSV, the response is already set up for download
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `route-${route.routeNumber || route.id}-${new Date(route.date).toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (err) {
-      setExportError(err instanceof Error ? err.message : "An error occurred during export");
+      alert(`❌ Error: ${errorMessage}`);
     } finally {
-      setExporting(false);
+      setIsGeneratingImageReport(false);
+    }
+  };
+
+  // Generate and download route image PDF (replaces ZIP functionality)
+  const handleGenerateImagePDF = async () => {
+    if (!route) return;
+
+    // Check if route has any images
+    const totalImages = route.stops.reduce((total, stop) => total + (stop.invoiceImageUrls?.length || 0), 0);
+
+    if (totalImages === 0) {
+      alert("❌ No images found for this route. Complete some deliveries with image uploads first.");
+      return;
+    }
+
+    // Count drivers and stops with images
+    const driversWithImages = new Set();
+    const stopsWithImages = route.stops.filter(stop => stop.invoiceImageUrls?.length > 0);
+
+    stopsWithImages.forEach(stop => {
+      if (stop.driverNameFromUpload) {
+        driversWithImages.add(stop.driverNameFromUpload);
+      }
+    });
+
+    // Confirm PDF creation
+    const confirmed = confirm(
+      `📄 Generate PDF report for Route ${route.routeNumber}?\n\n` +
+      `This will create a professional PDF with:\n` +
+      `• ${driversWithImages.size} driver sections\n` +
+      `• ${stopsWithImages.length} stops with images\n` +
+      `• ${totalImages} high-quality embedded images\n` +
+      `• Customer names and stop details\n\n` +
+      `Continue?`
+    );
+
+    if (!confirmed) return;
+
+    setIsGeneratingImagePDF(true);
+
+    try {
+      await generateImagePDF(route);
+
+      // Show success message
+      alert(
+        `✅ PDF report generated successfully!\n\n` +
+        `📄 The PDF contains:\n` +
+        `• Professional business document format\n` +
+        `• All ${totalImages} images in original quality\n` +
+        `• Organized by driver and customer\n` +
+        `• Ready for sharing and archiving`
+      );
+    } catch (err) {
+      console.error("📄 Error generating PDF report:", err);
+
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
+
+      let errorMessage = "Failed to generate PDF report";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      alert(`❌ Error: ${errorMessage}`);
+    } finally {
+      setIsGeneratingImagePDF(false);
     }
   };
 
@@ -504,7 +440,7 @@ export default function RouteDetailPage({
 
   // Send emails for all completed stops in the route
   const handleSendBulkEmails = async () => {
-    if (!route || !token) return;
+    if (!route) return;
 
     setIsSendingEmails(true);
     setEmailResults(null);
@@ -515,31 +451,7 @@ export default function RouteDetailPage({
     try {
       console.log("📧 Starting bulk email send for route:", routeId);
 
-      const response = await fetch(`/api/admin/routes/${routeId}/send-emails`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log("📧 Response status:", response.status);
-      console.log("📧 Response headers:", response.headers.get("content-type"));
-
-      // Check if response is JSON
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textResponse = await response.text();
-        console.error("📧 Non-JSON response received:", textResponse.substring(0, 200));
-        throw new Error("Server returned an invalid response. Please check the server logs.");
-      }
-
-      const data = await response.json();
-      console.log("📧 Response data:", data);
-
-      if (!response.ok) {
-        throw new Error(data.message || `Server error: ${response.status}`);
-      }
+      const data = await sendBulkEmails(route);
 
       // Show success message
       const completedCount = route.stops.filter(s => s.status === 'COMPLETED').length;
@@ -553,11 +465,13 @@ export default function RouteDetailPage({
 
       console.log("📧 Bulk email results:", data);
 
-      // DO NOT refresh route data here - it's causing the JSON error
-      // The route data doesn't need to be refreshed after sending emails
-
     } catch (err) {
       console.error("📧 Error sending bulk emails:", err);
+
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
 
       // More detailed error message
       let errorMessage = "Failed to send emails";
@@ -583,36 +497,14 @@ export default function RouteDetailPage({
 
   // Delete route functions
   const handleDeleteRoute = async () => {
-    if (!token || !route) return;
+    if (!route) return;
 
     setDeleteLoading(true);
     setDeleteError("");
     setDeleteWarning(null);
 
     try {
-      const response = await fetch(`/api/admin/routes/${route.id}/delete`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.status === 409) {
-        // Route has completed stops, show warning
-        setDeleteWarning({
-          message: data.warning,
-          completedStops: data.completedStops,
-          totalStops: data.totalStops,
-        });
-        setDeleteLoading(false);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete route");
-      }
+      const data = await deleteRoute(route.id, false);
 
       // Success - route deleted
       console.log("Route deleted successfully:", data);
@@ -628,30 +520,36 @@ export default function RouteDetailPage({
       // Redirect to routes list
       router.push("/admin/routes");
     } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
+
+      // Check if it's a 409 conflict (completed stops warning)
+      if (err instanceof Error && err.message.includes("completed stops")) {
+        // Parse the error to extract warning details
+        setDeleteWarning({
+          message: err.message,
+          completedStops: 0, // Would need to be extracted from error
+          totalStops: route.stops.length,
+        });
+        setDeleteLoading(false);
+        return;
+      }
+
       setDeleteError(err instanceof Error ? err.message : "An error occurred");
       setDeleteLoading(false);
     }
   };
 
   const handleForceDelete = async () => {
-    if (!token || !route) return;
+    if (!route) return;
 
     setDeleteLoading(true);
     setDeleteError("");
 
     try {
-      const response = await fetch(`/api/admin/routes/${route.id}/delete?force=true`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete route");
-      }
+      const data = await deleteRoute(route.id, true);
 
       // Success - route deleted
       console.log("Route force deleted successfully:", data);
@@ -667,6 +565,11 @@ export default function RouteDetailPage({
       // Redirect to routes list
       router.push("/admin/routes");
     } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
+
       setDeleteError(err instanceof Error ? err.message : "An error occurred");
       setDeleteLoading(false);
     }
@@ -680,33 +583,18 @@ export default function RouteDetailPage({
   };
 
   // Function to update stop sequence
-  const updateStopSequence = async (stopId: string, newSequence: number) => {
+  const handleUpdateStopSequence = async (stopId: string, newSequence: number) => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      const response = await fetch(`/api/admin/stops/${stopId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sequence: newSequence,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update sequence");
-      }
+      await updateStopSequence(routeId, stopId, newSequence);
 
       // Refresh the route data
       fetchRouteDetails();
       setEditingSequence(null);
     } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
       console.error("Error updating sequence:", err);
       alert("Failed to update sequence. Please try again.");
     }
@@ -721,7 +609,7 @@ export default function RouteDetailPage({
   // Handle sequence edit save
   const saveSequence = (stopId: string) => {
     if (tempSequence > 0) {
-      updateStopSequence(stopId, tempSequence);
+      handleUpdateStopSequence(stopId, tempSequence);
     }
   };
 
@@ -771,22 +659,7 @@ export default function RouteDetailPage({
     setError("");
 
     try {
-      const response = await fetch(`/api/admin/routes/${routeId}/stops`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...addStopForm,
-          amount: addStopForm.amount ? parseFloat(addStopForm.amount) : null,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to add stop");
-      }
+      await addStop(routeId, addStopForm);
 
       // Reset form and close modal
       setAddStopForm({
@@ -806,6 +679,10 @@ export default function RouteDetailPage({
       // Refresh route details
       await fetchRouteDetails();
     } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setAddingStop(false);
@@ -991,11 +868,11 @@ export default function RouteDetailPage({
             ) : (stop.totalPaymentAmount || 0) > 0 ? (
               /* Show Excel payment breakdown */
               <div className="text-xs text-gray-500 mt-1">
-                {stop.paymentAmountCash > 0 && `Cash: $${stop.paymentAmountCash.toFixed(2)}`}
-                {stop.paymentAmountCash > 0 && (stop.paymentAmountCheck > 0 || stop.paymentAmountCC > 0) && ', '}
-                {stop.paymentAmountCheck > 0 && `Check: $${stop.paymentAmountCheck.toFixed(2)}`}
-                {stop.paymentAmountCheck > 0 && stop.paymentAmountCC > 0 && ', '}
-                {stop.paymentAmountCC > 0 && `CC: $${stop.paymentAmountCC.toFixed(2)}`}
+                {(stop.paymentAmountCash || 0) > 0 && `Cash: $${(stop.paymentAmountCash || 0).toFixed(2)}`}
+                {(stop.paymentAmountCash || 0) > 0 && ((stop.paymentAmountCheck || 0) > 0 || (stop.paymentAmountCC || 0) > 0) && ', '}
+                {(stop.paymentAmountCheck || 0) > 0 && `Check: $${(stop.paymentAmountCheck || 0).toFixed(2)}`}
+                {(stop.paymentAmountCheck || 0) > 0 && (stop.paymentAmountCC || 0) > 0 && ', '}
+                {(stop.paymentAmountCC || 0) > 0 && `CC: $${(stop.paymentAmountCC || 0).toFixed(2)}`}
               </div>
             ) : null}
           </div>
@@ -1023,24 +900,11 @@ export default function RouteDetailPage({
     );
   };
 
-  // Calculate total amount for a specific driver
-  const getDriverTotalAmount = (stops: Stop[]) => {
-    return stops.reduce((total, stop) => total + (stop.amount || 0), 0);
-  };
-
-  // Calculate total payment amount for a specific driver
-  const getDriverTotalPaymentAmount = (stops: Stop[]) => {
-    return stops.reduce((total, stop) => {
-      // Prioritize driver-recorded payments over Excel amounts
-      return total + (stop.driverPaymentAmount || stop.totalPaymentAmount || 0);
-    }, 0);
-  };
-
   // Droppable Driver Section Component
   const DroppableDriverSection = ({ driverName, stops }: { driverName: string; stops: Stop[] }) => {
     const { setNodeRef, isOver } = useSortable({ id: driverName });
-    const driverTotal = getDriverTotalAmount(stops);
-    const driverPaymentTotal = getDriverTotalPaymentAmount(stops);
+    const driverTotal = getTotalAmount(stops);
+    const driverPaymentTotal = getTotalPaymentAmount(stops);
 
     return (
       <div
@@ -1276,6 +1140,7 @@ export default function RouteDetailPage({
                 <button
                   onClick={() => handleExportRoute('json')}
                   disabled={exporting}
+                  style={{ display: 'none' }}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {exporting ? (
@@ -1299,6 +1164,63 @@ export default function RouteDetailPage({
                     </svg>
                   )}
                   {exporting ? "Exporting..." : "Export JSON"}
+                </button>
+                {/* Generate Image PDF Button (replaces ZIP archive) */}
+                <button
+                  onClick={handleGenerateImagePDF}
+                  disabled={isGeneratingImagePDF}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingImagePDF ? (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-4 w-4 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  )}
+                  {isGeneratingImagePDF ? "Generating PDF..." : `Generate PDF Report (${route?.stops?.reduce((total, stop) => total + (stop.invoiceImageUrls?.length || 0), 0) || 0})`}
+                </button>
+                {/* Legacy ZIP Archive Button (kept for backward compatibility) */}
+                <button
+                  onClick={handleGenerateImageReport}
+                  disabled={isGeneratingImageReport}
+                  style={{ display: 'none' }}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingImageReport ? (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-4 w-4 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  )}
+                  {isGeneratingImageReport ? "Archiving..." : `Legacy ZIP Archive`}
                 </button>
                 {/* Send Bulk Emails Button */}
                 <button
@@ -1425,142 +1347,7 @@ export default function RouteDetailPage({
       ) : route ? (
         <>
           {/* Route Summary */}
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="px-6 py-4 bg-gray-900 text-white border-b border-gray-200">
-              <h2 className="text-lg font-semibold">Route Summary</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <svg
-                      className="h-5 w-5 text-gray-500 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-                      />
-                    </svg>
-                    <h3 className="text-sm font-medium text-gray-500">
-                      Route Number
-                    </h3>
-                  </div>
-                  <p className="text-xl font-bold text-gray-900">
-                    {route.routeNumber || "N/A"}
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <svg
-                      className="h-5 w-5 text-gray-500 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <h3 className="text-sm font-medium text-gray-500">Date</h3>
-                  </div>
-                  <p className="text-xl font-bold text-gray-900">
-                    {formatDate(route.date)}
-                  </p>
-                </div>
-
-                {/* Hide the route driver since it's just a placeholder */}
-                {route.driver && route.driver.username !== "Route Admin" && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center mb-2">
-                      <svg
-                        className="h-5 w-5 text-gray-500 mr-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                      <h3 className="text-sm font-medium text-gray-500">
-                        Driver
-                      </h3>
-                    </div>
-                    <p className="text-xl font-bold text-gray-900">
-                      {route.driver?.fullName ||
-                        route.driver?.username ||
-                        "Unknown Driver"}
-                    </p>
-                  </div>
-                )}
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <svg
-                      className="h-5 w-5 text-gray-500 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <h3 className="text-sm font-medium text-gray-500">
-                      Status
-                    </h3>
-                  </div>
-                  <span
-                    className={`px-3 py-1 inline-flex text-sm font-medium rounded-full ${getStatusBadgeClass(
-                      route.status
-                    )}`}
-                  >
-                    {route.status.replace("_", " ")}
-                  </span>
-                </div>
-
-                {/* Drivers Assigned */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <svg
-                      className="h-5 w-5 text-gray-500 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <h3 className="text-sm font-medium text-gray-500">
-                      Drivers Assigned
-                    </h3>
-                  </div>
-                  <p className="text-xl font-bold text-gray-900">
-                    {Object.keys(getStopsGroupedByDriver()).length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <RouteSummary route={route} getStopsGroupedByDriver={getStopsGroupedByDriver} />
 
           {/* Stops List */}
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -1874,11 +1661,11 @@ export default function RouteDetailPage({
                                 ) : (stop.totalPaymentAmount || 0) > 0 ? (
                                   /* Show Excel payment breakdown */
                                   <div className="text-xs text-gray-500 mt-1">
-                                    {stop.paymentAmountCash > 0 && `Cash: $${stop.paymentAmountCash.toFixed(2)}`}
-                                    {stop.paymentAmountCash > 0 && (stop.paymentAmountCheck > 0 || stop.paymentAmountCC > 0) && ', '}
-                                    {stop.paymentAmountCheck > 0 && `Check: $${stop.paymentAmountCheck.toFixed(2)}`}
-                                    {stop.paymentAmountCheck > 0 && stop.paymentAmountCC > 0 && ', '}
-                                    {stop.paymentAmountCC > 0 && `CC: $${stop.paymentAmountCC.toFixed(2)}`}
+                                    {(stop.paymentAmountCash || 0) > 0 && `Cash: $${(stop.paymentAmountCash || 0).toFixed(2)}`}
+                                    {(stop.paymentAmountCash || 0) > 0 && ((stop.paymentAmountCheck || 0) > 0 || (stop.paymentAmountCC || 0) > 0) && ', '}
+                                    {(stop.paymentAmountCheck || 0) > 0 && `Check: $${(stop.paymentAmountCheck || 0).toFixed(2)}`}
+                                    {(stop.paymentAmountCheck || 0) > 0 && (stop.paymentAmountCC || 0) > 0 && ', '}
+                                    {(stop.paymentAmountCC || 0) > 0 && `CC: $${(stop.paymentAmountCC || 0).toFixed(2)}`}
                                   </div>
                                 ) : null}
                               </div>
@@ -1936,7 +1723,7 @@ export default function RouteDetailPage({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-lg font-bold text-green-600">
-                            ${getTotalAmount().toFixed(2)}
+                            ${route ? getTotalAmount(route.stops).toFixed(2) : '0.00'}
                           </div>
                         </td>
                         <td className="px-6 py-4"></td>
@@ -1996,426 +1783,37 @@ export default function RouteDetailPage({
       )}
 
       {/* Add Stop Modal */}
-      {showAddStopModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Add New Stop</h3>
-                <button
-                  onClick={handleCloseAddStopModal}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleAddStop} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Customer Name *
-                    </label>
-                    <CustomerDropdown
-                      value={addStopForm.customerNameFromUpload}
-                      onChange={handleCustomerSelect}
-                      placeholder="Select a customer..."
-                      required
-                    />
-                    {selectedCustomer && (
-                      <div className="mt-2 text-sm text-green-600">
-                        ✓ Customer found: {selectedCustomer.name}
-                        {selectedCustomer.groupCode && ` (${selectedCustomer.groupCode})`}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Assign to Driver *
-                    </label>
-                    <select
-                      value={addStopForm.driverId}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, driverId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">Select a driver</option>
-                      {drivers.map((driver) => (
-                        <option key={driver.id} value={driver.id}>
-                          {driver.fullName || driver.username}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Order Number
-                    </label>
-                    <input
-                      type="text"
-                      value={addStopForm.orderNumberWeb}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, orderNumberWeb: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Invoice Number
-                    </label>
-                    <input
-                      type="text"
-                      value={addStopForm.quickbooksInvoiceNum}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, quickbooksInvoiceNum: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      value={addStopForm.address}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, address: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Info
-                    </label>
-                    <input
-                      type="text"
-                      value={addStopForm.contactInfo}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, contactInfo: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={addStopForm.amount}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, amount: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="isCOD"
-                      checked={addStopForm.isCOD}
-                      onChange={(e) => setAddStopForm(prev => ({ ...prev, isCOD: e.target.checked }))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="isCOD" className="ml-2 block text-sm text-gray-900">
-                      Cash on Delivery (COD)
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Driver Notes
-                  </label>
-                  <textarea
-                    value={addStopForm.initialDriverNotes}
-                    onChange={(e) => setAddStopForm(prev => ({ ...prev, initialDriverNotes: e.target.value }))}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Any special instructions for the driver..."
-                  />
-                </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCloseAddStopModal}
-                    disabled={addingStop}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={addingStop}
-                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 flex items-center"
-                  >
-                    {addingStop && (
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    )}
-                    Add Stop
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddStopModal
+        show={showAddStopModal}
+        onClose={handleCloseAddStopModal}
+        onSubmit={handleAddStop}
+        form={addStopForm}
+        setForm={setAddStopForm}
+        drivers={drivers}
+        selectedCustomer={selectedCustomer}
+        onCustomerSelect={handleCustomerSelect}
+        adding={addingStop}
+        error={error}
+      />
 
       {/* Delete Confirmation Dialog */}
-      {showDeleteDialog && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">
-                <svg
-                  className="w-6 h-6 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-              </div>
-              <div className="mt-4 text-center">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Delete Route
-                </h3>
-                <div className="mt-2 px-7 py-3">
-                  {deleteWarning ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-gray-500">
-                        {deleteWarning.message}
-                      </p>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                        <div className="flex">
-                          <div className="flex-shrink-0">
-                            <svg
-                              className="h-5 w-5 text-yellow-400"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm text-yellow-700">
-                              <strong>Warning:</strong> This route has {deleteWarning.completedStops} completed stops out of {deleteWarning.totalStops} total stops.
-                              Deleting this route will permanently remove all delivery data and cannot be undone.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        Are you sure you want to permanently delete this route and all its data?
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">
-                      Are you sure you want to delete route "{route?.routeNumber}"?
-                      This action cannot be undone and will permanently remove the route and all its stops.
-                    </p>
-                  )}
-                </div>
-
-                {deleteError && (
-                  <div className="mt-3 bg-red-50 border border-red-200 rounded-md p-3">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="h-5 w-5 text-red-400"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-red-700">{deleteError}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-center space-x-3 mt-6">
-                  <button
-                    onClick={resetDeleteDialog}
-                    disabled={deleteLoading}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  {deleteWarning ? (
-                    <button
-                      onClick={handleForceDelete}
-                      disabled={deleteLoading}
-                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
-                    >
-                      {deleteLoading && (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      )}
-                      Force Delete
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleDeleteRoute}
-                      disabled={deleteLoading}
-                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
-                    >
-                      {deleteLoading && (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      )}
-                      Delete Route
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteRouteDialog
+        show={showDeleteDialog}
+        route={route}
+        deleteWarning={deleteWarning}
+        deleteError={deleteError}
+        deleteLoading={deleteLoading}
+        onResetDeleteDialog={resetDeleteDialog}
+        onHandleDeleteRoute={handleDeleteRoute}
+        onHandleForceDelete={handleForceDelete}
+      />
 
       {/* Email Results Modal */}
-      {showEmailResults && emailResults && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  📧 Email Sending Results
-                </h3>
-                <button
-                  onClick={() => setShowEmailResults(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">
-                    Route: {emailResults.route?.routeNumber || 'N/A'}
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {emailResults.summary}
-                  </p>
-                  <div className="flex space-x-4 text-sm">
-                    <span className="text-green-600">
-                      ✅ Sent: {emailResults.results?.sent || 0}
-                    </span>
-                    <span className="text-red-600">
-                      ❌ Failed: {emailResults.results?.failed || 0}
-                    </span>
-                    <span className="text-gray-600">
-                      📊 Total: {emailResults.results?.total || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {emailResults.results?.details && emailResults.results.details.length > 0 && (
-                <div className="max-h-96 overflow-y-auto">
-                  <h4 className="font-medium text-gray-900 mb-2">Detailed Results:</h4>
-                  <div className="space-y-2">
-                    {emailResults.results.details.map((detail: any, index: number) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded-lg border ${
-                          detail.status === 'sent'
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-red-50 border-red-200'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium text-gray-900">
-                              {detail.customer}
-                            </span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              (Order: {detail.orderNumber})
-                            </span>
-                          </div>
-                          <span className={`text-sm font-medium ${
-                            detail.status === 'sent' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {detail.status === 'sent' ? '✅ Sent' : '❌ Failed'}
-                          </span>
-                        </div>
-                        {detail.error && (
-                          <p className="text-sm text-red-600 mt-1">
-                            Error: {detail.error}
-                          </p>
-                        )}
-                        {detail.messageId && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Message ID: {detail.messageId}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {emailResults.results?.errors && emailResults.results.errors.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="font-medium text-red-900 mb-2">Errors:</h4>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <ul className="text-sm text-red-700 space-y-1">
-                      {emailResults.results.errors.map((error: string, index: number) => (
-                        <li key={index}>• {error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowEmailResults(false)}
-                  className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EmailResultsModal
+        show={showEmailResults}
+        emailResults={emailResults}
+        onClose={() => setShowEmailResults(false)}
+      />
     </div>
   );
 }

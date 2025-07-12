@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
+import { getTodayStartUTC, getTodayEndUTC } from "@/lib/timezone";
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,10 +23,11 @@ export async function GET(request: NextRequest) {
     const driverFilter = searchParams.get("driver");
     const routeFilter = searchParams.get("route");
 
-    // Get today's date range
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+
+    // Get today's date range in PST timezone
+    const startOfDay = getTodayStartUTC();
+    const endOfDay = getTodayEndUTC();
 
     // Build where clause for routes
     const routeWhere: any = {
@@ -36,18 +38,33 @@ export async function GET(request: NextRequest) {
       isDeleted: false,
     };
 
-    // Add driver filter if specified
+    // Get driver info if filtering by driver
+    let selectedDriver = null;
     if (driverFilter) {
-      routeWhere.OR = [
-        { driverId: driverFilter },
-        {
-          stops: {
-            some: {
-              driverNameFromUpload: driverFilter,
-            },
-          },
+      selectedDriver = await prisma.user.findUnique({
+        where: {
+          username: driverFilter,
+          role: "DRIVER",
+          isDeleted: false,
         },
-      ];
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+        },
+      });
+
+      if (!selectedDriver) {
+        console.log("Driver not found:", driverFilter);
+        // If driver not found, return empty results
+        return NextResponse.json({
+          stops: [],
+          drivers: [],
+          routes: [],
+        });
+      }
+
+      console.log("Selected driver:", selectedDriver);
     }
 
     // Add route filter if specified
@@ -55,12 +72,36 @@ export async function GET(request: NextRequest) {
       routeWhere.id = routeFilter;
     }
 
+    // Build stop filter - this is the main filter that determines which stops to return
+    const stopWhere: any = {
+      route: {
+        ...routeWhere,
+      },
+      isDeleted: false,
+    };
+
+    // If driver filter is applied, filter stops by driver assignment
+    if (selectedDriver) {
+      stopWhere.OR = [
+        // Stops assigned via driverNameFromUpload (exact username match)
+        { driverNameFromUpload: selectedDriver.username },
+        // Also check by full name if it exists
+        ...(selectedDriver.fullName ? [{ driverNameFromUpload: selectedDriver.fullName }] : []),
+        // Stops on routes where this driver is the primary driver
+        {
+          route: {
+            driverId: selectedDriver.id,
+            ...routeWhere, // Include the date and other route filters
+          },
+        },
+      ];
+    }
+
+    console.log("Stop query where clause:", JSON.stringify(stopWhere, null, 2));
+
     // Get today's stops with route and customer information
     const stops = await prisma.stop.findMany({
-      where: {
-        route: routeWhere,
-        isDeleted: false,
-      },
+      where: stopWhere,
       select: {
         id: true,
         sequence: true,
@@ -92,6 +133,9 @@ export async function GET(request: NextRequest) {
         stopDocuments: {
           where: {
             isDeleted: false,
+            document: {
+              isDeleted: false, // Also filter out deleted documents
+            },
           },
           include: {
             document: {
@@ -100,13 +144,9 @@ export async function GET(request: NextRequest) {
                 title: true,
                 type: true,
                 fileName: true,
+                filePath: true, // Include filePath for document viewing
               },
             },
-          },
-        },
-        _count: {
-          select: {
-            stopDocuments: true,
           },
         },
       },
@@ -157,8 +197,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Add document count to each stop based on the filtered stopDocuments
+    const stopsWithCount = stops.map(stop => ({
+      ...stop,
+      _count: {
+        stopDocuments: stop.stopDocuments.length, // Count only the filtered documents
+      },
+    }));
+
     return NextResponse.json({
-      stops,
+      stops: stopsWithCount,
       drivers,
       routes,
     });

@@ -6,6 +6,7 @@ import {
   emitStopStatusUpdate,
   emitRouteStatusUpdate,
 } from "@/app/api/socketio/route";
+import { getPSTDate } from "@/lib/timezone";
 
 // GET /api/driver/stops/[id] - Get a specific stop for the driver
 export async function GET(
@@ -252,8 +253,8 @@ export async function PATCH(
       }
     }
 
-    // Automatically set timestamps based on status changes
-    const now = new Date();
+    // Automatically set timestamps based on status changes (using PST timezone)
+    const now = getPSTDate();
 
     // If status is changing to ON_THE_WAY, record the timestamp
     if (data.status === "ON_THE_WAY") {
@@ -629,7 +630,7 @@ export async function PATCH(
                 },
                 data: {
                   status: "ON_THE_WAY",
-                  onTheWayTime: new Date(), // Set timestamp when automatically updating to ON_THE_WAY
+                  onTheWayTime: getPSTDate(), // Set timestamp when automatically updating to ON_THE_WAY (PST)
                 },
                 include: {
                   customer: {

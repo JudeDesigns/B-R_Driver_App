@@ -48,6 +48,7 @@ interface Stop {
       title: string;
       type: string;
       fileName: string;
+      filePath: string; // Added for document viewing functionality
     };
   }>;
   _count: {
@@ -84,6 +85,15 @@ export default function DocumentManagementPage() {
   const [selectedStopForUpload, setSelectedStopForUpload] = useState<string>('');
   const [showStopDetailsModal, setShowStopDetailsModal] = useState(false);
   const [selectedStopForDetails, setSelectedStopForDetails] = useState<Stop | null>(null);
+
+  // Invoice-specific fields for stop documents
+  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('');
+  const [invoiceAmount, setInvoiceAmount] = useState<string>('');
+
+  // Delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
   // Document management states
   const [showEditModal, setShowEditModal] = useState(false);
@@ -204,14 +214,19 @@ export default function DocumentManagementPage() {
     }
   };
 
-  // Document types
-  const documentTypes = [
+  // Document types - filtered based on upload type
+  const allDocumentTypes = [
     { value: "INVOICE", label: "Invoice" },
     { value: "CREDIT_MEMO", label: "Credit Memo" },
     { value: "DELIVERY_RECEIPT", label: "Statement" },
     { value: "RETURN_FORM", label: "Return Form" },
     { value: "OTHER", label: "Other" },
   ];
+
+  // Filter document types based on upload type
+  const documentTypes = uploadType === 'customer'
+    ? allDocumentTypes.filter(type => type.value !== 'INVOICE') // Hide Invoice for customer documents
+    : allDocumentTypes; // Show all types for stop documents
 
   // Function to get proper document type label
   const getDocumentTypeLabel = (type: string) => {
@@ -275,6 +290,51 @@ export default function DocumentManagementPage() {
     setShowStopDetailsModal(true);
   };
 
+  // Handle stop document deletion
+  const handleDeleteStopDocument = async (documentId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showNotification('error', 'Authentication Error', 'Please log in again');
+        return;
+      }
+
+      const response = await fetch(`/api/admin/documents/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Failed to delete document: ${response.status} - ${errorData}`);
+      }
+
+      showNotification('success', 'Success', 'Document deleted successfully');
+
+      // Refresh the stops data
+      const stopsResponse = await fetch('/api/admin/stops/today', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (stopsResponse.ok) {
+        const stopsData = await stopsResponse.json();
+        setStops(stopsData);
+      }
+
+      // Close the modal and reset states
+      setShowDeleteConfirm(false);
+      setDocumentToDelete(null);
+
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      showNotification('error', 'Error', 'Failed to delete document');
+    }
+  };
+
   const handleUploadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -323,6 +383,12 @@ export default function DocumentManagementPage() {
         uploadFormData.append('customerId', customerId);
       } else if (uploadType === 'stop') {
         uploadFormData.append('stopId', selectedStopForUpload);
+
+        // Add invoice-specific data if this is an invoice document
+        if (type === 'INVOICE') {
+          uploadFormData.append('invoiceNumber', invoiceNumber);
+          uploadFormData.append('invoiceAmount', invoiceAmount);
+        }
       }
 
       const response = await fetch('/api/admin/documents', {
@@ -351,6 +417,9 @@ export default function DocumentManagementPage() {
       setShowUploadModal(false);
       setSelectedStopForUpload('');
       setUploadType('customer');
+      setSelectedDocumentType('');
+      setInvoiceNumber('');
+      setInvoiceAmount('');
 
       // Refresh data
       fetchDocuments();
@@ -444,12 +513,14 @@ export default function DocumentManagementPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleString('en-US', {
+      timeZone: "America/Los_Angeles",
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: true,
     });
   };
 
@@ -807,6 +878,8 @@ export default function DocumentManagementPage() {
                   </label>
                   <select
                     name="type"
+                    value={selectedDocumentType}
+                    onChange={(e) => setSelectedDocumentType(e.target.value)}
                     required
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -818,6 +891,38 @@ export default function DocumentManagementPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* Invoice-specific fields for stop documents */}
+                {uploadType === 'stop' && selectedDocumentType === 'INVOICE' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Invoice Number
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        placeholder="Enter invoice number..."
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Total Amount
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={invoiceAmount}
+                        onChange={(e) => setInvoiceAmount(e.target.value)}
+                        placeholder="Enter total amount..."
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -930,7 +1035,10 @@ export default function DocumentManagementPage() {
                                 <p className="font-medium text-gray-900">{doc.title}</p>
                                 <p className="text-sm text-gray-500">{doc.type.replace('_', ' ')} • {doc.fileName}</p>
                               </div>
-                              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                              <button
+                                onClick={() => handleViewDocument(doc)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              >
                                 View
                               </button>
                             </div>
@@ -965,9 +1073,23 @@ export default function DocumentManagementPage() {
                                 <p className="font-medium text-gray-900">{stopDoc.document.title}</p>
                                 <p className="text-sm text-gray-500">{stopDoc.document.type.replace('_', ' ')} • {stopDoc.document.fileName}</p>
                               </div>
-                              <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                View
-                              </button>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleViewDocument(stopDoc.document)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDocumentToDelete(stopDoc.document.id);
+                                    setShowDeleteConfirm(true);
+                                  }}
+                                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1126,6 +1248,55 @@ export default function DocumentManagementPage() {
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Delete Document
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stop Document Delete Confirmation Modal */}
+      {showDeleteConfirm && documentToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-lg font-medium text-gray-900">Delete Stop Document</h3>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-600">
+                  Are you sure you want to delete this stop-specific document?
+                  This action cannot be undone. The document will be permanently removed from the system.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDocumentToDelete(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (documentToDelete) {
+                      handleDeleteStopDocument(documentToDelete);
+                    }
+                  }}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                 >
                   Delete Document

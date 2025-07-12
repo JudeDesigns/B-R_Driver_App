@@ -3,6 +3,7 @@ import { PrismaClient, User, Customer, Route, Stop } from "@prisma/client";
 import prisma from "./db";
 import { InputValidator } from "./security";
 import { createPSTDate, getPSTDateString } from "./timezone";
+import { shouldIgnoreDriver, shouldIgnoreCustomer } from "./routeValidation";
 
 // Define the structure for a parsed stop
 export interface ParsedStop {
@@ -30,60 +31,7 @@ export interface ParsedStop {
   totalPaymentAmount?: number; // Sum of all payment amounts
 }
 
-/**
- * Check if a driver name should be ignored
- * @param driverName The driver name to check
- * @returns True if the driver name should be ignored, false otherwise
- */
-function shouldIgnoreDriver(driverName: string): boolean {
-  if (!driverName) return true;
 
-  // Convert to uppercase for case-insensitive comparison
-  const upperName = driverName.toUpperCase();
-
-  // Check for specific strings that indicate this is not a valid driver
-  if (
-    upperName.includes("INV") ||
-    upperName.includes("CRM") ||
-    upperName.includes("@") ||
-    upperName.includes("CUSTOMER") ||
-    upperName === "LUIS" ||
-    upperName === "BARAK" ||
-    upperName === "KHIARA" ||
-    upperName.includes("BARAK CUSTOMER") ||
-    // Add more specific names to ignore if needed
-    upperName.includes("ADMIN") ||
-    upperName.includes("TEST") ||
-    upperName.includes("UNKNOWN")
-  ) {
-    return true;
-  }
-
-  // Check if the name contains any non-alphabetic characters (except spaces and hyphens)
-  // This helps filter out names that might be codes or other non-name strings
-  const validNamePattern = /^[A-Za-z\s\-]+$/;
-  if (!validNamePattern.test(driverName)) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Check if a customer name should be ignored
- * @param customerName The customer name to check
- * @returns True if the customer name should be ignored, false otherwise
- */
-function shouldIgnoreCustomer(customerName: string): boolean {
-  if (!customerName) return true;
-
-  // Check for email addresses (contains @)
-  if (customerName.includes("@")) {
-    return true;
-  }
-
-  return false;
-}
 
 // Define the structure for a parsed route
 export interface ParsedRoute {
@@ -207,10 +155,10 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       paymentAmountCC: headerMap.get("Credit Card Amount") ?? -1, // Column AM
     };
 
-    // Always use column AI (index 34) for invoice numbers as specified
+    // Always use column AJ (index 35) for invoice numbers as specified
     // This overrides any column mapping that might have been found by name
-    columnIndices.quickbooksInvoiceNum = 34; // Column AI (0-based index)
-    console.log("Using column AI (index 34) for invoice numbers as specified");
+    columnIndices.quickbooksInvoiceNum = 35; // Column AJ (0-based index)
+    console.log("Using column AJ (index 35) for invoice numbers as specified");
 
     // Always use column C (index 2) for driver names as specified
     // This overrides any column mapping that might have been found by name
@@ -359,10 +307,10 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           row[columnIndices.customerName]?.toString() || "";
         const rawSequence = row[columnIndices.sequence]?.toString() || "0";
 
-        // Validate and sanitize customer name
+        // Validate and sanitize customer name (preserve business characters like & and ')
         let customerName = "";
         try {
-          customerName = InputValidator.sanitizeString(rawCustomerName, 100);
+          customerName = InputValidator.sanitizeCustomerName(rawCustomerName, 100);
           if (customerName.length < 2) {
             throw new Error("Customer name too short");
           }
@@ -399,39 +347,10 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
               : "";
           })(),
           quickbooksInvoiceNum: (() => {
-            // Try multiple approaches to get the invoice number
+            // ONLY use column AJ (index 35) for invoice numbers - no fallback logic
+            // This prevents web order numbers from being incorrectly used as invoice numbers
 
-            // 1. Try direct access to column AI (index 34)
-            let rawValue = row[34]; // Column AI (0-based index)
-
-            // 2. If that fails, try using the mapped column index
-            if (rawValue === undefined || rawValue === null) {
-              rawValue = row[columnIndices.quickbooksInvoiceNum];
-            }
-
-            // 3. If both fail, try searching for a column with "Invoice" in the header
-            if (rawValue === undefined || rawValue === null) {
-              // Look for any column that might contain invoice data
-              for (let i = 0; i < row.length; i++) {
-                if (row[i] !== undefined && row[i] !== null) {
-                  const cellValue = row[i].toString().trim();
-                  // If the cell value looks like an invoice number (contains digits)
-                  if (
-                    /\d/.test(cellValue) &&
-                    cellValue.length > 3 &&
-                    cellValue.length < 20
-                  ) {
-                    rawValue = row[i];
-                    console.log(
-                      `Found potential invoice number in column ${i}: ${cellValue}`
-                    );
-                    break;
-                  }
-                }
-              }
-            }
-
-            // Process the invoice number based on its type and format
+            let rawValue = row[35]; // Column AJ (0-based index)
             let invoiceNum: string = "";
 
             if (rawValue !== undefined && rawValue !== null) {
@@ -439,24 +358,18 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
               invoiceNum = rawValue.toString().trim();
             }
 
-            // Log all values in the row for debugging
-            const rowValues = [];
-            for (let i = 30; i < 40; i++) {
-              if (row[i] !== undefined && row[i] !== null) {
-                rowValues.push(`Col ${i}: ${row[i]}`);
-              }
-            }
-
+            // Enhanced debug logging to track the exact values
             console.log(`Row ${rowIndex} - Invoice # Debug:`, {
               customerName: row[columnIndices.customerName]?.toString() || "",
-              directColumnAI: row[34],
-              mappedColumnIndex: columnIndices.quickbooksInvoiceNum,
-              mappedValue: row[columnIndices.quickbooksInvoiceNum],
+              columnAJ_index35: row[35],
+              columnAJ_type: typeof row[35],
+              columnAJ_isEmpty: row[35] === undefined || row[35] === null || row[35] === "",
               finalInvoiceNum: invoiceNum,
-              columnsAE_to_AJ: rowValues,
+              webOrderColumn: row[columnIndices.orderNumberWeb],
+              webOrderValue: row[columnIndices.orderNumberWeb]?.toString() || "",
             });
 
-            return invoiceNum; // Always return a string (empty if no value)
+            return invoiceNum; // Return empty string if column AJ is empty
           })(),
           initialDriverNotes:
             row[columnIndices.initialDriverNotes]?.toString() || undefined,
@@ -1073,19 +986,23 @@ export async function saveRouteToDatabase(
         );
       }
 
-      // Log the invoice numbers being used
-      console.log(`Stop for ${parsedStop.customerName}:`, {
-        isUpdate,
-        existingInvoiceNum: existingInvoiceData?.quickbooksInvoiceNum,
-        newInvoiceNum: parsedStop.quickbooksInvoiceNum,
-        finalInvoiceNum: quickbooksInvoiceNum,
-        existingOrderNum: existingInvoiceData?.orderNumberWeb,
-        newOrderNum: parsedStop.orderNumberWeb,
-        finalOrderNum: orderNumberWeb,
-        invoiceNumType: typeof quickbooksInvoiceNum,
-        orderNumType: typeof orderNumberWeb,
-        customerEmail: parsedStop.customerEmail,
+      // Enhanced logging to track invoice number assignment
+      console.log(`=== INVOICE NUMBER TRACKING for ${parsedStop.customerName} ===`);
+      console.log(`Parsed from Excel:`, {
+        quickbooksInvoiceNum: parsedStop.quickbooksInvoiceNum,
+        quickbooksInvoiceNum_type: typeof parsedStop.quickbooksInvoiceNum,
+        quickbooksInvoiceNum_isEmpty: !parsedStop.quickbooksInvoiceNum || parsedStop.quickbooksInvoiceNum === "",
+        orderNumberWeb: parsedStop.orderNumberWeb,
+        orderNumberWeb_type: typeof parsedStop.orderNumberWeb,
+        orderNumberWeb_isEmpty: !parsedStop.orderNumberWeb || parsedStop.orderNumberWeb === "",
       });
+      console.log(`Final values being saved to database:`, {
+        finalInvoiceNum: quickbooksInvoiceNum,
+        finalOrderNum: orderNumberWeb,
+        isUpdate,
+        existingInvoiceData: existingInvoiceData,
+      });
+      console.log(`=== END INVOICE NUMBER TRACKING ===`);
 
       // Log the data being used to create the stop
       const stopData = {

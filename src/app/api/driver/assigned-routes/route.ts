@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
 
 
 // GET /api/driver/assigned-routes - Get routes where the driver is assigned to stops
@@ -54,18 +55,38 @@ export async function GET(request: NextRequest) {
     // First, find all stops assigned to this driver
     const driverName = driver.fullName || driver.username;
     
+    // Prepare date filter
+    let dateFilter = {};
+    if (date) {
+      if (date === getPSTDateString()) {
+        // For "today", use PST timezone-aware date range
+        dateFilter = {
+          date: {
+            gte: getTodayStartUTC(),
+            lt: getTodayEndUTC(),
+          },
+        };
+      } else {
+        // For other dates, use the provided date
+        dateFilter = {
+          date: {
+            gte: new Date(date + 'T00:00:00Z'),
+            lt: new Date(date + 'T23:59:59Z'),
+          },
+        };
+      }
+    }
+
+    // Prepare status filter
+    const statusFilter = status ? { status: status as any } : {};
+
     // Get routes where the driver is directly assigned
     const directlyAssignedRoutes = await prisma.route.findMany({
       where: {
         driverId: decoded.id,
         isDeleted: false,
-        ...(date ? {
-          date: {
-            gte: new Date(date + 'T00:00:00'),
-            lte: new Date(date + 'T23:59:59'),
-          },
-        } : {}),
-        ...(status ? { status } : {}),
+        ...dateFilter,
+        ...statusFilter,
       },
       include: {
         _count: {
@@ -96,13 +117,8 @@ export async function GET(request: NextRequest) {
           },
         },
         isDeleted: false,
-        ...(date ? {
-          date: {
-            gte: new Date(date + 'T00:00:00'),
-            lte: new Date(date + 'T23:59:59'),
-          },
-        } : {}),
-        ...(status ? { status } : {}),
+        ...dateFilter,
+        ...statusFilter,
       },
       include: {
         _count: {

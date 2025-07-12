@@ -95,11 +95,14 @@ export async function GET(request: NextRequest) {
       return new NextResponse("No routes found for export", { status: 400 });
     }
 
-    // Helper functions for clean data formatting
+    // Helper functions for clean data formatting in PST timezone
     const formatDate = (date: any): string => {
       if (!date) return "";
       try {
-        return new Date(date).toISOString().split('T')[0]; // YYYY-MM-DD format
+        const dateObj = new Date(date);
+        return dateObj.toLocaleDateString("en-CA", {
+          timeZone: "America/Los_Angeles"
+        }); // YYYY-MM-DD format in PST
       } catch {
         return "";
       }
@@ -109,6 +112,7 @@ export async function GET(request: NextRequest) {
       if (!date) return "";
       try {
         return new Date(date).toLocaleString('en-US', {
+          timeZone: "America/Los_Angeles",
           year: 'numeric',
           month: '2-digit',
           day: '2-digit',

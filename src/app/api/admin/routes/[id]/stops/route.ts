@@ -5,10 +5,9 @@ import { verifyToken } from "@/lib/auth";
 // POST /api/admin/routes/[id]/stops - Add a new stop to a route
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const params = await context.params;
-  const { id: routeId } = params;
+  const { id: routeId } = await params;
 
   try {
     // Verify authentication

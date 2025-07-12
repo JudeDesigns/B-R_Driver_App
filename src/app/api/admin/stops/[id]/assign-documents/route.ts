@@ -114,6 +114,9 @@ export async function GET(
       where: {
         stopId,
         isDeleted: false,
+        document: {
+          isDeleted: false, // Filter out deleted documents
+        },
       },
       include: {
         document: {

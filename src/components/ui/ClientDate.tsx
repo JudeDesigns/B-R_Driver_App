@@ -6,14 +6,25 @@ export default function ClientDate() {
   const [date, setDate] = useState<string>('');
 
   useEffect(() => {
-    // Set the date only on the client side
-    setDate(new Date().toLocaleString());
-    
-    // Update the date every second
-    const interval = setInterval(() => {
-      setDate(new Date().toLocaleString());
-    }, 60000); // Update every minute
-    
+    // Set the date only on the client side in PST timezone
+    const updateDate = () => {
+      setDate(new Date().toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: true,
+      }));
+    };
+
+    updateDate(); // Set initial date
+
+    // Update the date every minute
+    const interval = setInterval(updateDate, 60000);
+
     return () => clearInterval(interval);
   }, []);
 

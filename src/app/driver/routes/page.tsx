@@ -172,6 +172,7 @@ export default function DriverRoutesPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
+      timeZone: "America/Los_Angeles",
       year: "numeric",
       month: "short",
       day: "numeric",
