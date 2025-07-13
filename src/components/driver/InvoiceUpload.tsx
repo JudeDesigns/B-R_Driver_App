@@ -90,15 +90,15 @@ export default function InvoiceUpload({
         );
       }
 
-      // Show success message and redirect to dashboard
-      console.log("Delivery completed successfully, redirecting to dashboard...");
+      // Show success message and redirect to stops page
+      console.log("Delivery completed successfully, redirecting to stops page...");
 
       // Small delay to show success state, then redirect
       setTimeout(() => {
         // Check if token is still valid before redirecting
         const currentToken = sessionStorage.getItem("token") || localStorage.getItem("token");
         if (currentToken) {
-          router.push("/driver/dashboard");
+          router.push("/driver/stops");
         } else {
           // Token expired, redirect to login
           console.log("Token expired during delivery, redirecting to login");

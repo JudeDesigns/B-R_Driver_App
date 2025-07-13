@@ -244,9 +244,9 @@ export default function EndRoutePage() {
 
       setSuccess("Route completed successfully!");
 
-      // Redirect to dashboard after a short delay
+      // Redirect to main driver page after a short delay
       setTimeout(() => {
-        router.push("/driver/dashboard");
+        router.push("/driver");
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

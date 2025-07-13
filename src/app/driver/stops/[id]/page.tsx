@@ -458,11 +458,11 @@ export default function StopDetailPage({
         }
       }
 
-      // If status is COMPLETED, redirect to dashboard after a short delay
+      // If status is COMPLETED, redirect to stops page after a short delay
       if (newStatus === "COMPLETED") {
-        console.log("Delivery completed successfully, redirecting to dashboard...");
+        console.log("Delivery completed successfully, redirecting to stops page...");
         setTimeout(() => {
-          router.push("/driver/dashboard");
+          router.push("/driver/stops");
         }, 1500);
       } else {
         // Refresh stop details for other status updates

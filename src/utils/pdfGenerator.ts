@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+
 
 // Function to convert image to base64
 async function imageToBase64(imagePath: string): Promise<string | null> {
@@ -225,205 +225,27 @@ export async function generateDeliveryPDF(
   console.log(`📄 Starting PDF generation for stop ${stop.id} with ${imageUrls.length} images...`);
 
   try {
-    // Create a new PDF document using pdf-lib (more reliable than Puppeteer)
-    const pdfDoc = await PDFDocument.create();
-    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Convert image URLs to embedded images for the HTML template
+    const embeddedImages: EmbeddedImage[] = [];
 
-    // Add first page
-    let page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-    const margin = 50;
-    let yPosition = height - margin;
-
-    // Helper function to add new page if needed
-    const addNewPageIfNeeded = (requiredHeight: number) => {
-      if (yPosition - requiredHeight < margin) {
-        page = pdfDoc.addPage();
-        yPosition = height - margin;
-      }
-    };
-
-    // Helper function to draw text
-    const drawText = (text: string, x: number, y: number, options: any = {}) => {
-      page.drawText(text, {
-        x,
-        y,
-        font: options.font || helveticaFont,
-        size: options.size || 12,
-        color: options.color || rgb(0, 0, 0),
-        ...options
+    for (const imageUrl of imageUrls) {
+      const base64 = await imageToBase64(imageUrl.url);
+      embeddedImages.push({
+        name: imageUrl.name,
+        base64: base64
       });
-    };
-
-    // Title
-    drawText('B&R Food Services - Delivery Confirmation', margin, yPosition, {
-      font: helveticaBoldFont,
-      size: 18,
-      color: rgb(0.2, 0.2, 0.8)
-    });
-    yPosition -= 40;
-
-    // Customer Information
-    drawText('Customer Information', margin, yPosition, {
-      font: helveticaBoldFont,
-      size: 14
-    });
-    yPosition -= 25;
-
-    drawText(`Customer: ${stop.customerName}`, margin + 20, yPosition);
-    yPosition -= 20;
-    drawText(`Address: ${stop.customerAddress}`, margin + 20, yPosition);
-    yPosition -= 20;
-    drawText(`Route: ${stop.routeNumber}`, margin + 20, yPosition);
-    yPosition -= 20;
-    drawText(`Invoice: ${stop.quickbooksInvoiceNum || stop.orderNumberWeb || 'N/A'}`, margin + 20, yPosition);
-    yPosition -= 30;
-
-    // Delivery Information
-    drawText('Delivery Information', margin, yPosition, {
-      font: helveticaBoldFont,
-      size: 14
-    });
-    yPosition -= 25;
-
-    if (stop.arrivalTime) {
-      drawText(`Arrival Time: ${new Date(stop.arrivalTime).toLocaleString()}`, margin + 20, yPosition);
-      yPosition -= 20;
-    }
-    if (stop.completionTime) {
-      drawText(`Completion Time: ${new Date(stop.completionTime).toLocaleString()}`, margin + 20, yPosition);
-      yPosition -= 20;
-    }
-    if (stop.amount) {
-      drawText(`Amount: $${stop.amount.toFixed(2)}`, margin + 20, yPosition);
-      yPosition -= 20;
-    }
-    yPosition -= 10;
-
-    // Payment Information
-    if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
-      drawText('Payment Information', margin, yPosition, {
-        font: helveticaBoldFont,
-        size: 14
-      });
-      yPosition -= 25;
-
-      drawText(`Payment Amount: $${stop.driverPaymentAmount.toFixed(2)}`, margin + 20, yPosition);
-      yPosition -= 20;
-
-      if (stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0) {
-        drawText(`Payment Methods: ${stop.driverPaymentMethods.join(', ')}`, margin + 20, yPosition);
-        yPosition -= 20;
-      }
-      yPosition -= 10;
     }
 
-    // Driver Notes
-    if (stop.driverNotes) {
-      drawText('Driver Notes', margin, yPosition, {
-        font: helveticaBoldFont,
-        size: 14
-      });
-      yPosition -= 25;
-
-      drawText(stop.driverNotes, margin + 20, yPosition);
-      yPosition -= 30;
-    }
-
-    // Returns Information
-    if (returns && returns.length > 0) {
-      addNewPageIfNeeded(100);
-      drawText('Returns', margin, yPosition, {
-        font: helveticaBoldFont,
-        size: 14
-      });
-      yPosition -= 25;
-
-      for (const returnItem of returns) {
-        addNewPageIfNeeded(40);
-        drawText(`• ${returnItem.productSku}: ${returnItem.productDescription}`, margin + 20, yPosition);
-        yPosition -= 15;
-        drawText(`  Quantity: ${returnItem.quantity}, Reason: ${returnItem.reasonCode}`, margin + 30, yPosition);
-        yPosition -= 20;
-      }
-      yPosition -= 10;
-    }
-
-    // Process and embed images
-    console.log(`📄 Processing ${imageUrls.length} images for PDF embedding...`);
-
-    for (let i = 0; i < imageUrls.length; i++) {
-      const imageUrl = imageUrls[i];
-      console.log(`📄 Processing image ${i + 1}/${imageUrls.length}: ${imageUrl.name}`);
-
-      try {
-        const imagePath = path.join(process.cwd(), 'public', imageUrl.url.replace('/uploads/', 'uploads/'));
-        const imageBuffer = await fs.readFile(imagePath);
-
-        let embeddedImage;
-        const imageExtension = path.extname(imageUrl.url).toLowerCase();
-
-        if (imageExtension === '.png') {
-          embeddedImage = await pdfDoc.embedPng(imageBuffer);
-        } else if (imageExtension === '.jpg' || imageExtension === '.jpeg') {
-          embeddedImage = await pdfDoc.embedJpg(imageBuffer);
-        } else {
-          console.warn(`⚠️ Unsupported image format: ${imageExtension}`);
-          continue;
-        }
-
-        // Calculate image dimensions to fit within page
-        const maxImageWidth = width - (margin * 2);
-        const maxImageHeight = 300;
-
-        const imageAspectRatio = embeddedImage.width / embeddedImage.height;
-        let imageWidth = Math.min(maxImageWidth, embeddedImage.width);
-        let imageHeight = imageWidth / imageAspectRatio;
-
-        if (imageHeight > maxImageHeight) {
-          imageHeight = maxImageHeight;
-          imageWidth = imageHeight * imageAspectRatio;
-        }
-
-        // Check if we need a new page for the image
-        addNewPageIfNeeded(imageHeight + 40);
-
-        // Draw image label
-        drawText(`Image ${i + 1}:`, margin, yPosition, {
-          font: helveticaBoldFont,
-          size: 12
-        });
-        yPosition -= 20;
-
-        // Draw the image
-        page.drawImage(embeddedImage, {
-          x: margin,
-          y: yPosition - imageHeight,
-          width: imageWidth,
-          height: imageHeight
-        });
-
-        yPosition -= imageHeight + 20;
-        console.log(`✅ Embedded image: ${imageUrl.name}`);
-
-      } catch (error) {
-        console.error(`❌ Error processing image ${imageUrl.name}:`, error);
-        // Continue with other images
-      }
-    }
-
-    // Generate PDF bytes
-    const pdfBytes = await pdfDoc.save();
-    console.log(`✅ PDF generated successfully with ${imageUrls.length} images using pdf-lib`);
-
-    return Buffer.from(pdfBytes);
+    // Use the HTML template with Puppeteer for the clean design
+    return await generatePDFWithRetry(stop, embeddedImages, returns, baseUrl);
 
   } catch (error) {
     console.error(`❌ PDF generation failed:`, error);
     throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+
 
 function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns: ReturnItem[], baseUrl?: string): string {
   // Use provided baseUrl or fallback to production domain
@@ -433,9 +255,7 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
 
   // Calculate payment information
   const totalPaymentAmount = stop.driverPaymentAmount || 0;
-  const paymentMethods = stop.driverPaymentMethods || [];
-  const paymentStatus = stop.paymentFlagNotPaid ? 'Not paid' : 'Paid';
-  const invoiceNumber = stop.quickbooksInvoiceNum || stop.orderNumberWeb || 'N/A';
+  const invoiceNumber = stop.quickbooksInvoiceNum || 'N/A';
   const totalAmount = stop.amount || 0;
 
   return `
@@ -454,29 +274,35 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
 
     body {
       font-family: 'Arial', 'Helvetica', sans-serif;
-      line-height: 1.5;
+      line-height: 1.6;
       color: #000000;
       background: #ffffff;
       font-size: 14px;
+      padding: 40px 20px;
     }
 
     .container {
-      max-width: 210mm;
+      max-width: 600px;
       margin: 0 auto;
-      padding: 20mm;
       background: white;
+      border: 1px solid #000000;
+      padding: 40px;
     }
 
-    /* Professional Header with Truck Image */
-    .header {
-      position: relative;
-      margin-bottom: 30px;
-      background: #ffffff;
+    .customer-name {
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 20px;
+      color: #000000;
     }
 
-    .truck-image {
-      width: 100%;
-      height: 200px;
+    .thank-you-message {
+      text-align: center;
+      margin-bottom: 40px;
+      color: #000000;
+      line-height: 1.5;
+    }
       background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDgwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPCEtLSBCYWNrZ3JvdW5kIC0tPgogIDxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjNDI2M0VCIi8+CiAgCiAgPCEtLSBDb21wYW55IE5hbWUgLS0+CiAgPHRleHQgeD0iNDAwIiB5PSI4MCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkImYW1wO1IgRk9PRCBTRVJWSUNFUZO8L3RleHQ+CiAgCiAgPCEtLSBUYWdsaW5lIC0tPgogIDx0ZXh0IHg9IjQwMCIgeT0iMTIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIj5jdXR0aW5nIHByaWNlczwvdGV4dD4KICA8IS0tIERlY29yYXRpdmUgZWxlbWVudHMgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iMTAwIiByPSIzMCIgZmlsbD0id2hpdGUiIG9wYWNpdHk9IjAuMiIvPgogIDxjaXJjbGUgY3g9IjcwMCIgY3k9IjEwMCIgcj0iMzAiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjIiLz4KICA8IS0tIEZvcmsgYW5kIGtuaWZlIGljb25zIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUwLCA4MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIiIGhlaWdodD0iNDAiIGZpbGw9IndoaXRlIi8+CiAgICA8cmVjdCB4PSI4IiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0id2hpdGUiLz4KICAgIDxyZWN0IHg9IjE2IiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0id2hpdGUiLz4KICAgIDxyZWN0IHg9IjI0IiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0id2hpdGUiLz4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNiIgaGVpZ2h0PSI4IiBmaWxsPSJ3aGl0ZSIvPgogIDwvZz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsIDgwKSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0id2hpdGUiLz4KICAgIDxjaXJjbGUgY3g9IjEiIGN5PSI4IiByPSIzIiBmaWxsPSJ3aGl0ZSIvPgogIDwvZz4KPC9zdmc+') center/cover no-repeat;
       border-radius: 8px;
       margin-bottom: 20px;
@@ -543,6 +369,12 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
       font-size: 16px;
       color: #000000;
       margin-bottom: 10px;
+    }
+
+    .payment-amount {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000000;
     }
 
     .payment-methods {
@@ -666,35 +498,31 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
 </head>
 <body>
   <div class="container">
-    <!-- Professional Header with Truck Image -->
-    <div class="header">
-      <div class="truck-image"></div>
-    </div>
+    <!-- Customer Name -->
+    <div class="customer-name">${stop.customerName}</div>
 
-    <!-- Customer Section -->
-    <div class="customer-section">
-      <div class="customer-name">${stop.customerName}</div>
-      <div class="thank-you-message">
-        Thank you for being a loyal customer.<br><br>
-        Please review attached documents, including today's invoice, credit memo, and any other delivery related document.
-      </div>
+    <!-- Thank You Message -->
+    <div class="thank-you-message">
+      Thank you for being a loyal customer.<br><br>
+      Please review attached documents, including today's invoice, credit memo, and any other delivery related document.
     </div>
 
     <!-- Invoice Section -->
     <div class="invoice-section">
       <div class="invoice-number">INVOICE # ${invoiceNumber}</div>
       <div class="total-amount">TOTAL AMOUNT: $${totalAmount.toFixed(2)}</div>
+    </div>
 
-      <div class="company-signature">
-        Thank you,<br>
-        <strong>B&R Food Services</strong>
-      </div>
+    <!-- Company Signature -->
+    <div class="company-signature">
+      Thank you,<br>
+      <strong>B&R Food Services</strong>
     </div>
 
     <!-- Payment Section -->
     <div class="payment-section">
       <div class="payment-received">Payment received at the time of the delivery</div>
-      <div class="payment-methods">$${totalPaymentAmount.toFixed(2)}</div>
+      <div class="payment-amount">$${totalPaymentAmount.toFixed(2)}</div>
     </div>
 
     <!-- Returns Section -->
