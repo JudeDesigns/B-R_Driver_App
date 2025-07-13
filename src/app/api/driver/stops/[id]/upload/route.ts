@@ -288,11 +288,11 @@ export async function POST(
 
     console.log(`Using base URL for PDF generation: ${baseUrl}`);
 
-    // Generate PDF using Puppeteer with extended timeout for large images
+    // Generate PDF using Puppeteer with extended timeout for large images (increased for 30+ images)
     const pdfBuffer = await Promise.race([
       generateDeliveryPDF(stopData, imageUrls, returnsData, baseUrl),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('PDF generation timeout after 5 minutes')), 300000)
+        setTimeout(() => reject(new Error('PDF generation timeout after 15 minutes')), 900000)
       )
     ]);
 

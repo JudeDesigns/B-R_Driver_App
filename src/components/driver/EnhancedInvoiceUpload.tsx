@@ -49,6 +49,64 @@ export default function EnhancedInvoiceUpload({
     }
   };
 
+  // Function to compress image on client side
+  const compressImage = async (file: File, maxSizeKB: number = 800): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions (max 1600px width)
+        let { width, height } = img;
+        const maxWidth = 1600;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Start with quality 0.8 and reduce if needed
+        let quality = 0.8;
+        const tryCompress = () => {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedSizeKB = blob.size / 1024;
+
+              if (compressedSizeKB <= maxSizeKB || quality <= 0.3) {
+                // Create new file with compressed data
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now()
+                });
+
+                console.log(`📱 Client compression: ${file.name} ${(file.size/1024).toFixed(1)}KB → ${compressedSizeKB.toFixed(1)}KB`);
+                resolve(compressedFile);
+              } else {
+                // Try with lower quality
+                quality -= 0.1;
+                tryCompress();
+              }
+            } else {
+              resolve(file); // Fallback to original
+            }
+          }, 'image/jpeg', quality);
+        };
+
+        tryCompress();
+      };
+
+      img.onerror = () => resolve(file); // Fallback to original
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Handle file selection (multiple files)
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -70,8 +128,21 @@ export default function EnhancedInvoiceUpload({
       setSuccess('');
     }
 
+    // Check if we should compress images
+    const totalImages = images.length + validFiles.length;
+    const shouldCompress = totalImages >= 10 || validFiles.some(f => f.size > 1000000); // 10+ images or files > 1MB
+
+    if (shouldCompress) {
+      setError('Compressing images for better performance...');
+    }
+
+    // Compress images if needed
+    const processedFiles = shouldCompress
+      ? await Promise.all(validFiles.map(file => compressImage(file)))
+      : validFiles;
+
     // Create preview objects for new files
-    const newImages: UploadedImage[] = validFiles.map(file => ({
+    const newImages: UploadedImage[] = processedFiles.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       file,
       preview: URL.createObjectURL(file),
@@ -81,6 +152,10 @@ export default function EnhancedInvoiceUpload({
     // Add to existing images (or replace if first selection)
     setImages(prev => images.length === 0 ? newImages : [...prev, ...newImages]);
     setError('');
+
+    if (shouldCompress) {
+      console.log(`📱 Client-side compression completed for ${processedFiles.length} images`);
+    }
 
     // Reset file input to allow re-selection of same files
     if (fileInputRef.current) {

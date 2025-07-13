@@ -1,10 +1,69 @@
 import puppeteer from 'puppeteer';
 import { promises as fs } from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 
-// Function to convert image to base64
-async function imageToBase64(imagePath: string): Promise<string | null> {
+// Function to compress image using Sharp
+async function compressImage(inputPath: string, maxSizeKB: number = 500): Promise<Buffer> {
+  try {
+    const image = sharp(inputPath);
+    const metadata = await image.metadata();
+
+    console.log(`📄 Compressing image: ${path.basename(inputPath)} (${metadata.width}x${metadata.height})`);
+
+    // Start with quality 85 for JPEG compression
+    let quality = 85;
+    let compressedBuffer: Buffer;
+
+    // Resize if image is very large (over 2000px width)
+    let resizeWidth = metadata.width;
+    if (metadata.width && metadata.width > 2000) {
+      resizeWidth = 1600; // Resize to 1600px width max
+      console.log(`📄 Resizing image from ${metadata.width}px to ${resizeWidth}px width`);
+    }
+
+    do {
+      compressedBuffer = await image
+        .resize(resizeWidth, null, {
+          withoutEnlargement: true,
+          fit: 'inside'
+        })
+        .jpeg({
+          quality: quality,
+          progressive: true,
+          mozjpeg: true // Use mozjpeg for better compression
+        })
+        .toBuffer();
+
+      const compressedSizeKB = compressedBuffer.length / 1024;
+      console.log(`📄 Compression attempt: quality ${quality}, size ${compressedSizeKB.toFixed(1)}KB`);
+
+      // If size is acceptable or quality is too low, break
+      if (compressedSizeKB <= maxSizeKB || quality <= 30) {
+        break;
+      }
+
+      // Reduce quality for next attempt
+      quality -= 10;
+    } while (quality > 30);
+
+    const finalSizeKB = (compressedBuffer.length / 1024).toFixed(1);
+    const originalSizeKB = ((await fs.stat(inputPath)).size / 1024).toFixed(1);
+    const compressionRatio = ((1 - compressedBuffer.length / (await fs.stat(inputPath)).size) * 100).toFixed(1);
+
+    console.log(`✅ Image compressed: ${originalSizeKB}KB → ${finalSizeKB}KB (${compressionRatio}% reduction)`);
+
+    return compressedBuffer;
+  } catch (error) {
+    console.error(`❌ Error compressing image: ${inputPath}`, error);
+    // Fallback to original image
+    return await fs.readFile(inputPath);
+  }
+}
+
+// Function to convert image to base64 with smart compression
+async function imageToBase64(imagePath: string, forceCompress: boolean = false): Promise<string | null> {
   try {
     const fullPath = path.join(process.cwd(), 'public', imagePath.replace('/uploads/', 'uploads/'));
 
@@ -17,18 +76,35 @@ async function imageToBase64(imagePath: string): Promise<string | null> {
     }
 
     const stats = await fs.stat(fullPath);
-    const imageBuffer = await fs.readFile(fullPath);
+    const originalSizeKB = stats.size / 1024;
+
+    let imageBuffer: Buffer;
+    let mimeType = 'image/jpeg'; // Default to JPEG after compression
+
+    // Compress if image is large (>500KB) or compression is forced
+    if (originalSizeKB > 500 || forceCompress) {
+      console.log(`📄 Compressing large image: ${imagePath} (${originalSizeKB.toFixed(1)}KB)`);
+      imageBuffer = await compressImage(fullPath, 400); // Target 400KB max
+      mimeType = 'image/jpeg'; // Compressed images are always JPEG
+    } else {
+      // Use original image for small files
+      imageBuffer = await fs.readFile(fullPath);
+
+      // Determine original MIME type
+      const ext = path.extname(imagePath).toLowerCase();
+      if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.gif') mimeType = 'image/gif';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else mimeType = 'image/jpeg';
+
+      console.log(`📄 Using original image: ${imagePath} (${originalSizeKB.toFixed(1)}KB)`);
+    }
+
     const base64 = imageBuffer.toString('base64');
+    const finalSizeKB = (imageBuffer.length / 1024).toFixed(1);
 
-    // Determine MIME type based on file extension
-    const ext = path.extname(imagePath).toLowerCase();
-    let mimeType = 'image/jpeg'; // default
+    console.log(`📄 Image ready for PDF: ${imagePath} (${finalSizeKB}KB base64)`);
 
-    if (ext === '.png') mimeType = 'image/png';
-    else if (ext === '.gif') mimeType = 'image/gif';
-    else if (ext === '.webp') mimeType = 'image/webp';
-
-    console.log(`📄 Image converted: ${imagePath} (${(stats.size / 1024).toFixed(1)}KB)`);
     return `data:${mimeType};base64,${base64}`;
   } catch (error) {
     console.warn(`⚠️ Failed to convert image to base64: ${imagePath}`, error);
@@ -77,6 +153,7 @@ interface ImageUrl {
 interface EmbeddedImage {
   name: string;
   base64: string | null;
+  url?: string; // Optional URL for link-based display
 }
 
 async function generatePDFWithRetry(
@@ -120,16 +197,19 @@ async function generatePDFWithRetry(
         '--no-default-browser-check',
         '--no-pings',
         '--password-store=basic',
-        '--use-mock-keychain'
+        '--use-mock-keychain',
+        // Increased memory limits for 30+ images
+        '--max-old-space-size=4096',
+        '--max_old_space_size=4096'
       ]
     });
 
     console.log(`📄 Creating new page...`);
     page = await browser.newPage();
 
-    // Set longer timeouts for large images
-    page.setDefaultTimeout(180000); // 3 minutes
-    page.setDefaultNavigationTimeout(180000); // 3 minutes
+    // Set longer timeouts for large images (increased for 30+ images)
+    page.setDefaultTimeout(600000); // 10 minutes
+    page.setDefaultNavigationTimeout(600000); // 10 minutes
 
     // Set viewport for consistent rendering
     await page.setViewport({ width: 1200, height: 1600 });
@@ -140,18 +220,20 @@ async function generatePDFWithRetry(
     console.log(`📄 Setting page content...`);
     await page.setContent(htmlContent, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000 // 1 minute for content loading
+      timeout: 300000 // 5 minutes for content loading
     });
 
-    // Wait for images to load - longer timeout for large images
+    // Wait for images to load - much longer timeout for 30+ images
     console.log(`📄 Waiting for images to load...`);
-    await page.waitForTimeout(5000); // 5 seconds for image loading
+    const imageLoadTimeout = Math.max(30000, embeddedImages.length * 2000); // 2 seconds per image, minimum 30 seconds
+    console.log(`📄 Using ${imageLoadTimeout}ms timeout for ${embeddedImages.length} images`);
+    await page.waitForTimeout(imageLoadTimeout);
 
     console.log(`📄 Generating PDF...`);
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
-      timeout: 120000, // 2 minutes for PDF generation
+      timeout: 600000, // 10 minutes for PDF generation (increased for 30+ images)
       margin: {
         top: '20px',
         bottom: '20px',
@@ -225,15 +307,53 @@ export async function generateDeliveryPDF(
   console.log(`📄 Starting PDF generation for stop ${stop.id} with ${imageUrls.length} images...`);
 
   try {
-    // Convert image URLs to embedded images for the HTML template
+    // Always embed all images for archival purposes
+    console.log(`📄 Converting ${imageUrls.length} images to base64 for embedding...`);
+
+    // Determine if we should compress images (for large batches)
+    const shouldCompress = imageUrls.length >= 15; // Compress for 15+ images
+    if (shouldCompress) {
+      console.log(`📄 Large batch detected (${imageUrls.length} images) - enabling compression`);
+    }
+
+    // Process images in batches to avoid memory overload
+    const batchSize = 5; // Process 5 images at a time
     const embeddedImages: EmbeddedImage[] = [];
 
-    for (const imageUrl of imageUrls) {
-      const base64 = await imageToBase64(imageUrl.url);
-      embeddedImages.push({
-        name: imageUrl.name,
-        base64: base64
+    for (let i = 0; i < imageUrls.length; i += batchSize) {
+      const batch = imageUrls.slice(i, i + batchSize);
+      console.log(`📄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(imageUrls.length/batchSize)} (${batch.length} images)`);
+
+      // Process batch in parallel for speed
+      const batchPromises = batch.map(async (imageUrl) => {
+        const base64 = await imageToBase64(imageUrl.url, shouldCompress);
+        return {
+          name: imageUrl.name,
+          base64: base64
+        };
       });
+
+      const batchResults = await Promise.all(batchPromises);
+      embeddedImages.push(...batchResults);
+
+      // Small delay between batches to prevent memory spikes and allow garbage collection
+      if (i + batchSize < imageUrls.length) {
+        console.log(`📄 Batch completed. Pausing for memory management...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay for GC
+
+        // Force garbage collection if available (Node.js with --expose-gc flag)
+        if (global.gc) {
+          global.gc();
+          console.log(`📄 Garbage collection triggered`);
+        }
+      }
+    }
+
+    const successfulImages = embeddedImages.filter(img => img.base64).length;
+    console.log(`📄 Successfully converted ${successfulImages}/${imageUrls.length} images`);
+
+    if (shouldCompress) {
+      console.log(`📄 Compression enabled for large batch - images optimized for PDF embedding`);
     }
 
     // Use the HTML template with Puppeteer for the clean design
@@ -472,12 +592,13 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
 
     .embedded-image {
       max-width: 100%;
-      max-height: 200px;
+      max-height: 300px; /* Increased for better quality but still manageable */
       width: auto;
       height: auto;
       border: 1px solid #ddd;
       border-radius: 4px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      object-fit: contain; /* Maintain aspect ratio */
     }
 
     .image-caption {
@@ -491,7 +612,7 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
     @media print {
       body { -webkit-print-color-adjust: exact; }
       .container { padding: 10mm; }
-      .embedded-image { max-height: 150px; }
+      .embedded-image { max-height: 250px; } /* Optimized for print */
     }
 
   </style>
