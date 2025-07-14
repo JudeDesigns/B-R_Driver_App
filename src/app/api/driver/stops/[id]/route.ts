@@ -420,6 +420,7 @@ export async function PATCH(
                 adminNotes: null, // Will be populated if needed
                 orderNumberWeb: updatedStop.orderNumberWeb,
                 quickbooksInvoiceNum: updatedStop.quickbooksInvoiceNum,
+                amount: updatedStop.amount || 0, // Add total amount
               };
 
               // Prepare image URLs for PDF (from invoice images)

@@ -50,7 +50,8 @@ const createDeliveryConfirmationEmail = (
   customerName: string,
   orderNumber: string,
   invoiceNumber: string,
-  deliveryTime: string
+  deliveryTime: string,
+  totalAmount: number = 0
 ) => {
   return `
     <!DOCTYPE html>
@@ -160,6 +161,10 @@ const createDeliveryConfirmationEmail = (
             <span class="detail-value">${invoiceNumber}</span>
           </div>
           <div class="detail-row">
+            <span class="detail-label">Total amount:</span>
+            <span class="detail-value">$${totalAmount.toFixed(2)}</span>
+          </div>
+          <div class="detail-row">
             <span class="detail-label">Delivered to:</span>
             <span class="detail-value">${customerName}</span>
           </div>
@@ -206,20 +211,24 @@ export const sendDeliveryConfirmationEmail = async (
     console.log(`📄 PDF generated with base URL: ${baseUrl}`);
 
     // Create the email HTML content
-    const invoiceNumber = stopData.quickbooksInvoiceNum || stopData.orderNumberWeb || 'N/A';
+    const invoiceNumber = stopData.quickbooksInvoiceNum || 'N/A'; // Use only QuickBooks invoice, not web order
+    const totalAmount = stopData.amount || 0;
     const emailHtml = createDeliveryConfirmationEmail(
       customerName,
       orderNumber,
       invoiceNumber,
-      deliveryTime
+      deliveryTime,
+      totalAmount // Add total amount parameter
     );
 
     // Determine email recipient and subject based on configuration
     const shouldSendToCustomer = sendToCustomer && EMAIL_CONFIG.SEND_TO_CUSTOMERS;
     const actualRecipient = shouldSendToCustomer ? customerEmail : EMAIL_CONFIG.OFFICE_EMAIL;
+
+    // Format subject line according to requirements
     const emailSubject = shouldSendToCustomer
       ? 'Your order has been delivered!'
-      : `Delivery Completed - ${customerName} - Order ${orderNumber}`;
+      : `Delivery Completed - ${customerName} - Order #${invoiceNumber} $${totalAmount.toFixed(2)}`;
 
     // Create the email record in the database
     const emailRecord = await prisma.customerEmail.create({

@@ -109,6 +109,7 @@ export async function POST(
           adminNotes: null,
           orderNumberWeb: stop.orderNumberWeb,
           quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
+          amount: stop.amount || 0, // Add total amount
         };
 
         // Prepare image URLs for PDF (from invoice images)
