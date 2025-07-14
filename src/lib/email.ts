@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import prisma from './db';
-import { generateDeliveryPDF } from '@/utils/pdfGenerator';
 
 // Email configuration flags
 export const EMAIL_CONFIG = {
@@ -197,18 +196,27 @@ export const sendDeliveryConfirmationEmail = async (
   customerName: string,
   orderNumber: string,
   deliveryTime: string,
-  stopData: any, // Full stop data for PDF generation
-  imageUrls: any[], // Image URLs for PDF
-  returns: any[], // Return items for PDF
+  stopData: any, // Stop data for email content
+  existingPdfPath?: string, // Path to existing PDF file (optional)
   sendToCustomer: boolean = false // New parameter to control customer vs office email
 ) => {
   try {
-    // Generate the delivery confirmation PDF with correct domain
-    console.log('Generating delivery confirmation PDF...');
-    const baseUrl = 'https://delivery.brfood.us';
-    const pdfBuffer = await generateDeliveryPDF(stopData, imageUrls, returns, baseUrl);
-    console.log(`PDF generated successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
-    console.log(`📄 PDF generated with base URL: ${baseUrl}`);
+    let pdfBuffer: Buffer;
+
+    if (existingPdfPath) {
+      // Use existing PDF file
+      console.log(`📄 Using existing PDF: ${existingPdfPath}`);
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      const fullPdfPath = path.join(process.cwd(), 'public', existingPdfPath);
+      pdfBuffer = await fs.readFile(fullPdfPath);
+      console.log(`📄 Existing PDF loaded successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+    } else {
+      // Fallback: Generate new PDF (for backward compatibility)
+      console.log('⚠️ No existing PDF found, generating new PDF...');
+      throw new Error('PDF generation fallback not implemented - existing PDF path required');
+    }
 
     // Create the email HTML content
     const invoiceNumber = stopData.quickbooksInvoiceNum || 'N/A'; // Use only QuickBooks invoice, not web order

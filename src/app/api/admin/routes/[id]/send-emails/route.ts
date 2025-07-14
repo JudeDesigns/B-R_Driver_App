@@ -83,6 +83,7 @@ export async function POST(
       total: completedStops.length,
       sent: 0,
       failed: 0,
+      skipped: 0,
       errors: [] as string[],
       details: [] as any[]
     };
@@ -120,6 +121,21 @@ export async function POST(
 
         // Send the email (to office by default)
         const sendToCustomer = false;
+
+        // Skip stops without PDF
+        if (!stop.signedInvoicePdfUrl) {
+          console.warn(`⚠️ Skipping stop ${stop.id} - no PDF available`);
+          emailResults.skipped++;
+          emailResults.details.push({
+            stopId: stop.id,
+            customer: stop.customer.name,
+            orderNumber: stop.orderNumberWeb || "N/A",
+            status: 'skipped',
+            reason: 'No PDF available'
+          });
+          continue;
+        }
+
         const emailResult = await sendDeliveryConfirmationEmail(
           stop.id,
           stop.customer.email || '',
@@ -127,8 +143,7 @@ export async function POST(
           stop.orderNumberWeb || "N/A",
           deliveryTime,
           stopDataForPdf,
-          imageUrls,
-          stop.returns,
+          stop.signedInvoicePdfUrl, // Use existing PDF path
           sendToCustomer
         );
 

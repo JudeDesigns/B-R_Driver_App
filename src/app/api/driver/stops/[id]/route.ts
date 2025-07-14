@@ -349,6 +349,11 @@ export async function PATCH(
             routeNumber: true,
           },
         },
+        payments: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
 
@@ -431,17 +436,31 @@ export async function PATCH(
 
               // Send the email with PDF attachment (to office automatically)
               const sendToCustomer = false; // Always false - sending to office email
-              const emailResult = await sendDeliveryConfirmationEmail(
-                updatedStop.id,
-                customer.email || '', // Customer email for record keeping (not used for actual sending)
-                customer.name,
-                updatedStop.orderNumberWeb || "N/A",
-                deliveryTime,
-                stopDataForPdf,
-                imageUrls,
-                returns,
-                sendToCustomer
-              );
+
+              // Use existing PDF if available, otherwise skip email (PDF should exist from upload)
+              if (updatedStop.signedInvoicePdfUrl) {
+                console.log(`📄 Using existing PDF for email: ${updatedStop.signedInvoicePdfUrl}`);
+
+                const emailResult = await sendDeliveryConfirmationEmail(
+                  updatedStop.id,
+                  customer.email || '', // Customer email for record keeping (not used for actual sending)
+                  customer.name,
+                  updatedStop.orderNumberWeb || "N/A",
+                  deliveryTime,
+                  stopDataForPdf,
+                  updatedStop.signedInvoicePdfUrl, // Use existing PDF path
+                  sendToCustomer
+                );
+
+                if (emailResult.success) {
+                  console.log(`✅ Automatic delivery confirmation email sent to office for: ${customer.name}`);
+                  console.log(`📧 Message ID: ${emailResult.messageId}`);
+                } else {
+                  console.error(`❌ Failed to send automatic email for ${customer.name}: ${emailResult.error}`);
+                }
+              } else {
+                console.warn(`⚠️ No PDF found for stop ${updatedStop.id}, skipping email notification`);
+              }
 
               if (emailResult.success) {
                 console.log(`✅ Automatic delivery confirmation email sent to office for: ${customer.name}`);

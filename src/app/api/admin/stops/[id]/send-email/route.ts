@@ -101,6 +101,15 @@ export async function POST(
 
     // Send the email with PDF attachment (to office by default, can be changed to customer)
     const sendToCustomer = false; // Set to true when you want to send to customers
+
+    // Use existing PDF if available
+    if (!stop.signedInvoicePdfUrl) {
+      return NextResponse.json(
+        { message: "No PDF available for this stop. Please ensure images have been uploaded and processed." },
+        { status: 400 }
+      );
+    }
+
     const emailResult = await sendDeliveryConfirmationEmail(
       stopId,
       stop.customer.email,
@@ -108,8 +117,7 @@ export async function POST(
       stop.orderNumberWeb || "N/A",
       deliveryTime,
       stopDataForPdf,
-      imageUrls,
-      stop.returns,
+      stop.signedInvoicePdfUrl, // Use existing PDF path
       sendToCustomer
     );
 
