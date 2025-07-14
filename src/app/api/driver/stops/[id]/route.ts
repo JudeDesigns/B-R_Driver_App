@@ -357,6 +357,12 @@ export async function PATCH(
       },
     });
 
+    // Get the signedInvoicePdfUrl separately to ensure we have it for email
+    const stopWithPdf = await prisma.stop.findUnique({
+      where: { id },
+      select: { signedInvoicePdfUrl: true }
+    });
+
     // If status is updated, emit WebSocket event
     if (data.status && data.status !== stop.status) {
       try {
@@ -438,8 +444,8 @@ export async function PATCH(
               const sendToCustomer = false; // Always false - sending to office email
 
               // Use existing PDF if available, otherwise skip email (PDF should exist from upload)
-              if (updatedStop.signedInvoicePdfUrl) {
-                console.log(`📄 Using existing PDF for email: ${updatedStop.signedInvoicePdfUrl}`);
+              if (stopWithPdf?.signedInvoicePdfUrl) {
+                console.log(`📄 Using existing PDF for email: ${stopWithPdf.signedInvoicePdfUrl}`);
 
                 const emailResult = await sendDeliveryConfirmationEmail(
                   updatedStop.id,
@@ -448,7 +454,7 @@ export async function PATCH(
                   updatedStop.orderNumberWeb || "N/A",
                   deliveryTime,
                   stopDataForPdf,
-                  updatedStop.signedInvoicePdfUrl, // Use existing PDF path
+                  stopWithPdf.signedInvoicePdfUrl, // Use existing PDF path
                   sendToCustomer
                 );
 

@@ -53,6 +53,30 @@ export async function POST(
               },
             },
           },
+          select: {
+            id: true,
+            customerName: true,
+            address: true,
+            orderNumberWeb: true,
+            quickbooksInvoiceNum: true,
+            amount: true,
+            arrivalTime: true,
+            completionTime: true,
+            driverNotes: true,
+            signedInvoicePdfUrl: true, // Include PDF URL
+            customer: true,
+            route: {
+              select: {
+                id: true,
+                routeNumber: true,
+              },
+            },
+            returns: {
+              where: {
+                isDeleted: false,
+              },
+            },
+          },
         },
       },
     });

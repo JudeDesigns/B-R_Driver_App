@@ -209,13 +209,22 @@ export const sendDeliveryConfirmationEmail = async (
       const fs = require('fs').promises;
       const path = require('path');
 
-      const fullPdfPath = path.join(process.cwd(), 'public', existingPdfPath);
-      pdfBuffer = await fs.readFile(fullPdfPath);
-      console.log(`📄 Existing PDF loaded successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+      try {
+        const fullPdfPath = path.join(process.cwd(), 'public', existingPdfPath);
+
+        // Check if file exists first
+        await fs.access(fullPdfPath);
+
+        pdfBuffer = await fs.readFile(fullPdfPath);
+        console.log(`📄 Existing PDF loaded successfully, size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+      } catch (fileError) {
+        console.error(`❌ Failed to read PDF file: ${existingPdfPath}`, fileError);
+        throw new Error(`PDF file not found or inaccessible: ${existingPdfPath}`);
+      }
     } else {
-      // Fallback: Generate new PDF (for backward compatibility)
-      console.log('⚠️ No existing PDF found, generating new PDF...');
-      throw new Error('PDF generation fallback not implemented - existing PDF path required');
+      // Fallback: Skip email instead of breaking
+      console.warn('⚠️ No existing PDF path provided, skipping email notification');
+      throw new Error('No PDF available for email attachment. Please ensure images have been uploaded and processed.');
     }
 
     // Create the email HTML content
