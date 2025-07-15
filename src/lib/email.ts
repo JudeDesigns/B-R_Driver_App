@@ -3,9 +3,10 @@ import prisma from './db';
 
 // Email configuration flags
 export const EMAIL_CONFIG = {
-  // Set to true to send emails to customers, false to send to office
+  // Set to false: send to office only
+  // Set to true: send to both office AND customers
   SEND_TO_CUSTOMERS: false,
-  // Office email address
+  // Office email address (always receives emails)
   OFFICE_EMAIL: process.env.OFFICE_EMAIL || 'infobrfood@gmail.com',
 };
 
@@ -238,14 +239,24 @@ export const sendDeliveryConfirmationEmail = async (
       totalAmount // Add total amount parameter
     );
 
-    // Determine email recipient and subject based on configuration
+    // Determine email recipients based on configuration
     const shouldSendToCustomer = sendToCustomer && EMAIL_CONFIG.SEND_TO_CUSTOMERS;
-    const actualRecipient = shouldSendToCustomer ? customerEmail : EMAIL_CONFIG.OFFICE_EMAIL;
 
-    // Format subject line according to requirements
-    const emailSubject = shouldSendToCustomer
-      ? 'Your order has been delivered!'
-      : `Delivery Completed - ${customerName} - Order #${invoiceNumber} $${totalAmount.toFixed(2)}`;
+    // Build recipient list
+    const recipients = [];
+
+    // Always send to office
+    recipients.push(EMAIL_CONFIG.OFFICE_EMAIL);
+
+    // If SEND_TO_CUSTOMERS is true, also send to customer
+    if (shouldSendToCustomer && customerEmail && customerEmail.trim() !== '') {
+      recipients.push(customerEmail);
+    }
+
+    const actualRecipient = recipients.join(', ');
+
+    // Format subject line - always use office format for consistency
+    const emailSubject = `Delivery Completed - ${customerName} - Order #${invoiceNumber} $${totalAmount.toFixed(2)}`;
 
     // Create the email record in the database
     const emailRecord = await prisma.customerEmail.create({
@@ -267,7 +278,8 @@ export const sendDeliveryConfirmationEmail = async (
     const pdfFilename = `delivery-confirmation-${orderNumber.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}.pdf`;
 
     // Send the email with PDF attachment
-    console.log(`Attempting to send email to: ${actualRecipient} (${shouldSendToCustomer ? 'customer' : 'office'})`);
+    console.log(`Attempting to send email to: ${actualRecipient}`);
+    console.log(`Recipients: Office (${EMAIL_CONFIG.OFFICE_EMAIL})${shouldSendToCustomer && customerEmail ? ` + Customer (${customerEmail})` : ' only'}`);
     console.log(`PDF attachment size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
     console.log(`Email configuration - SEND_TO_CUSTOMERS: ${EMAIL_CONFIG.SEND_TO_CUSTOMERS}`);
 
@@ -285,8 +297,9 @@ export const sendDeliveryConfirmationEmail = async (
       ],
     });
 
-    console.log(`Email sent successfully - Message ID: ${info.messageId}`);
-    console.log(`SMTP Response: ${info.response}`);
+    console.log(`✅ Email sent successfully - Message ID: ${info.messageId}`);
+    console.log(`📧 Delivered to: ${recipients.length} recipient(s) - ${actualRecipient}`);
+    console.log(`📨 SMTP Response: ${info.response}`);
 
     // Update the email record with the sent status
     await prisma.customerEmail.update({
@@ -297,7 +310,7 @@ export const sendDeliveryConfirmationEmail = async (
       },
     });
 
-    console.log('Email sent successfully:', info.messageId);
+    console.log(`🎉 Delivery confirmation email sent successfully: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending email:', error);

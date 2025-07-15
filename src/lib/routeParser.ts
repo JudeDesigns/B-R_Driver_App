@@ -885,13 +885,46 @@ export async function saveRouteToDatabase(
       );
 
       if (!customer && stopWithCustomer) {
-        // Need to create this customer
-        customersToCreate.push({
-          name: customerName,
-          address: "", // This will need to be updated later
-          groupCode: stopWithCustomer.customerGroupCode,
-          email: stopWithCustomer.customerEmail,
+        // Check if there are any customers with the same name (including deleted ones)
+        const allCustomersWithName = await tx.customer.findMany({
+          where: {
+            name: customerName,
+          },
+          orderBy: {
+            createdAt: 'desc', // Get the most recent one first
+          },
         });
+
+        if (allCustomersWithName.length > 0) {
+          // Use the most recent customer (likely the manually created one)
+          const mostRecentCustomer = allCustomersWithName[0];
+
+          if (mostRecentCustomer.isDeleted) {
+            // Restore the deleted customer instead of creating a new one
+            await tx.customer.update({
+              where: { id: mostRecentCustomer.id },
+              data: {
+                isDeleted: false,
+                groupCode: stopWithCustomer.customerGroupCode || mostRecentCustomer.groupCode,
+                email: stopWithCustomer.customerEmail || mostRecentCustomer.email,
+              },
+            });
+            customerMap.set(customerName, mostRecentCustomer);
+            console.log(`🔄 Restored deleted customer: ${customerName}`);
+          } else {
+            // Customer exists and is active, use it
+            customerMap.set(customerName, mostRecentCustomer);
+            console.log(`✅ Using existing customer: ${customerName}`);
+          }
+        } else {
+          // No customer with this name exists, create new one
+          customersToCreate.push({
+            name: customerName,
+            address: "", // This will need to be updated later
+            groupCode: stopWithCustomer.customerGroupCode,
+            email: stopWithCustomer.customerEmail,
+          });
+        }
       } else if (
         customer &&
         stopWithCustomer &&
