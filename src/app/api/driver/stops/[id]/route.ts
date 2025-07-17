@@ -440,8 +440,8 @@ export async function PATCH(
                 name: `Invoice Image ${index + 1}`,
               }));
 
-              // Send the email with PDF attachment (to office automatically)
-              const sendToCustomer = false; // Always false - sending to office email
+              // Send the email with PDF attachment (controlled by EMAIL_CONFIG.SEND_TO_CUSTOMERS)
+              const sendToCustomer = true; // Let EMAIL_CONFIG.SEND_TO_CUSTOMERS control the behavior
 
               // Use existing PDF if available, otherwise skip email (PDF should exist from upload)
               if (stopWithPdf?.signedInvoicePdfUrl) {

@@ -143,8 +143,8 @@ export async function POST(
           name: `Invoice Image ${index + 1}`,
         }));
 
-        // Send the email (to office by default)
-        const sendToCustomer = false;
+        // Send the email (controlled by EMAIL_CONFIG.SEND_TO_CUSTOMERS)
+        const sendToCustomer = true;
 
         // Skip stops without PDF
         if (!stop.signedInvoicePdfUrl) {

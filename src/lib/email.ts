@@ -5,7 +5,7 @@ import prisma from './db';
 export const EMAIL_CONFIG = {
   // Set to false: send to office only
   // Set to true: send to both office AND customers
-  SEND_TO_CUSTOMERS: false,
+  SEND_TO_CUSTOMERS: true,
   // Office email address (always receives emails)
   OFFICE_EMAIL: process.env.OFFICE_EMAIL || 'infobrfood@gmail.com',
 };
@@ -240,6 +240,7 @@ export const sendDeliveryConfirmationEmail = async (
     );
 
     // Determine email recipients based on configuration
+    // Note: sendToCustomer parameter allows individual calls to opt-out, but EMAIL_CONFIG is the main control
     const shouldSendToCustomer = sendToCustomer && EMAIL_CONFIG.SEND_TO_CUSTOMERS;
 
     // Build recipient list

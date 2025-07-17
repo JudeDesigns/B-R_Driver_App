@@ -99,8 +99,8 @@ export async function POST(
       name: `Invoice Image ${index + 1}`,
     }));
 
-    // Send the email with PDF attachment (to office by default, can be changed to customer)
-    const sendToCustomer = false; // Set to true when you want to send to customers
+    // Send the email with PDF attachment (controlled by EMAIL_CONFIG.SEND_TO_CUSTOMERS)
+    const sendToCustomer = true; // Let EMAIL_CONFIG.SEND_TO_CUSTOMERS control the behavior
 
     // Use existing PDF if available
     if (!stop.signedInvoicePdfUrl) {
