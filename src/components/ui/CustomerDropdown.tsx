@@ -19,12 +19,9 @@ interface CustomerDropdownProps {
   className?: string;
 }
 
-// Hardcoded customer list as fallback - you can add your actual customers here
+// Fallback customer list (only used if API fails)
 const FALLBACK_CUSTOMERS: Customer[] = [
-  { id: "1", name: "Cafecito", address: "123 Main St", phone: "555-0001" },
-  { id: "2", name: "Tacos Carnitas Sahuayo Whittier", address: "456 Oak Ave", phone: "555-0002" },
-  { id: "3", name: "Restaurant ABC", address: "789 Pine St", phone: "555-0003" },
-  { id: "4", name: "Food Place XYZ", address: "321 Elm St", phone: "555-0004" },
+  { id: "fallback-1", name: "Enter custom name...", address: "", phone: "" },
 ];
 
 export default function CustomerDropdown({
@@ -73,8 +70,8 @@ export default function CustomerDropdown({
         return;
       }
 
-      // Try to get customers from existing stops
-      const response = await fetch("/api/admin/stops/today", {
+      // Load ALL customers from the customers API (not just today's stops)
+      const response = await fetch("/api/admin/customers?limit=1000", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -82,35 +79,24 @@ export default function CustomerDropdown({
 
       if (response.ok) {
         const data = await response.json();
-        const uniqueCustomers = new Map();
 
-        // Add fallback customers first
-        FALLBACK_CUSTOMERS.forEach(customer => {
-          uniqueCustomers.set(customer.id, customer);
-        });
+        if (data.customers && Array.isArray(data.customers)) {
+          // Convert API response to our Customer interface
+          const customerList = data.customers.map((customer: any) => ({
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.contactInfo, // API uses contactInfo field
+            address: customer.address,
+            groupCode: customer.groupCode,
+          })).sort((a: Customer, b: Customer) => a.name.localeCompare(b.name));
 
-        // Add customers from stops
-        if (data.stops) {
-          data.stops.forEach((stop: any) => {
-            if (stop.customer && stop.customer.name) {
-              uniqueCustomers.set(stop.customer.id, {
-                id: stop.customer.id,
-                name: stop.customer.name,
-                email: stop.customer.email,
-                phone: stop.customer.phone,
-                address: stop.customer.address,
-                groupCode: stop.customer.groupCode,
-              });
-            }
-          });
+          setCustomers(customerList);
+          console.log(`✅ Loaded ${customerList.length} customers from database`);
+        } else {
+          console.warn("No customers found in API response, using fallback");
+          setCustomers(FALLBACK_CUSTOMERS);
         }
-
-        const customerList = Array.from(uniqueCustomers.values()).sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-
-        setCustomers(customerList);
-        console.log(`Loaded ${customerList.length} customers (${FALLBACK_CUSTOMERS.length} fallback + ${customerList.length - FALLBACK_CUSTOMERS.length} from stops)`);
       } else {
         console.error("Failed to load customers from API, using fallback");
         setCustomers(FALLBACK_CUSTOMERS);
