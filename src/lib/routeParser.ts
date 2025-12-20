@@ -219,8 +219,15 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
     }
 
     // Initialize route data with today's date in PST timezone
+    // createPSTDate() without parameters now correctly returns start of today in PST
     const today = createPSTDate();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day for consistent comparison
+
+    // Debug logging for route initialization
+    console.log(`[ROUTE PARSER] Initializing route with today's date:`, {
+      todayUTC: today.toISOString(),
+      todayPST: today.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+      isDST: today.toLocaleString("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "short" }).includes("PDT")
+    });
 
     const route: ParsedRoute = {
       routeNumber: "",
@@ -271,14 +278,20 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
 
             // Validate and normalize the parsed date to PST timezone
             if (!isNaN(parsedDate.getTime())) {
-              // Convert to PST timezone and normalize to start of day
+              // Convert to PST timezone - createPSTDate now handles timezone correctly
               const pstDate = createPSTDate(parsedDate.getFullYear(), parsedDate.getMonth() + 1, parsedDate.getDate());
-              pstDate.setHours(0, 0, 0, 0);
-              parsedDate = pstDate;
-              route.date = parsedDate;
+              route.date = pstDate;
+
+              // Debug logging for route date assignment
+              console.log(`[ROUTE PARSER] Route date set from Excel:`, {
+                originalValue: dateValue,
+                parsedDate: parsedDate.toISOString(),
+                pstDate: pstDate.toISOString(),
+                pstDisplay: pstDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+              });
             }
           } catch (error) {
-            console.warn(`Failed to parse date from Excel: ${row[columnIndices.date]}`);
+            console.warn(`Failed to parse date from Excel: ${row[columnIndices.date]}`, error);
           }
         }
 
@@ -442,7 +455,7 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           continue;
         }
 
-        // Check if this customer should be ignored (contains @ symbol)
+        // Check if this customer should be ignored (email addresses, documentation entries, etc.)
         if (shouldIgnoreCustomer(stop.customerName)) {
           result.warnings.push(
             `Row ${rowIndex}: Ignored row with invalid customer name: "${stop.customerName}"`

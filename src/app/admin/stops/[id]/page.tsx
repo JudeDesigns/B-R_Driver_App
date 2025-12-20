@@ -7,6 +7,34 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { useSocket } from "@/contexts/SocketContext";
 import { useOptimizedAdminStopDetails } from "@/hooks/useOptimizedSocketEvents";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
+import { formatDriverNotes } from "@/utils/notesFormatter";
+import DocumentPreview from "@/components/admin/DocumentPreview";
+
+interface Document {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  createdAt: string;
+  uploader: {
+    id: string;
+    username: string;
+    fullName: string | null;
+  };
+}
+
+interface StopDocument {
+  id: string;
+  document: Document;
+  isPrinted: boolean;
+  printedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface Stop {
   id: string;
@@ -33,6 +61,7 @@ interface Stop {
   customer: Customer;
   route: Route;
   adminNotes: AdminNote[];
+  stopDocuments: StopDocument[];
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +74,7 @@ interface Customer {
   preferences: string | null;
   groupCode: string | null;
   email: string | null;
+  documents: Document[];
 }
 
 interface Route {
@@ -128,6 +158,11 @@ export default function StopDetailPage({
   const [reassigningDriver, setReassigningDriver] = useState(false);
   const [showDriverSelect, setShowDriverSelect] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState("");
+
+  // QuickBooks invoice number edit state
+  const [showQuickBooksEdit, setShowQuickBooksEdit] = useState(false);
+  const [quickBooksValue, setQuickBooksValue] = useState("");
+  const [updatingQuickBooks, setUpdatingQuickBooks] = useState(false);
 
   const router = useRouter();
 
@@ -296,6 +331,54 @@ export default function StopDetailPage({
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setReassigningDriver(false);
+    }
+  };
+
+  // Update QuickBooks invoice number function
+  const handleUpdateQuickBooks = async () => {
+    if (!stop) return;
+
+    setUpdatingQuickBooks(true);
+    setError("");
+
+    try {
+      // Check both localStorage and sessionStorage
+      let token = localStorage.getItem("token");
+
+      // If not found in localStorage, check sessionStorage
+      if (!token) {
+        token = sessionStorage.getItem("token");
+      }
+
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/admin/stops/${stopId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          quickbooksInvoiceNum: quickBooksValue.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update QuickBooks invoice number");
+      }
+
+      // Refresh stop details to show updated QuickBooks number
+      await fetchStopDetails();
+      setShowQuickBooksEdit(false);
+      setQuickBooksValue("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setUpdatingQuickBooks(false);
     }
   };
 
@@ -1157,22 +1240,60 @@ export default function StopDetailPage({
                     <h3 className="text-sm font-medium text-gray-500">
                       Order Numbers
                     </h3>
-                    <div className="mt-1 space-y-1">
+                    <div className="mt-1 space-y-2">
                       {stop.orderNumberWeb && (
                         <p className="text-sm text-gray-900">
                           <span className="font-medium">Web:</span>{" "}
                           {stop.orderNumberWeb}
                         </p>
                       )}
-                      {stop.quickbooksInvoiceNum && (
-                        <p className="text-sm text-gray-900">
-                          <span className="font-medium">QuickBooks:</span>{" "}
-                          {stop.quickbooksInvoiceNum}
-                        </p>
-                      )}
-                      {!stop.orderNumberWeb && !stop.quickbooksInvoiceNum && (
-                        <p className="text-sm text-gray-500">None specified</p>
-                      )}
+
+                      {/* QuickBooks Invoice Number with Edit Functionality */}
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">QuickBooks: </span>
+                        {showQuickBooksEdit ? (
+                          <div className="mt-1 flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={quickBooksValue}
+                              onChange={(e) => setQuickBooksValue(e.target.value)}
+                              placeholder="Enter QuickBooks invoice number"
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-blue flex-1"
+                            />
+                            <button
+                              onClick={handleUpdateQuickBooks}
+                              disabled={updatingQuickBooks}
+                              className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {updatingQuickBooks ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowQuickBooksEdit(false);
+                                setQuickBooksValue("");
+                              }}
+                              className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center space-x-2">
+                            <span className="text-sm text-gray-900">
+                              {stop.quickbooksInvoiceNum || "Not specified"}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setShowQuickBooksEdit(true);
+                                setQuickBooksValue(stop.quickbooksInvoiceNum || "");
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Change
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1186,8 +1307,8 @@ export default function StopDetailPage({
                           Initial Driver Notes
                         </h3>
                         <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-900">
-                            {stop.initialDriverNotes}
+                          <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                            {formatDriverNotes(stop.initialDriverNotes)}
                           </p>
                         </div>
                       </div>
@@ -1835,6 +1956,13 @@ export default function StopDetailPage({
             </div>
           </div>
         </div>
+
+        {/* Document Preview Section */}
+        <DocumentPreview
+          customerDocuments={stop.customer.documents}
+          stopDocuments={stop.stopDocuments}
+          customerName={stop.customer.name}
+        />
       </div>
     </div>
   );

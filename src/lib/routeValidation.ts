@@ -50,9 +50,45 @@ export function shouldIgnoreDriver(driverName: string): boolean {
 export function shouldIgnoreCustomer(customerName: string): boolean {
   if (!customerName) return true;
 
+  // Convert to uppercase for case-insensitive comparison
+  const upperName = customerName.toUpperCase().trim();
+
   // Check for email addresses (contains @)
   if (customerName.includes("@")) {
     return true;
+  }
+
+  // Check for specific administrative/documentation entries that should be skipped
+  const skipPatterns = [
+    "END OF ROUTE – POST-TRIP DOCUMENTATION",
+    "END OF ROUTE - POST-TRIP DOCUMENTATION", // Alternative dash format
+    "BREAK COMPLIANCE – CALIFORNIA LAW",
+    "BREAK COMPLIANCE - CALIFORNIA LAW", // Alternative dash format
+    "END OF ROUTE – POST-TRIP DOCUMENTATION", // Exact match from requirement
+    "ALL P.O",
+    "Fueling Procedures – Gasoline Vans",
+    "Fueling Procedures – Diesel Trucks",
+    "Start of Route – Driver Preparation & Documentation"
+  ];
+
+  // Check if the customer name matches any of the skip patterns
+  for (const pattern of skipPatterns) {
+    if (upperName === pattern.toUpperCase()) {
+      return true;
+    }
+  }
+
+  // Additional flexible matching for variations in spacing/punctuation
+  const normalizedName = upperName.replace(/[–\-\s]+/g, ' ').trim();
+  const flexiblePatterns = [
+    "END OF ROUTE POST TRIP DOCUMENTATION",
+    "BREAK COMPLIANCE CALIFORNIA LAW"
+  ];
+
+  for (const pattern of flexiblePatterns) {
+    if (normalizedName === pattern) {
+      return true;
+    }
   }
 
   return false;

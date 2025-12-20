@@ -33,6 +33,18 @@ export default function DriverDashboard() {
 
   const [token, setToken] = useState<string | null>(null);
   const [routes, setRoutes] = useState<any[]>([]);
+  const [pendingDocuments, setPendingDocuments] = useState(0);
+
+  // Attendance status state
+  const [attendanceStatus, setAttendanceStatus] = useState<{
+    isClockedIn: boolean;
+    message: string;
+    warning: string | null;
+    enforcementMode: string;
+    lastChecked: string;
+    source: string;
+  } | null>(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   // Initialize socket connection
   const { isConnected, joinRoom, subscribe } = useSocket();
@@ -68,6 +80,30 @@ export default function DriverDashboard() {
       router.push("/login");
     }
   }, [router]);
+
+  // Fetch attendance status
+  const fetchAttendanceStatus = useCallback(async () => {
+    if (!token) return;
+
+    setAttendanceLoading(true);
+    try {
+      const response = await fetch("/api/driver/attendance/status", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAttendanceStatus(data);
+      }
+    } catch (error) {
+      console.error("Error fetching attendance status:", error);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }, [token]);
 
   // Use useCallback to memoize the function and prevent unnecessary re-renders
   const fetchAssignedRoutes = useCallback(async () => {
@@ -162,12 +198,13 @@ export default function DriverDashboard() {
     }
   }, [token, isMobile]); // Add dependencies
 
-  // Fetch routes when token is available
+  // Fetch routes and attendance status when token is available
   useEffect(() => {
     if (token) {
       fetchAssignedRoutes();
+      fetchAttendanceStatus();
     }
-  }, [token, fetchAssignedRoutes]);
+  }, [token, fetchAssignedRoutes, fetchAttendanceStatus]);
 
   // Set up WebSocket connection and event listeners
   useEffect(() => {
@@ -259,7 +296,71 @@ export default function DriverDashboard() {
         </div>
       </div>
 
-
+      {/* Attendance Status Banner */}
+      {attendanceStatus && !attendanceLoading && (
+        <div
+          className={`border-l-4 p-4 rounded ${attendanceStatus.isClockedIn
+              ? "border-green-500 bg-green-50"
+              : attendanceStatus.enforcementMode === "strict"
+                ? "border-red-500 bg-red-50"
+                : "border-yellow-500 bg-yellow-50"
+            }`}
+        >
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              {attendanceStatus.isClockedIn ? (
+                <svg
+                  className="h-5 w-5 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className={`h-5 w-5 ${attendanceStatus.enforcementMode === "strict"
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                    }`}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+            <div className="ml-3 flex-1">
+              <p
+                className={`text-sm font-medium ${attendanceStatus.isClockedIn
+                    ? "text-green-800"
+                    : attendanceStatus.enforcementMode === "strict"
+                      ? "text-red-800"
+                      : "text-yellow-800"
+                  }`}
+              >
+                {attendanceStatus.message}
+              </p>
+              {attendanceStatus.warning && (
+                <p className="mt-1 text-sm text-gray-600">
+                  {attendanceStatus.warning}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Mode: {attendanceStatus.enforcementMode} | Source:{" "}
+                {attendanceStatus.source}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <h2 className="text-lg font-medium text-black mt-3 mobile-heading">
         Today&apos;s Deliveries
@@ -301,15 +402,14 @@ export default function DriverDashboard() {
                       Status
                     </span>
                     <span
-                      className={`text-sm font-medium px-3 py-1 rounded-full mobile-status ${
-                        route.status === "PENDING"
+                      className={`text-sm font-medium px-3 py-1 rounded-full mobile-status ${route.status === "PENDING"
                           ? "bg-yellow-100 text-yellow-800"
                           : route.status === "IN_PROGRESS"
-                          ? "bg-blue-100 text-blue-800"
-                          : route.status === "COMPLETED"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
+                            ? "bg-blue-100 text-blue-800"
+                            : route.status === "COMPLETED"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                        }`}
                     >
                       {route.status.replace("_", " ")}
                     </span>

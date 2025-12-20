@@ -7,6 +7,8 @@ import { useSocket } from "@/hooks/useSocket";
 import { SocketEvents } from "@/lib/socketClient";
 import Image from "next/image";
 import { getPSTDateString } from "@/lib/timezone";
+import { formatDriverNotes } from "@/utils/notesFormatter";
+import GoogleMapsLink, { RouteMapLink } from "@/components/ui/GoogleMapsLink";
 
 interface Customer {
   id: string;
@@ -785,17 +787,23 @@ export default function DriverStopsPage() {
           </div>
 
           {safetyCheckCompleted && !loading && stops.length > 0 && (
-            <button
-              onClick={() => setShowWeather(!showWeather)}
-              className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition duration-200 touch-manipulation"
-              aria-label="Toggle Weather"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div className="flex items-center space-x-2">
+              <RouteMapLink
+                stops={stops}
+                variant="link"
+                size="sm"
+              />
+              <button
+                onClick={() => setShowWeather(!showWeather)}
+                className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition duration-200 touch-manipulation"
+                aria-label="Toggle Weather"
               >
+                <svg
+                  className="w-5 h-5 text-gray-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -804,6 +812,7 @@ export default function DriverStopsPage() {
                 />
               </svg>
             </button>
+            </div>
           )}
         </div>
 
@@ -1152,7 +1161,7 @@ export default function DriverStopsPage() {
         </div>
       )}
 
-      {/* Map View */}
+      {/* Map View - Google Maps Integration */}
       {viewMode === "map" &&
         safetyCheckCompleted &&
         !loading &&
@@ -1161,59 +1170,62 @@ export default function DriverStopsPage() {
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <h2 className="font-medium text-gray-800">Route Map</h2>
               <span className="text-xs text-gray-500">
-                Interactive map view
+                {filteredStops.length} stops
               </span>
             </div>
-            <div
-              ref={mapRef}
-              className="h-96 bg-gray-100 relative flex items-center justify-center"
-            >
-              <div className="text-center p-6 max-w-md">
-                <svg
-                  className="w-16 h-16 text-gray-400 mx-auto mb-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            <div className="p-4 space-y-4">
+              {/* Full Route Map Link */}
+              <div className="text-center">
+                <RouteMapLink
+                  stops={filteredStops}
+                  variant="button"
+                  size="lg"
+                  className="w-full sm:w-auto"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                  />
-                </svg>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Interactive Map
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  This would display an interactive map with all your stops for
-                  the day, showing the optimal route and current location.
-                </p>
-                <p className="text-sm text-gray-500">
-                  For demonstration purposes only. In a production environment,
-                  this would integrate with Google Maps or a similar mapping
-                  service.
+                  🗺️ View Full Route in Google Maps ({filteredStops.length} stops)
+                </RouteMapLink>
+                <p className="text-xs text-gray-500 mt-2">
+                  Opens Google Maps with your complete delivery route
                 </p>
               </div>
 
-              {/* Map Markers (Simulated) */}
-              {filteredStops.map((stop, index) => (
-                <div
-                  key={stop.id}
-                  className={`absolute w-8 h-8 rounded-full flex items-center justify-center border-2 ${getStatusBadgeClass(
-                    stop.status
-                  )}`}
-                  style={{
-                    top: `${20 + ((index * 15) % 70)}%`,
-                    left: `${15 + ((index * 20) % 70)}%`,
-                    transform: "translate(-50%, -50%)",
-                    transition: "all 0.3s ease-in-out",
-                    zIndex: index === 0 ? 10 : index,
-                  }}
-                >
-                  <span className="text-xs font-bold">{stop.sequence}</span>
+              {/* Individual Stop Links */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Individual Stop Navigation:</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {filteredStops.map((stop) => (
+                    <div
+                      key={stop.id}
+                      className="card-content-safe p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="content-area">
+                        <div className="flex items-center">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mr-3 ${getStatusBadgeClass(stop.status)}`}>
+                            {stop.sequence}
+                          </span>
+                          <div className="prevent-overflow">
+                            <p className="customer-name-safe text-sm font-medium text-gray-900">
+                              {stop.customer.name}
+                            </p>
+                            <p className="customer-address-safe text-xs text-gray-500">
+                              {stop.customer.address}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="action-area">
+                        <GoogleMapsLink
+                          address={stop.customer.address}
+                          customerName={stop.customer.name}
+                          type="directions"
+                          variant="icon"
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
@@ -1227,7 +1239,7 @@ export default function DriverStopsPage() {
             {filteredStops.map((stop) => (
               <div
                 key={stop.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden transform transition duration-300 hover:shadow-lg hover:-translate-y-1 mobile-card touch-manipulation"
+                className="stop-card-safe mobile-card touch-manipulation transform transition duration-300 hover:shadow-lg hover:-translate-y-1"
               >
                 <div
                   className={`h-3 ${
@@ -1235,12 +1247,12 @@ export default function DriverStopsPage() {
                   }`}
                 ></div>
                 <div className="p-5">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-medium text-gray-900 truncate pr-2 text-base">
+                  <div className="stop-header">
+                    <h3 className="stop-title text-base">
                       {stop.customer.name}
                     </h3>
                     <div
-                      className={`flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                      className={`stop-status ${getStatusBadgeClass(
                         stop.status
                       )}`}
                     >
@@ -1251,7 +1263,7 @@ export default function DriverStopsPage() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-gray-500 mb-4 truncate">
+                  <p className="stop-address">
                     {stop.customer.address}
                   </p>
 
@@ -1324,17 +1336,26 @@ export default function DriverStopsPage() {
                     </div>
                   </div>
 
-                  {stop.initialDriverNotes && (
-                    <div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-4 max-h-20 overflow-y-auto">
+                  {stop.customer.preferences && (
+                    <div className="bg-green-50 p-3 rounded text-xs text-green-800 mb-4 max-h-20 overflow-y-auto respect-boundaries">
                       <p className="font-medium mb-1.5">
-                        Delivery Instructions:
+                        Customer Preferences:
                       </p>
-                      <p>{stop.initialDriverNotes}</p>
+                      <p className="text-overflow-safe-multiline-3 break-words-safe">{stop.customer.preferences}</p>
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center mt-5">
-                    <div className="flex space-x-2">
+                  {stop.initialDriverNotes && (
+                    <div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-4 max-h-20 overflow-y-auto respect-boundaries">
+                      <p className="font-medium mb-1.5">
+                        Delivery Instructions:
+                      </p>
+                      <p className="text-overflow-safe-multiline-3 break-words-safe">{formatDriverNotes(stop.initialDriverNotes)}</p>
+                    </div>
+                  )}
+
+                  <div className="stop-actions">
+                    <div className="action-group">
                       {stop.isCOD && (
                         <span className="px-2.5 py-1.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
                           COD
@@ -1352,25 +1373,27 @@ export default function DriverStopsPage() {
                       )}
                     </div>
 
-                    <Link
-                      href={`/driver/stops/${stop.id}`}
-                      className="inline-flex items-center px-4 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 active:bg-gray-900 transition duration-200 touch-manipulation"
-                    >
-                      <span>Details</span>
-                      <svg
-                        className="ml-1.5 w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                    <div className="button-container-safe">
+                      <Link
+                        href={`/driver/stops/${stop.id}`}
+                        className="inline-flex items-center px-4 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 active:bg-gray-900 transition duration-200 touch-manipulation mobile-button-safe"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </Link>
+                        <span>Details</span>
+                        <svg
+                          className="ml-1.5 w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1396,8 +1419,8 @@ export default function DriverStopsPage() {
                   key={stop.id}
                   className="p-5 hover:bg-gray-50 transition duration-150"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                    <div className="flex-1">
+                  <div className="list-item-safe">
+                    <div className="list-content">
                       <div className="flex items-start">
                         <div className="flex-shrink-0 mr-4">
                           <div
@@ -1408,15 +1431,33 @@ export default function DriverStopsPage() {
                             {stop.sequence}
                           </div>
                         </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 text-base">
+                        <div className="prevent-overflow">
+                          <h3 className="customer-name-safe font-medium text-gray-900 text-base">
                             {stop.customer.name}
                           </h3>
-                          <p className="text-sm text-gray-500 mt-1.5">
+                          <p className="customer-address-safe text-sm text-gray-500 mt-1.5">
                             {stop.customer.address}
                           </p>
+                          {stop.customer.preferences && (
+                            <div className="mt-3 text-xs text-green-800 flex items-start respect-boundaries">
+                              <svg
+                                className="w-4 h-4 mr-1.5 flex-shrink-0 mt-0.5 text-green-500"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              <span className="text-overflow-safe-multiline break-words-safe">
+                                <span className="font-medium">Preferences:</span> {stop.customer.preferences}
+                              </span>
+                            </div>
+                          )}
                           {stop.initialDriverNotes && (
-                            <div className="mt-3 text-xs text-blue-800 flex items-start">
+                            <div className="mt-3 text-xs text-blue-800 flex items-start respect-boundaries">
                               <svg
                                 className="w-4 h-4 mr-1.5 flex-shrink-0 mt-0.5 text-blue-500"
                                 fill="none"
@@ -1430,8 +1471,8 @@ export default function DriverStopsPage() {
                                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                               </svg>
-                              <span className="line-clamp-2">
-                                {stop.initialDriverNotes}
+                              <span className="text-overflow-safe-multiline break-words-safe">
+                                {formatDriverNotes(stop.initialDriverNotes)}
                               </span>
                             </div>
                           )}
@@ -1439,7 +1480,7 @@ export default function DriverStopsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:items-end gap-3 mt-4 sm:mt-0">
+                    <div className="list-actions">
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBadgeClass(
                           stop.status
@@ -1465,8 +1506,20 @@ export default function DriverStopsPage() {
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                           />
                         </svg>
-                        <span>{stop.quickbooksInvoiceNum || "No Invoice"}</span>
+                        <span className="text-overflow-safe">{stop.quickbooksInvoiceNum || "No Invoice"}</span>
                       </div>
+
+                      {/* Google Maps Navigation Link */}
+                      <GoogleMapsLink
+                        address={stop.customer.address}
+                        customerName={stop.customer.name}
+                        type="directions"
+                        variant="button"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        📍 Navigate
+                      </GoogleMapsLink>
 
                       <Link
                         href={`/driver/stops/${stop.id}`}

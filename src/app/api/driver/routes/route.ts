@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString, createPSTDateFromString, toPSTEndOfDay } from "@/lib/timezone";
+import { requireActiveShift } from "@/lib/attendanceMiddleware";
 
 // GET /api/driver/routes - Get routes for the logged-in driver
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Check authentication and attendance status
+    const attendanceCheck = await requireActiveShift(request);
+    if (!attendanceCheck.allowed) {
       return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
+        attendanceCheck.error,
+        { status: attendanceCheck.status || 403 }
       );
     }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = verifyToken(token) as any;
-    
-    if (!decoded || !decoded.id || decoded.role !== "DRIVER") {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const decoded = attendanceCheck.decoded;
 
     // Parse query parameters
     const url = new URL(request.url);
@@ -65,11 +57,12 @@ export async function GET(request: NextRequest) {
           lte: getTodayEndUTC(),
         };
       } else {
-        // For other dates, use the provided date
-        const dateObj = new Date(date);
+        // For other dates, use proper PST timezone conversion
+        const startDate = createPSTDateFromString(date);
+        const endDate = toPSTEndOfDay(startDate);
         query.where.date = {
-          gte: new Date(dateObj.setHours(0, 0, 0, 0)),
-          lt: new Date(dateObj.setHours(23, 59, 59, 999)),
+          gte: startDate,
+          lt: endDate,
         };
       }
     }

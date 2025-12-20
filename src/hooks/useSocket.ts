@@ -55,23 +55,32 @@ export const useSocket = (
         username = sessionStorage.getItem("username");
       }
 
-      // If token is expired or expiring soon, try to refresh it
-      if (token && tokenManager.isTokenExpiringSoon(token)) {
-        console.log("WebSocket: Token is expiring soon, attempting refresh");
-        tokenManager.refreshToken().then((newToken) => {
-          if (newToken && socketRef.current) {
-            // Reconnect with new token
-            socketRef.current.auth = {
-              token: newToken,
-              role: userRole,
-              id: userId,
-              username: username
-            };
-            socketRef.current.connect();
+      // Proactive token validation - ensure token is valid before connecting
+      if (token && (tokenManager.isTokenExpired(token) || tokenManager.isTokenExpiringSoon(token))) {
+        console.log("WebSocket: Token expired or expiring soon, refreshing before connection");
+
+        // Use async token refresh to ensure we have a valid token
+        tokenManager.ensureValidToken().then((validToken) => {
+          if (validToken) {
+            // Update token and user data from storage after refresh
+            token = validToken;
+            userRole = localStorage.getItem("userRole") || sessionStorage.getItem("userRole");
+            userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+            username = localStorage.getItem("username") || sessionStorage.getItem("username");
+
+            // Proceed with connection using valid token
+            proceedWithConnection(validToken, userRole, userId, username);
+          } else {
+            console.log("WebSocket: Token refresh failed, cannot connect");
+            setIsConnected(false);
+            setError("Authentication failed. Please log in again.");
           }
         }).catch((error) => {
-          console.log("WebSocket: Token refresh failed", error);
+          console.log("WebSocket: Token refresh error:", error);
+          setIsConnected(false);
+          setError("Authentication failed. Please log in again.");
         });
+        return; // Exit early, connection will be handled in the promise
       }
     }
 
@@ -83,24 +92,66 @@ export const useSocket = (
       return;
     }
 
-    // Create socket connection to the Socket.IO server on the same port as the app
-    const socketServerUrl =
-      typeof window !== "undefined" ? window.location.origin : "";
+    // Helper functions for authentication error handling
+    async function handleTokenExpiredError(socket: any, role: string | null, id: string | null, user: string | null) {
+      console.log("WebSocket: Token expired, attempting refresh...");
 
-    // Only log in development mode
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Auth info:", { token: "***", userRole, userId, username });
+      try {
+        const newToken = await tokenManager.refreshToken();
+
+        if (newToken) {
+          // Re-authenticate with new token
+          socket.emit('reauthenticate', {
+            token: newToken,
+            role: role,
+            id: id,
+            username: user
+          });
+        } else {
+          setError("Session expired. Please log in again.");
+          setIsConnected(false);
+        }
+      } catch (error) {
+        console.error("WebSocket: Token refresh failed:", error);
+        setError("Session expired. Please log in again.");
+        setIsConnected(false);
+      }
     }
 
-    // Create an optimized Socket.IO connection with performance enhancements
-    const socket = io(socketServerUrl, {
-      path: "/socket.io",
-      auth: {
-        token,
-        role: userRole,
-        id: userId,
-        username: username,
-      },
+    function handleInvalidTokenError() {
+      console.log("WebSocket: Invalid token, clearing session");
+      setError("Session invalid. Please log in again.");
+      setIsConnected(false);
+
+      // Clear tokens
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+    }
+
+    // Proceed with connection using validated token
+    proceedWithConnection(token, userRole, userId, username);
+
+    // Connection function with enhanced error handling
+    function proceedWithConnection(validToken: string, role: string | null, id: string | null, user: string | null) {
+
+      // Create socket connection to the Socket.IO server on the same port as the app
+      const socketServerUrl =
+        typeof window !== "undefined" ? window.location.origin : "";
+
+      // Only log in development mode
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Auth info:", { token: "***", role, id, user });
+      }
+
+      // Create an optimized Socket.IO connection with performance enhancements
+      const socket = io(socketServerUrl, {
+        path: "/socket.io",
+        auth: {
+          token: validToken,
+          role: role,
+          id: id,
+          username: user,
+        },
       // Optimize transport configuration for better performance
       // Use WebSocket first for faster connection if available, fallback to polling
       transports: ["websocket", "polling"],
@@ -125,14 +176,35 @@ export const useSocket = (
 
     // Simple, focused event handlers for reliability
 
-    // Connection events - optimized with reduced logging
-    socket.on(SocketEvents.CONNECT, () => {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Socket connected successfully");
-      }
-      setIsConnected(true);
-      setError(null);
-    });
+      // Connection events - optimized with reduced logging
+      socket.on(SocketEvents.CONNECT, () => {
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Socket connected successfully");
+        }
+        setIsConnected(true);
+        setError(null);
+      });
+
+      // Enhanced authentication error handling
+      socket.on(SocketEvents.AUTH_ERROR, (authError: any) => {
+        console.log("WebSocket: Received auth error:", authError.type, "-", authError.message);
+
+        if (authError.type === 'TOKEN_EXPIRED') {
+          handleTokenExpiredError(socket, role, id, user);
+        } else if (authError.type === 'INVALID_TOKEN') {
+          handleInvalidTokenError();
+        } else {
+          console.log("WebSocket: Authentication error:", authError.message);
+          setError(`Authentication error: ${authError.message}`);
+        }
+      });
+
+      // Re-authentication success handler
+      socket.on('reauthenticated', (data: any) => {
+        console.log("WebSocket: Re-authentication successful");
+        setIsConnected(true);
+        setError(null);
+      });
 
     socket.on(SocketEvents.DISCONNECT, (reason) => {
       if (process.env.NODE_ENV !== "production") {
@@ -211,22 +283,23 @@ export const useSocket = (
       // setError(`Socket error: ${err.message}`);
     });
 
-    // Store socket reference
-    socketRef.current = socket;
+      // Store socket reference
+      socketRef.current = socket;
 
-    // Get a reference to the current joinedRoomsRef for cleanup
-    const currentJoinedRoomsRef = joinedRoomsRef;
+      // Get a reference to the current joinedRoomsRef for cleanup
+      const currentJoinedRoomsRef = joinedRoomsRef;
 
-    // Clean up on unmount
-    return () => {
-      if (socket) {
-        socket.disconnect();
-        socketRef.current = null;
+      // Clean up on unmount
+      return () => {
+        if (socket) {
+          socket.disconnect();
+          socketRef.current = null;
 
-        // Clear joined rooms set on cleanup using the captured reference
-        currentJoinedRoomsRef.current.clear();
-      }
-    };
+          // Clear joined rooms set on cleanup using the captured reference
+          currentJoinedRoomsRef.current.clear();
+        }
+      };
+    } // End of proceedWithConnection function
   }, [autoConnect, providedToken]);
 
   // Keep track of joined rooms to prevent duplicate join events

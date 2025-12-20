@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import {
+  verifyPasswordConfirmation,
+  createPasswordConfirmationErrorResponse,
+} from "@/lib/passwordConfirmation";
 import * as argon2 from "argon2";
 
 // Import session manager with error handling
@@ -236,20 +240,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // Verify password confirmation (includes authentication check)
+    const passwordCheck = await verifyPasswordConfirmation(request);
+
+    if (!passwordCheck.confirmed) {
+      return createPasswordConfirmationErrorResponse(passwordCheck);
     }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = verifyToken(token) as any;
+    const decoded = {
+      id: passwordCheck.userId,
+      role: passwordCheck.userRole,
+    };
 
-    if (
-      !decoded ||
-      !decoded.id ||
-      !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)
-    ) {
+    if (!["ADMIN", "SUPER_ADMIN"].includes(decoded.role as string)) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 

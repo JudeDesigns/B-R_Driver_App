@@ -18,6 +18,7 @@ import StopHeader from "@/components/driver/stops/StopHeader";
 import CustomerInfoCard from "@/components/driver/stops/CustomerInfoCard";
 import StatusUpdateCard from "@/components/driver/stops/StatusUpdateCard";
 import PaymentModal from "@/components/driver/stops/PaymentModal";
+import LocationTracker from "@/components/driver/LocationTracker";
 
 interface Document {
   id: string;
@@ -121,7 +122,7 @@ export default function StopDetailPage({
 
   // Payment recording state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentEntries, setPaymentEntries] = useState<Array<{amount: string, method: string, notes: string}>>([{amount: "", method: "", notes: ""}]);
+  const [paymentEntries, setPaymentEntries] = useState<Array<{ amount: string, method: string, notes: string }>>([{ amount: "", method: "", notes: "" }]);
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
@@ -584,7 +585,7 @@ export default function StopDetailPage({
       }
 
       // Reset form and close modal
-      setPaymentEntries([{amount: "", method: "", notes: ""}]);
+      setPaymentEntries([{ amount: "", method: "", notes: "" }]);
       setShowPaymentModal(false);
 
       // Automatically mark Step 3 (Payment) as completed when payment is saved
@@ -606,7 +607,7 @@ export default function StopDetailPage({
 
   // Payment entry management
   const addPaymentEntry = () => {
-    setPaymentEntries(prev => [...prev, {amount: "", method: "", notes: ""}]);
+    setPaymentEntries(prev => [...prev, { amount: "", method: "", notes: "" }]);
   };
 
   const removePaymentEntry = (index: number) => {
@@ -617,7 +618,7 @@ export default function StopDetailPage({
 
   const updatePaymentEntry = (index: number, field: string, value: string) => {
     setPaymentEntries(prev => prev.map((entry, i) =>
-      i === index ? {...entry, [field]: value} : entry
+      i === index ? { ...entry, [field]: value } : entry
     ));
   };
 
@@ -747,15 +748,14 @@ export default function StopDetailPage({
               key={step.id}
               onClick={() => canAccessStep(step.id) && goToStep(step.id)}
               disabled={!canAccessStep(step.id)}
-              className={`flex flex-col items-center p-2 sm:p-3 rounded-lg transition-all duration-200 min-w-0 flex-1 max-w-[80px] sm:max-w-none ${
-                currentStep === step.id
+              className={`flex flex-col items-center p-2 sm:p-3 rounded-lg transition-all duration-200 min-w-0 flex-1 max-w-[80px] sm:max-w-none ${currentStep === step.id
                   ? "bg-blue-100 border-2 border-blue-500 text-blue-700"
                   : isStepCompleted(step.id)
-                  ? "bg-green-100 border-2 border-green-500 text-green-700"
-                  : canAccessStep(step.id)
-                  ? "bg-gray-50 border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
-                  : "bg-gray-50 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
-              }`}
+                    ? "bg-green-100 border-2 border-green-500 text-green-700"
+                    : canAccessStep(step.id)
+                      ? "bg-gray-50 border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
+                      : "bg-gray-50 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
             >
               <div className="text-lg sm:text-xl mb-1">
                 {isStepCompleted(step.id) ? "✅" : step.icon}
@@ -825,6 +825,13 @@ export default function StopDetailPage({
           {/* Customer Information Card - Mobile Optimized */}
           <CustomerInfoCard stop={stop} formatDate={formatDate} />
 
+          {/* Location Tracker - Only active when driver is on the way */}
+          <LocationTracker
+            stopId={stop.id}
+            routeId={stop.route.id}
+            isActive={stop.status === "ON_THE_WAY" || stop.status === "ARRIVED"}
+          />
+
           {/* Status Update - Mobile Optimized */}
           <StatusUpdateCard
             stop={stop}
@@ -860,39 +867,41 @@ export default function StopDetailPage({
                               </h3>
                               <div className="grid gap-3">
                                 {stop.customer.documents.map((doc) => (
-                                  <div key={doc.id} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center space-x-3 flex-1">
-                                        <div className="text-2xl">
-                                          {doc.type === 'INVOICE' ? '📄' :
-                                           doc.type === 'CREDIT_MEMO' ? '💳' :
-                                           doc.type === 'DELIVERY_RECEIPT' ? '📋' :
-                                           doc.type === 'RETURN_FORM' ? '↩️' : '📎'}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="text-sm font-medium text-gray-900 truncate">
-                                            {doc.title}
-                                          </h4>
-                                          <p className="text-xs text-gray-600">
-                                            {getDocumentTypeLabel(doc.type)} • {(doc.fileSize / 1024).toFixed(1)} KB
-                                          </p>
-                                          {doc.description && (
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {doc.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <a
-                                          href={doc.filePath}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
-                                        >
-                                          View & Print
-                                        </a>
-                                      </div>
+                                  <div key={doc.id} className="document-card-safe bg-blue-50 border-blue-200">
+                                    <div className="document-icon text-2xl">
+                                      {doc.type === 'INVOICE' ? '📄' :
+                                        doc.type === 'CREDIT_MEMO' ? '💳' :
+                                          doc.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                            doc.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                    </div>
+                                    <div className="document-info">
+                                      <h4 className="document-title text-gray-900">
+                                        {doc.title}
+                                      </h4>
+                                      <p className="document-meta text-gray-600">
+                                        {getDocumentTypeLabel(doc.type)} • {(doc.fileSize / 1024).toFixed(1)} KB
+                                      </p>
+                                      {doc.description && (
+                                        <p className="document-meta text-gray-500 mt-1">
+                                          {doc.description}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-gray-500 mt-1 flex items-center">
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-overflow-safe">Uploaded {formatDate(doc.createdAt)}</span>
+                                      </p>
+                                    </div>
+                                    <div className="document-actions">
+                                      <a
+                                        href={doc.filePath}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation mobile-button-safe"
+                                      >
+                                        View & Print
+                                      </a>
                                     </div>
                                   </div>
                                 ))}
@@ -911,47 +920,49 @@ export default function StopDetailPage({
                               </h3>
                               <div className="grid gap-3">
                                 {stop.stopDocuments.map((stopDoc) => (
-                                  <div key={stopDoc.id} className="border border-green-200 rounded-lg p-3 bg-green-50">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center space-x-3 flex-1">
-                                        <div className="text-2xl">
-                                          {stopDoc.document.type === 'INVOICE' ? '📄' :
-                                           stopDoc.document.type === 'CREDIT_MEMO' ? '💳' :
-                                           stopDoc.document.type === 'DELIVERY_RECEIPT' ? '📋' :
-                                           stopDoc.document.type === 'RETURN_FORM' ? '↩️' : '📎'}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="text-sm font-medium text-gray-900 truncate">
-                                            {stopDoc.document.title}
-                                          </h4>
-                                          <p className="text-xs text-gray-600">
-                                            {getDocumentTypeLabel(stopDoc.document.type)} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
-                                          </p>
-                                          {stopDoc.document.description && (
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                              {stopDoc.document.description}
-                                            </p>
-                                          )}
-                                          {stopDoc.isPrinted && (
-                                            <p className="text-xs text-green-600 mt-1 flex items-center">
-                                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                              </svg>
-                                              Printed {stopDoc.printedAt ? new Date(stopDoc.printedAt).toLocaleDateString() : ''}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <a
-                                          href={stopDoc.document.filePath}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation"
-                                        >
-                                          View & Print
-                                        </a>
-                                      </div>
+                                  <div key={stopDoc.id} className="document-card-safe bg-green-50 border-green-200">
+                                    <div className="document-icon text-2xl">
+                                      {stopDoc.document.type === 'INVOICE' ? '📄' :
+                                        stopDoc.document.type === 'CREDIT_MEMO' ? '💳' :
+                                          stopDoc.document.type === 'DELIVERY_RECEIPT' ? '📋' :
+                                            stopDoc.document.type === 'RETURN_FORM' ? '↩️' : '📎'}
+                                    </div>
+                                    <div className="document-info">
+                                      <h4 className="document-title text-gray-900">
+                                        {stopDoc.document.title}
+                                      </h4>
+                                      <p className="document-meta text-gray-600">
+                                        {getDocumentTypeLabel(stopDoc.document.type)} • {(stopDoc.document.fileSize / 1024).toFixed(1)} KB
+                                      </p>
+                                      {stopDoc.document.description && (
+                                        <p className="document-meta text-gray-500 mt-1">
+                                          {stopDoc.document.description}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-gray-500 mt-1 flex items-center">
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-overflow-safe">Uploaded {formatDate(stopDoc.document.createdAt)}</span>
+                                      </p>
+                                      {stopDoc.isPrinted && (
+                                        <p className="text-xs text-green-600 mt-1 flex items-center">
+                                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                          </svg>
+                                          <span className="text-overflow-safe">Printed {stopDoc.printedAt ? new Date(stopDoc.printedAt).toLocaleDateString() : ''}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="document-actions">
+                                      <a
+                                        href={stopDoc.document.filePath}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation mobile-button-safe"
+                                      >
+                                        View & Print
+                                      </a>
                                     </div>
                                   </div>
                                 ))}
@@ -1029,7 +1040,7 @@ export default function StopDetailPage({
                                 }));
                                 setPaymentEntries(existingPayments);
                               } else {
-                                setPaymentEntries([{amount: "", method: "", notes: ""}]);
+                                setPaymentEntries([{ amount: "", method: "", notes: "" }]);
                               }
                               setShowPaymentModal(true);
                             }}
@@ -1144,13 +1155,33 @@ export default function StopDetailPage({
                     >
                       Previous
                     </button>
-                    <button
-                      onClick={nextStep}
-                      disabled={currentStep === steps.length}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next Step
-                    </button>
+                    {currentStep === steps.length ? (
+                      <button
+                        onClick={() => updateStatus("COMPLETED")}
+                        disabled={isStatusButtonDisabled("COMPLETED")}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      >
+                        {updatingStatus ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Completing...
+                          </>
+                        ) : (
+                          "Complete Delivery"
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={nextStep}
+                        disabled={currentStep === steps.length}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next Step
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1177,7 +1208,7 @@ export default function StopDetailPage({
         onClose={() => {
           setShowPaymentModal(false);
           setPaymentError("");
-          setPaymentEntries([{amount: "", method: "", notes: ""}]);
+          setPaymentEntries([{ amount: "", method: "", notes: "" }]);
         }}
         addPaymentEntry={addPaymentEntry}
         removePaymentEntry={removePaymentEntry}

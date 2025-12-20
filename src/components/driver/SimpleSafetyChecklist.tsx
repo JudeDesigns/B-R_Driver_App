@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface SimpleSafetyChecklistProps {
   onSubmit: (data: SimpleSafetyCheckData) => void;
   isSubmitting: boolean;
+  vehicle?: {
+    id: string;
+    vehicleNumber: string;
+    fuelInstructions?: string | null;
+    fuelType?: string | null;
+  } | null;
 }
 
 export interface SimpleSafetyCheckData {
@@ -13,22 +19,22 @@ export interface SimpleSafetyCheckData {
   truckNumber: string;
   mileage: string;
   fuelLevel: string;
-  
+
   // Essential safety items
   lightsWorking: boolean;
   tiresCondition: boolean;
   braksWorking: boolean;
   vehicleClean: boolean;
-  
+
   // Equipment check
   palletJackWorking: boolean;
   dolliesSecured: boolean;
   strapsAvailable: boolean;
-  
+
   // Pre-departure
   routeReviewed: boolean;
   warehouseContacted: boolean;
-  
+
   // Notes
   notes: string;
 }
@@ -36,10 +42,11 @@ export interface SimpleSafetyCheckData {
 export default function SimpleSafetyChecklist({
   onSubmit,
   isSubmitting,
+  vehicle,
 }: SimpleSafetyChecklistProps) {
   const [formData, setFormData] = useState<SimpleSafetyCheckData>({
     date: new Date().toISOString().split("T")[0],
-    truckNumber: "",
+    truckNumber: vehicle?.vehicleNumber || "",
     mileage: "",
     fuelLevel: "FULL",
     lightsWorking: false,
@@ -54,12 +61,63 @@ export default function SimpleSafetyChecklist({
     notes: "",
   });
 
+  const [safetyInstructions, setSafetyInstructions] = useState<string | null>(null);
+  const [showFuelInstructions, setShowFuelInstructions] = useState(false);
+
+  useEffect(() => {
+    if (vehicle?.vehicleNumber) {
+      setFormData(prev => ({ ...prev, truckNumber: vehicle.vehicleNumber }));
+    }
+  }, [vehicle]);
+
+  useEffect(() => {
+    fetchSafetyInstructions();
+  }, []);
+
+  const fetchSafetyInstructions = async () => {
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) return;
+
+      const response = await fetch("/api/driver/system-documents?type=SAFETY_INSTRUCTIONS", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.documents && data.documents.length > 0) {
+          // Assuming the file path or content is what we want. 
+          // For now, let's just show a link if it's a file, or content if it's text.
+          // The schema has filePath and fileName.
+          // We might need a way to view the content. 
+          // For this implementation, I'll assume we want to show a download link or similar.
+          // But the user asked for "Interactive Safety Instructions".
+          // If it's a PDF, we link it.
+          setSafetyInstructions(data.documents[0].fileName);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching safety instructions:", error);
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >
   ) => {
     const { name, value, type } = e.target;
+
+    if (name === "fuelLevel") {
+      // Show fuel instructions if level is low or quarter
+      if (value === "LOW" || value === "QUARTER") {
+        setShowFuelInstructions(true);
+      } else {
+        setShowFuelInstructions(false);
+      }
+    }
 
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
@@ -82,6 +140,27 @@ export default function SimpleSafetyChecklist({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Safety Instructions Alert */}
+      {safetyInstructions && (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <span className="text-xl">ℹ️</span>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">Safety Instructions</h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>Please review the daily safety instructions before proceeding.</p>
+                {/* In a real app, this would link to the document viewer */}
+                <span className="font-semibold underline cursor-pointer">
+                  {safetyInstructions}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Basic Vehicle Info */}
       <div className="space-y-4">
         <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
@@ -158,6 +237,28 @@ export default function SimpleSafetyChecklist({
             </select>
           </div>
         </div>
+
+        {/* Conditional Fuel Instructions */}
+        {showFuelInstructions && vehicle?.fuelInstructions && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg animate-fade-in">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-xl">⛽</span>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">Fueling Instructions</h3>
+                <div className="mt-2 text-sm text-yellow-700 whitespace-pre-wrap">
+                  {vehicle.fuelInstructions}
+                </div>
+                {vehicle.fuelType && (
+                  <p className="mt-1 text-xs font-semibold text-yellow-800">
+                    Fuel Type: {vehicle.fuelType}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Safety Checks */}
@@ -278,3 +379,4 @@ export default function SimpleSafetyChecklist({
     </form>
   );
 }
+

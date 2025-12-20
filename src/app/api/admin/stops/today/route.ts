@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
                 type: true,
                 fileName: true,
                 filePath: true, // Include filePath for document viewing
+                createdAt: true,
               },
             },
           },

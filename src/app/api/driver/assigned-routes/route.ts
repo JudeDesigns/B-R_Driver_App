@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const token = authHeader.split(" ")[1];
     const decoded = verifyToken(token) as any;
-    
+
     if (!decoded || !decoded.id || decoded.role !== "DRIVER") {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -51,10 +51,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(url.searchParams.get("limit") || "10");
     const offset = parseInt(url.searchParams.get("offset") || "0");
 
-    // Find routes where this driver is assigned to stops
-    // First, find all stops assigned to this driver
-    const driverName = driver.fullName || driver.username;
-    
     // Prepare date filter
     let dateFilter = {};
     if (date) {
@@ -98,9 +94,18 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        vehicleAssignments: {
+          where: {
+            driverId: decoded.id,
+            isActive: true,
+          },
+          include: {
+            vehicle: true,
+          },
+        },
       },
     });
-    
+
     // Get routes where the driver is assigned to stops via driverNameFromUpload
     // Use precise matching to prevent cross-driver issues
     const routesWithAssignedStops = await prisma.route.findMany({
@@ -134,24 +139,90 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        vehicleAssignments: {
+          where: {
+            driverId: decoded.id,
+            isActive: true,
+          },
+          include: {
+            vehicle: true,
+          },
+        },
       },
     });
-    
+
+    // Get routes where the driver is assigned via vehicle assignment
+    // First, find active vehicle assignments for this driver
+    const vehicleAssignments = await prisma.vehicleAssignment.findMany({
+      where: {
+        driverId: decoded.id,
+        isActive: true,
+        isDeleted: false,
+        routeId: { not: null }, // Only assignments with specific routes
+      },
+      select: {
+        routeId: true,
+      },
+    });
+
+    const routeIdsFromVehicles = vehicleAssignments
+      .map(a => a.routeId)
+      .filter((id): id is string => id !== null);
+
+    // Fetch those routes if any exist
+    const routesViaVehicleAssignment = routeIdsFromVehicles.length > 0
+      ? await prisma.route.findMany({
+        where: {
+          id: { in: routeIdsFromVehicles },
+          isDeleted: false,
+          ...dateFilter,
+          ...statusFilter,
+        },
+        include: {
+          _count: {
+            select: {
+              stops: {
+                where: {
+                  isDeleted: false,
+                },
+              },
+            },
+          },
+          vehicleAssignments: {
+            where: {
+              driverId: decoded.id,
+              isActive: true,
+            },
+            include: {
+              vehicle: true,
+            },
+          },
+        },
+      })
+      : [];
+
     // Combine and deduplicate routes
     const routeMap = new Map();
-    
+
     // Add directly assigned routes
     directlyAssignedRoutes.forEach(route => {
       routeMap.set(route.id, route);
     });
-    
+
     // Add routes with assigned stops
     routesWithAssignedStops.forEach(route => {
       if (!routeMap.has(route.id)) {
         routeMap.set(route.id, route);
       }
     });
-    
+
+    // Add routes via vehicle assignment
+    routesViaVehicleAssignment.forEach(route => {
+      if (!routeMap.has(route.id)) {
+        routeMap.set(route.id, route);
+      }
+    });
+
     // Convert map to array and sort by date
     const allRoutes = Array.from(routeMap.values()).sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -173,7 +244,7 @@ export async function GET(request: NextRequest) {
 
     // Apply pagination
     const paginatedRoutes = allRoutes.slice(offset, offset + limit);
-    
+
     const response = NextResponse.json({
       routes: paginatedRoutes,
       totalCount: allRoutes.length,

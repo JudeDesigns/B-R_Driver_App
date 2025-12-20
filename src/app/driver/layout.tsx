@@ -118,10 +118,10 @@ export default function DriverLayout({
       </header>
 
       {/* Main Content - Mobile Optimized */}
-      <main className="flex-1 p-4 pb-24 mobile-container">{children}</main>
+      <main className="flex-1 p-4 mobile-container">{children}</main>
 
-      {/* Mobile Navigation - Optimized */}
-      <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full mobile-nav">
+      {/* Mobile Navigation - Always at Bottom */}
+      <nav className="bg-white border-t border-gray-200 w-full mobile-nav mt-auto">
         <div className="flex justify-around">
           <Link
             href="/driver"

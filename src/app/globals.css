@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../styles/mobile-utils.css";
+@import "../styles/text-overflow-fix.css";
 
 :root {
   /* Force light mode - ignore system dark mode preference */

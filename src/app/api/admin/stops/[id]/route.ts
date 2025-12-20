@@ -35,7 +35,71 @@ export async function GET(
         isDeleted: false,
       },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            documents: {
+              where: {
+                isDeleted: false,
+                isActive: true,
+              },
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                type: true,
+                fileName: true,
+                filePath: true,
+                fileSize: true,
+                mimeType: true,
+                createdAt: true,
+                uploader: {
+                  select: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+          },
+        },
+        stopDocuments: {
+          where: {
+            isDeleted: false,
+            document: {
+              isDeleted: false,
+              isActive: true,
+            },
+          },
+          include: {
+            document: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                type: true,
+                fileName: true,
+                filePath: true,
+                fileSize: true,
+                mimeType: true,
+                createdAt: true,
+                uploader: {
+                  select: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
         route: {
           select: {
             id: true,
@@ -157,22 +221,56 @@ export async function PUT(
 
     // Handle sequence conflicts if sequence is being changed
     if (data.sequence !== undefined && data.sequence !== existingStop.sequence) {
-      // Check if the new sequence already exists in the same route
-      const conflictingStop = await prisma.stop.findFirst({
+      const oldSequence = existingStop.sequence;
+      const newSequence = data.sequence;
+
+      // Get all stops in the same route (excluding the current stop)
+      const routeStops = await prisma.stop.findMany({
         where: {
           routeId: existingStop.routeId,
-          sequence: data.sequence,
           isDeleted: false,
-          id: { not: id } // Exclude current stop
-        }
+          id: { not: id }
+        },
+        orderBy: { sequence: 'asc' }
       });
 
-      if (conflictingStop) {
-        // Swap sequences to avoid conflicts
-        await prisma.stop.update({
-          where: { id: conflictingStop.id },
-          data: { sequence: existingStop.sequence }
+      // Determine which stops need to be shifted
+      const stopsToUpdate: { id: string; newSequence: number }[] = [];
+
+      if (newSequence < oldSequence) {
+        // Moving up (e.g., from sequence 5 to 2)
+        // Shift down all stops with sequence >= newSequence and < oldSequence
+        routeStops.forEach(stop => {
+          if (stop.sequence >= newSequence && stop.sequence < oldSequence) {
+            stopsToUpdate.push({
+              id: stop.id,
+              newSequence: stop.sequence + 1
+            });
+          }
         });
+      } else if (newSequence > oldSequence) {
+        // Moving down (e.g., from sequence 2 to 5)
+        // Shift up all stops with sequence > oldSequence and <= newSequence
+        routeStops.forEach(stop => {
+          if (stop.sequence > oldSequence && stop.sequence <= newSequence) {
+            stopsToUpdate.push({
+              id: stop.id,
+              newSequence: stop.sequence - 1
+            });
+          }
+        });
+      }
+
+      // Update all affected stops in a transaction
+      if (stopsToUpdate.length > 0) {
+        await prisma.$transaction(
+          stopsToUpdate.map(update =>
+            prisma.stop.update({
+              where: { id: update.id },
+              data: { sequence: update.newSequence }
+            })
+          )
+        );
       }
     }
 

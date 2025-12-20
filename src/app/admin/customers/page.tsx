@@ -14,6 +14,7 @@ interface Customer {
   name: string;
   address: string;
   contactInfo: string | null;
+  email: string | null;
   preferences: string | null;
   groupCode: string | null;
   createdAt: string;
@@ -219,6 +220,7 @@ export default function CustomersPage() {
           "Name",
           "Address",
           "Contact Info",
+          "Email",
           "Preferences",
           "Group Code",
           "Created At",
@@ -232,6 +234,11 @@ export default function CustomersPage() {
             `"${
               customer.contactInfo
                 ? customer.contactInfo.replace(/"/g, '""')
+                : ""
+            }"`,
+            `"${
+              customer.email
+                ? customer.email.replace(/"/g, '""')
                 : ""
             }"`,
             `"${
@@ -521,6 +528,10 @@ export default function CustomersPage() {
                     {
                       header: "Contact",
                       accessor: (customer) => customer.contactInfo || "N/A",
+                    },
+                    {
+                      header: "Email",
+                      accessor: (customer) => customer.email || "N/A",
                     },
                     {
                       header: "Actions",

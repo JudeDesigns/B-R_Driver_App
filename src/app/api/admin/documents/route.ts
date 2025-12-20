@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     const isActive = searchParams.get("isActive");
+    const searchQuery = searchParams.get("search");
 
     // Build where clause
     const where: any = {
@@ -35,6 +36,14 @@ export async function GET(request: NextRequest) {
 
     if (isActive !== null) {
       where.isActive = isActive === "true";
+    }
+
+    if (searchQuery) {
+      where.OR = [
+        { title: { contains: searchQuery, mode: "insensitive" } },
+        { description: { contains: searchQuery, mode: "insensitive" } },
+        { fileName: { contains: searchQuery, mode: "insensitive" } },
+      ];
     }
 
     // Get documents

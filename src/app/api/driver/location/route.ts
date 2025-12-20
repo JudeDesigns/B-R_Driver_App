@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store the location update in the database
+    // Store the location update in the database (history)
     const locationUpdate = await prisma.driverLocation.create({
       data: {
         driverId: decoded.id,
@@ -105,19 +105,33 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Emit location update event
-    emitDriverLocationUpdate({
-      driverId: decoded.id,
-      driverName: driver?.fullName || driver?.username || "Unknown Driver",
-      stopId: data.stopId,
-      routeId: data.routeId,
-      customerName: stop.customer.name,
-      routeNumber: stop.route.routeNumber,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      accuracy: data.accuracy || null,
-      timestamp: new Date().toISOString(),
+    // Update user's last known location (for quick access)
+    await prisma.user.update({
+      where: { id: decoded.id },
+      data: {
+        lastKnownLatitude: data.latitude,
+        lastKnownLongitude: data.longitude,
+        lastLocationUpdate: new Date(),
+        locationAccuracy: data.accuracy || null,
+      },
     });
+
+    // Emit location update event (only if real-time updates are enabled)
+    const realtimeEnabled = process.env.LOCATION_REALTIME_UPDATES === 'true';
+    if (realtimeEnabled) {
+      emitDriverLocationUpdate({
+        driverId: decoded.id,
+        driverName: driver?.fullName || driver?.username || "Unknown Driver",
+        stopId: data.stopId,
+        routeId: data.routeId,
+        customerName: stop.customer.name,
+        routeNumber: stop.route.routeNumber,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        accuracy: data.accuracy || null,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     return NextResponse.json({
       message: "Location updated successfully",

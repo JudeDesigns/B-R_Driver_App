@@ -8,29 +8,24 @@ declare global {
 
 // Configure Prisma client with optimized settings
 const prismaClientSingleton = () => {
-  // In development, log queries to help with debugging and optimization
-  const logOptions =
-    process.env.NODE_ENV !== "production"
-      ? {
-          log: [
-            {
-              emit: "event",
-              level: "query",
-            },
-          ],
-        }
-      : {};
-
-  // Configure connection pool for better performance
-  return new PrismaClient({
-    ...logOptions,
-    // Optimize connection pool settings
+  const options: any = {
     datasources: {
       db: {
         url: process.env.DATABASE_URL,
       },
     },
-  });
+  };
+
+  if (process.env.NODE_ENV !== "production") {
+    options.log = [
+      {
+        emit: "event",
+        level: "query",
+      },
+    ];
+  }
+
+  return new PrismaClient(options);
 };
 
 // Use global variable to prevent multiple instances in development
@@ -41,7 +36,8 @@ if (process.env.NODE_ENV !== "production") {
   global.prisma = prisma;
 
   // Log slow queries to help identify performance bottlenecks
-  prisma.$on("query", (e: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (prisma as any).$on("query", (e: any) => {
     if (e.duration > 200) {
       // Log queries that take more than 200ms
       console.log(`Slow query (${e.duration}ms): ${e.query}`);

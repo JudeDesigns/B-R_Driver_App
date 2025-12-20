@@ -269,6 +269,9 @@ export default function SafetyCheckPage() {
             <SimpleSafetyChecklist
               onSubmit={handleSubmit}
               isSubmitting={loading}
+              vehicle={
+                routes.find((r) => r.id === selectedRouteId)?.vehicleAssignments?.[0]?.vehicle
+              }
             />
           )}
         </div>

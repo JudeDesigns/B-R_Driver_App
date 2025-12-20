@@ -1,29 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-import { getTodayStartUTC, getTodayEndUTC, getPSTDateString } from "@/lib/timezone";
+import { getTodayStartUTC, getTodayEndUTC, getPSTDateString, createPSTDateFromString, toPSTStartOfDay, toPSTEndOfDay, debugTimezoneConversion } from "@/lib/timezone";
+import { requireActiveShift } from "@/lib/attendanceMiddleware";
 
 // GET /api/driver/stops - Get all stops assigned to the driver
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // Check authentication and attendance status
+    const attendanceCheck = await requireActiveShift(request);
+    if (!attendanceCheck.allowed) {
       return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
+        attendanceCheck.error,
+        { status: attendanceCheck.status || 403 }
       );
     }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = verifyToken(token) as any;
-
-    if (!decoded || !decoded.id || decoded.role !== "DRIVER") {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const decoded = attendanceCheck.decoded;
 
     // Get the driver's username
     const driver = await prisma.user.findUnique({
@@ -48,7 +40,24 @@ export async function GET(request: NextRequest) {
     const date = url.searchParams.get("date");
     const status = url.searchParams.get("status");
 
-    const driverName = driver.fullName || driver.username;
+    // Debug logging for date filtering
+    if (date) {
+      console.log(`[DRIVER STOPS API] Date filter requested: ${date}`);
+      const todayPST = getPSTDateString();
+      console.log(`[DRIVER STOPS API] Today in PST: ${todayPST}`);
+
+      if (date === todayPST) {
+        const startUTC = getTodayStartUTC();
+        const endUTC = getTodayEndUTC();
+        debugTimezoneConversion("Today Start UTC", startUTC);
+        debugTimezoneConversion("Today End UTC", endUTC);
+      } else {
+        const startDate = createPSTDateFromString(date);
+        const endDate = toPSTEndOfDay(startDate);
+        debugTimezoneConversion(`Custom Date Start (${date})`, startDate);
+        debugTimezoneConversion(`Custom Date End (${date})`, endDate);
+      }
+    }
 
     // SAFETY CHECK ENFORCEMENT: Get routes that have completed safety checks
     const completedSafetyCheckRoutes = await prisma.safetyCheck.findMany({
@@ -59,8 +68,8 @@ export async function GET(request: NextRequest) {
         ...(date ? {
           route: {
             date: {
-              gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
-              lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
+              gte: date === getPSTDateString() ? getTodayStartUTC() : createPSTDateFromString(date),
+              lte: date === getPSTDateString() ? getTodayEndUTC() : toPSTEndOfDay(createPSTDateFromString(date)),
             },
           },
         } : {}),
@@ -114,8 +123,8 @@ export async function GET(request: NextRequest) {
           ...(date ? [{
             route: {
               date: {
-                gte: date === getPSTDateString() ? getTodayStartUTC() : new Date(new Date(date).setHours(0, 0, 0, 0)),
-                lte: date === getPSTDateString() ? getTodayEndUTC() : new Date(new Date(date).setHours(23, 59, 59, 999)),
+                gte: date === getPSTDateString() ? getTodayStartUTC() : createPSTDateFromString(date),
+                lte: date === getPSTDateString() ? getTodayEndUTC() : toPSTEndOfDay(createPSTDateFromString(date)),
               },
             },
           }] : []),

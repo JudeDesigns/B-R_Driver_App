@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseRouteExcel, saveRouteToDatabase } from "@/lib/routeParser";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { debugTimezoneConversion } from "@/lib/timezone";
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,6 +85,16 @@ export async function POST(request: NextRequest) {
     );
 
     const { route, isUpdate } = result;
+
+    // Debug logging for route upload completion
+    console.log(`[ROUTE UPLOAD] Route ${isUpdate ? 'updated' : 'created'} successfully:`, {
+      routeId: route.id,
+      routeNumber: route.routeNumber,
+      uploadedAt: new Date().toISOString(),
+      uploadedAtPST: new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+    });
+
+    debugTimezoneConversion("Route Date Stored", route.date);
 
     return NextResponse.json({
       message: isUpdate

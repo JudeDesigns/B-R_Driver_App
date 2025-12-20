@@ -84,6 +84,15 @@ export async function GET(
                 },
               },
             },
+            _count: {
+              select: {
+                returns: {
+                  where: {
+                    isDeleted: false,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -93,7 +102,17 @@ export async function GET(
       return NextResponse.json({ message: "Route not found" }, { status: 404 });
     }
 
-    return NextResponse.json(route);
+    // Transform the response to include hasReturns boolean for each stop
+    const transformedRoute = {
+      ...route,
+      stops: route.stops.map(stop => ({
+        ...stop,
+        hasReturns: stop._count.returns > 0,
+        _count: undefined, // Remove the _count field from the response
+      })),
+    };
+
+    return NextResponse.json(transformedRoute);
   } catch (error) {
     console.error("Error fetching route:", error);
     return NextResponse.json(

@@ -79,6 +79,7 @@ interface Stop {
   driverPaymentAmount?: number;
   driverPaymentMethods?: string[];
   invoiceImageUrls?: string[];
+  hasReturns?: boolean;
 }
 
 
@@ -881,6 +882,9 @@ export default function RouteDetailPage({
           {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          {stop.hasReturns ? "Yes" : "No"}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           {formatDateTime(stop.arrivalTime)}
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -959,6 +963,9 @@ export default function RouteDetailPage({
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Returns
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Arrival
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -993,7 +1000,7 @@ export default function RouteDetailPage({
                     ${driverTotal.toFixed(2)}
                   </div>
                 </td>
-                <td colSpan={3} className="px-6 py-3"></td>
+                <td colSpan={4} className="px-6 py-3"></td>
               </tr>
             </tbody>
           </table>
@@ -1578,6 +1585,12 @@ export default function RouteDetailPage({
                         </th>
                         <th
                           scope="col"
+                          className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
+                        >
+                          Returns
+                        </th>
+                        <th
+                          scope="col"
                           className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider"
                         >
                           Actions
@@ -1677,6 +1690,9 @@ export default function RouteDetailPage({
                                   : "N/A"}
                               </div>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {stop.hasReturns ? "Yes" : "No"}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <Link
                                 href={`/admin/stops/${stop.id}`}
@@ -1726,6 +1742,7 @@ export default function RouteDetailPage({
                             ${route ? getTotalAmount(route.stops).toFixed(2) : '0.00'}
                           </div>
                         </td>
+                        <td className="px-6 py-4"></td>
                         <td className="px-6 py-4"></td>
                       </tr>
                     </tbody>

@@ -1,0 +1,416 @@
+/* Global Text Overflow Prevention for Driver Interface */
+
+/* Base text overflow utilities */
+.text-overflow-safe {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.text-overflow-safe-multiline {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  min-width: 0;
+}
+
+.text-overflow-safe-multiline-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  min-width: 0;
+}
+
+/* Flex container with text overflow protection */
+.flex-text-safe {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.flex-text-safe > * {
+  min-width: 0;
+}
+
+.flex-text-safe .flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.flex-text-safe .flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Card layouts with proper text constraints */
+.card-content-safe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.card-content-safe .content-area {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.card-content-safe .action-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Document/file name specific fixes */
+.file-name-safe {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .file-name-safe {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-name-safe {
+    max-width: 120px;
+  }
+}
+
+/* Customer name and address safe display */
+.customer-name-safe {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.customer-address-safe {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Button container protection */
+.button-container-safe {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: fit-content;
+}
+
+/* Grid item with text overflow protection */
+.grid-item-safe {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.grid-item-safe .grid-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.grid-item-safe .grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  min-width: 0;
+}
+
+.grid-item-safe .grid-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-item-safe .grid-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* List item with text overflow protection */
+.list-item-safe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.list-item-safe .list-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.list-item-safe .list-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Document card specific fixes */
+.document-card-safe {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.document-card-safe .document-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.125rem;
+}
+
+.document-card-safe .document-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  max-width: calc(100% - 8rem); /* Reserve space for icon and button */
+}
+
+.document-card-safe .document-title {
+  font-weight: 500;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-wrap: break-word;
+  word-break: break-word;
+  margin-bottom: 0.25rem;
+  line-height: 1.3;
+}
+
+.document-card-safe .document-meta {
+  font-size: 0.75rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-card-safe .document-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: fit-content;
+  margin-left: auto;
+}
+
+/* Mobile-specific document card fixes */
+@media (max-width: 640px) {
+  .document-card-safe {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .document-card-safe .document-icon {
+    display: none; /* Hide icon on mobile to save space */
+  }
+
+  .document-card-safe .document-info {
+    max-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .document-card-safe .document-title {
+    font-size: 0.8125rem;
+    -webkit-line-clamp: 3; /* Allow 3 lines on mobile */
+  }
+
+  .document-card-safe .document-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .document-card-safe .document-actions a,
+  .document-card-safe .document-actions button {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+    min-height: 44px; /* Ensure tap target size */
+  }
+}
+
+/* Stop card specific fixes */
+.stop-card-safe {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.stop-card-safe .stop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0.5rem 1rem;
+  min-width: 0;
+}
+
+.stop-card-safe .stop-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stop-card-safe .stop-status {
+  flex-shrink: 0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.stop-card-safe .stop-content {
+  padding: 0.5rem 1rem 1rem 1rem;
+  min-width: 0;
+}
+
+.stop-card-safe .stop-address {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.stop-card-safe .stop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.stop-card-safe .stop-actions .action-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Mobile-specific text overflow fixes */
+@media (max-width: 640px) {
+  .mobile-text-safe {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .mobile-title-safe {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .mobile-subtitle-safe {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: #6b7280;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-wrap: break-word;
+    word-break: break-word;
+  }
+  
+  .mobile-button-safe {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Utility classes for common scenarios */
+.truncate-with-tooltip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.break-words-safe {
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+.prevent-overflow {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Force text to respect container boundaries */
+.respect-boundaries {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.respect-boundaries * {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}

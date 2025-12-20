@@ -1,15 +1,70 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 
+// Import enhanced logging (will be transpiled from TypeScript)
+let socketLogger;
+try {
+  socketLogger = require("./socketLogger").socketLogger;
+} catch (error) {
+  // Fallback to console logging if enhanced logger not available
+  socketLogger = {
+    logConnection: (clientId, userId, userRole, success) => {
+      console.log(`[CONNECTION] ${success ? 'Success' : 'Failed'}: ${clientId}`);
+    },
+    logAuthentication: (clientId, event, success, errorType, userId, userRole) => {
+      console.log(`[AUTH] ${event}: ${success ? 'Success' : 'Failed'} - ${clientId}`);
+    },
+    logTokenExpiration: (clientId, userId, gracePeriod) => {
+      console.log(`[TOKEN] Expired: ${clientId} (Grace: ${gracePeriod})`);
+    },
+    warn: (event, message, context, metadata, rateLimitKey) => {
+      console.warn(`[${context}] ${event}: ${message}`);
+    },
+    error: (event, message, context, metadata) => {
+      console.error(`[${context}] ${event}: ${message}`);
+    }
+  };
+}
+
+// Rate-limited logging utility to prevent log spam
+const expiredTokenLogs = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+
+function shouldLogExpiredToken(identifier) {
+  const now = Date.now();
+  const lastLog = expiredTokenLogs.get(identifier);
+
+  if (!lastLog || now - lastLog > RATE_LIMIT_WINDOW) {
+    expiredTokenLogs.set(identifier, now);
+    return true;
+  }
+  return false;
+}
+
+// Clean up old entries periodically to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of expiredTokenLogs.entries()) {
+    if (now - timestamp > RATE_LIMIT_WINDOW * 2) {
+      expiredTokenLogs.delete(key);
+    }
+  }
+}, RATE_LIMIT_WINDOW);
+
 // Socket.IO event types
 const SocketEvents = {
   CONNECT: "connect",
   DISCONNECT: "disconnect",
   ERROR: "error",
+  // Authentication events
+  AUTH_ERROR: "auth_error",
+  TOKEN_REFRESH_REQUIRED: "token_refresh_required",
+  // Data events
   STOP_STATUS_UPDATED: "stop_status_updated",
   ROUTE_STATUS_UPDATED: "route_status_updated",
   ADMIN_NOTE_CREATED: "admin_note_created",
   DRIVER_LOCATION_UPDATED: "driver_location_updated",
+  // Room events
   JOIN_ROUTE_ROOM: "join_route_room",
   JOIN_DRIVER_ROOM: "join_driver_room",
   JOIN_ADMIN_ROOM: "join_admin_room",
@@ -100,6 +155,9 @@ function initSocketIO(httpServer) {
         // Store user info
         socket.data.user = { id, username, role };
 
+        // Enhanced connection logging
+        socketLogger.logConnection(socket.id, id, role, true);
+
         if (process.env.NODE_ENV !== "production") {
           console.log(`User connected: ${username || id} (${role})`);
         }
@@ -117,12 +175,158 @@ function initSocketIO(httpServer) {
           }
         }
       } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
-          console.error("Invalid token:", error);
+        // Enhanced error handling with graceful token expiration
+        if (error.name === 'TokenExpiredError') {
+          // Graceful handling for expired tokens
+          const clientIdentifier = socket.handshake.address || socket.id;
+
+          // Enhanced rate-limited logging
+          socketLogger.logTokenExpiration(socket.id, socket.data.user?.id, true);
+
+          if (shouldLogExpiredToken(clientIdentifier)) {
+            socketLogger.warn('TOKEN_EXPIRED', `Expired token from ${clientIdentifier}`, 'AUTH',
+              { clientId: socket.id, gracePeriod: true }, `expired_token_${clientIdentifier}`);
+          }
+
+          // Emit specific error for expired tokens
+          socket.emit(SocketEvents.AUTH_ERROR, {
+            type: 'TOKEN_EXPIRED',
+            message: 'Authentication token has expired. Please refresh your session.',
+            code: 'EXPIRED_TOKEN',
+            timestamp: new Date().toISOString()
+          });
+
+          // Give client 10 seconds to refresh token before disconnect
+          socket.data.authGracePeriod = setTimeout(() => {
+            if (!socket.data.authenticated) {
+              if (process.env.NODE_ENV !== "production") {
+                console.log(`Disconnecting socket ${socket.id} after grace period expired`);
+              }
+              socket.disconnect();
+            }
+          }, 10000);
+
+          return; // Don't disconnect immediately
+
+        } else if (error.name === 'JsonWebTokenError' || error.name === 'NotBeforeError') {
+          // Handle invalid tokens (more serious security concern)
+          const clientIdentifier = socket.handshake.address || socket.id;
+          console.warn(`Security Event: Invalid token attempt from ${clientIdentifier} [Socket.IO]`);
+
+          socket.emit(SocketEvents.AUTH_ERROR, {
+            type: 'INVALID_TOKEN',
+            message: 'Invalid authentication token provided.',
+            code: 'INVALID_TOKEN',
+            timestamp: new Date().toISOString()
+          });
+
+          socket.disconnect();
+          return;
+
+        } else {
+          // Handle other token verification errors
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Token verification error:", error);
+          }
+
+          socket.emit(SocketEvents.AUTH_ERROR, {
+            type: 'VERIFICATION_ERROR',
+            message: 'Token verification failed.',
+            code: 'VERIFICATION_ERROR',
+            timestamp: new Date().toISOString()
+          });
+
+          socket.disconnect();
+          return;
         }
-        socket.disconnect();
-        return;
       }
+
+      // Mark socket as authenticated after successful token verification
+      socket.data.authenticated = true;
+
+      // Clear any existing grace period timer
+      if (socket.data.authGracePeriod) {
+        clearTimeout(socket.data.authGracePeriod);
+        socket.data.authGracePeriod = null;
+      }
+
+      // Handle token re-authentication for expired tokens
+      socket.on('reauthenticate', (newAuth) => {
+        if (!newAuth || !newAuth.token) {
+          socket.emit(SocketEvents.AUTH_ERROR, {
+            type: 'MISSING_TOKEN',
+            message: 'No token provided for re-authentication.',
+            code: 'MISSING_TOKEN',
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        try {
+          // Verify the new token
+          const JWT_SECRET = process.env.JWT_SECRET;
+          if (!JWT_SECRET) {
+            console.error("JWT_SECRET environment variable is not set");
+            socket.disconnect();
+            return;
+          }
+
+          const decoded = jwt.verify(newAuth.token, JWT_SECRET);
+
+          // Update socket authentication data
+          socket.data.user = {
+            id: decoded.id,
+            username: decoded.username,
+            role: decoded.role
+          };
+          socket.data.authenticated = true;
+
+          // Clear grace period timer
+          if (socket.data.authGracePeriod) {
+            clearTimeout(socket.data.authGracePeriod);
+            socket.data.authGracePeriod = null;
+          }
+
+          // Re-join appropriate rooms
+          const { id, username, role } = decoded;
+          if (role === "DRIVER" && id) {
+            socket.join(`driver:${id}`);
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`Driver ${username} re-authenticated and rejoined driver:${id} room`);
+            }
+          } else if (["ADMIN", "SUPER_ADMIN"].includes(role)) {
+            socket.join("admin");
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`Admin ${username} re-authenticated and rejoined admin room`);
+            }
+          }
+
+          // Confirm successful re-authentication
+          socket.emit('reauthenticated', {
+            success: true,
+            timestamp: new Date().toISOString()
+          });
+
+        } catch (error) {
+          // Re-authentication failed
+          if (error.name === 'TokenExpiredError') {
+            socket.emit(SocketEvents.AUTH_ERROR, {
+              type: 'TOKEN_EXPIRED',
+              message: 'Re-authentication token is also expired.',
+              code: 'REAUTH_TOKEN_EXPIRED',
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            socket.emit(SocketEvents.AUTH_ERROR, {
+              type: 'REAUTH_FAILED',
+              message: 'Re-authentication failed.',
+              code: 'REAUTH_FAILED',
+              timestamp: new Date().toISOString()
+            });
+          }
+          socket.disconnect();
+        }
+      });
 
       // Handle room joining/leaving - optimized with validation
       // Keep track of joined rooms to prevent duplicate logging
@@ -195,6 +399,13 @@ function initSocketIO(httpServer) {
         }
       });
 
+      // Test helper for connection resilience testing
+      socket.on('test_connection_resilience', () => {
+        if (process.env.NODE_ENV !== "production") {
+          console.log('Test: Connection resilience test completed');
+        }
+      });
+
       // Handle disconnect - clean up resources
       socket.on(SocketEvents.DISCONNECT, (reason) => {
         if (process.env.NODE_ENV !== "production") {
@@ -203,6 +414,12 @@ function initSocketIO(httpServer) {
 
         // Clear joined rooms set
         joinedRooms.clear();
+
+        // Clean up grace period timer if it exists
+        if (socket.data.authGracePeriod) {
+          clearTimeout(socket.data.authGracePeriod);
+          socket.data.authGracePeriod = null;
+        }
 
         // Clean up any custom event listeners to prevent memory leaks
         socket.removeAllListeners();

@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import {
+  verifyPasswordConfirmation,
+  createPasswordConfirmationErrorResponse,
+} from "@/lib/passwordConfirmation";
 
 export async function DELETE(req: NextRequest) {
   try {
-    // Verify admin token
-    const token = req.headers.get("authorization")?.split(" ")[1];
-    if (!token) {
-      return NextResponse.json(
-        { message: "Unauthorized: No token provided" },
-        { status: 401 }
-      );
+    // Verify password confirmation (includes authentication check)
+    const passwordCheck = await verifyPasswordConfirmation(req);
+
+    if (!passwordCheck.confirmed) {
+      return createPasswordConfirmationErrorResponse(passwordCheck);
     }
 
-    const decoded = await verifyToken(token);
-    if (!decoded || decoded.role !== "SUPER_ADMIN") {
+    const decoded = {
+      id: passwordCheck.userId,
+      role: passwordCheck.userRole,
+    };
+
+    if (decoded.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { message: "Unauthorized: Super Admin access required for this operation" },
         { status: 403 }

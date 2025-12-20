@@ -189,6 +189,8 @@ export async function POST(request: NextRequest) {
             email: data.email || existingCustomer.email,
             preferences: data.preferences || existingCustomer.preferences,
             groupCode: data.groupCode || existingCustomer.groupCode,
+            paymentTerms: data.paymentTerms || existingCustomer.paymentTerms,
+            deliveryInstructions: data.deliveryInstructions || existingCustomer.deliveryInstructions,
           },
         });
 
@@ -217,6 +219,8 @@ export async function POST(request: NextRequest) {
         email: data.email || null,
         preferences: data.preferences || null,
         groupCode: data.groupCode || null,
+        paymentTerms: data.paymentTerms || "COD", // Default to COD
+        deliveryInstructions: data.deliveryInstructions || null,
       },
     });
 

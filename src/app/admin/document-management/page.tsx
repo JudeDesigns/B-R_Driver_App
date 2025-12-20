@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Notification from '@/components/ui/Notification';
+import InvoiceValidationAlert from '@/components/ui/InvoiceValidationAlert';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { validateInvoiceData, shouldBlockUpload, needsUserConfirmation, InvoiceValidationResult } from '@/utils/invoiceValidation';
 
 interface Customer {
   id: string;
@@ -49,6 +52,7 @@ interface Stop {
       type: string;
       fileName: string;
       filePath: string; // Added for document viewing functionality
+      createdAt: string; // Upload timestamp
     };
   }>;
   _count: {
@@ -82,6 +86,7 @@ export default function DocumentManagementPage() {
   const [selectedRoute, setSelectedRoute] = useState<string>('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState<'customer' | 'stop'>('customer');
+  const [selectedCustomerForUpload, setSelectedCustomerForUpload] = useState<string>('');
   const [selectedStopForUpload, setSelectedStopForUpload] = useState<string>('');
   const [showStopDetailsModal, setShowStopDetailsModal] = useState(false);
   const [selectedStopForDetails, setSelectedStopForDetails] = useState<Stop | null>(null);
@@ -99,6 +104,11 @@ export default function DocumentManagementPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Invoice validation state
+  const [validationResult, setValidationResult] = useState<InvoiceValidationResult | null>(null);
+  const [showValidationAlert, setShowValidationAlert] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<boolean>(false);
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -343,14 +353,13 @@ export default function DocumentManagementPage() {
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const type = formData.get('type') as string;
-    const customerId = formData.get('customerId') as string;
 
     if (!file || !title || !type) {
       showNotification('error', 'Validation Error', 'File, title, and type are required');
       return;
     }
 
-    if (uploadType === 'customer' && !customerId) {
+    if (uploadType === 'customer' && !selectedCustomerForUpload) {
       showNotification('error', 'Validation Error', 'Please select a customer for customer documents');
       return;
     }
@@ -358,6 +367,31 @@ export default function DocumentManagementPage() {
     if (uploadType === 'stop' && !selectedStopForUpload) {
       showNotification('error', 'Validation Error', 'Please select a stop for stop-specific documents');
       return;
+    }
+
+    // Validate invoice data if this is an invoice document
+    if (type === 'INVOICE') {
+      const validation = validateInvoiceData({
+        invoiceNumber,
+        invoiceAmount,
+        documentType: type,
+        fileName: file.name
+      });
+
+      // Block upload if there are errors
+      if (shouldBlockUpload(validation)) {
+        setValidationResult(validation);
+        setShowValidationAlert(true);
+        return;
+      }
+
+      // Show warning and ask for confirmation if there are warnings
+      if (needsUserConfirmation(validation) && !pendingUpload) {
+        setValidationResult(validation);
+        setShowValidationAlert(true);
+        setPendingUpload(true);
+        return;
+      }
     }
 
     try {
@@ -380,7 +414,7 @@ export default function DocumentManagementPage() {
       uploadFormData.append('type', type);
 
       if (uploadType === 'customer') {
-        uploadFormData.append('customerId', customerId);
+        uploadFormData.append('customerId', selectedCustomerForUpload);
       } else if (uploadType === 'stop') {
         uploadFormData.append('stopId', selectedStopForUpload);
 
@@ -415,6 +449,7 @@ export default function DocumentManagementPage() {
 
       // Reset form and close modal
       setShowUploadModal(false);
+      setSelectedCustomerForUpload('');
       setSelectedStopForUpload('');
       setUploadType('customer');
       setSelectedDocumentType('');
@@ -430,7 +465,28 @@ export default function DocumentManagementPage() {
     } catch (error) {
       console.error('Upload error:', error);
       showNotification('error', 'Upload Failed', error instanceof Error ? error.message : 'Failed to upload document');
+    } finally {
+      // Reset validation states
+      setPendingUpload(false);
+      setShowValidationAlert(false);
+      setValidationResult(null);
     }
+  };
+
+  const handleValidationConfirm = () => {
+    setShowValidationAlert(false);
+    setPendingUpload(true);
+    // Re-trigger the form submission
+    const form = document.querySelector('form[data-upload-form]') as HTMLFormElement;
+    if (form) {
+      form.requestSubmit();
+    }
+  };
+
+  const handleValidationCancel = () => {
+    setShowValidationAlert(false);
+    setPendingUpload(false);
+    setValidationResult(null);
   };
 
   const fetchDocuments = async () => {
@@ -500,7 +556,7 @@ export default function DocumentManagementPage() {
 
   const customerDocuments = documents.filter(doc => doc.customerId);
 
-  const filteredCustomerDocuments = selectedCustomer 
+  const filteredCustomerDocuments = selectedCustomer
     ? customerDocuments.filter(doc => doc.customerId === selectedCustomer)
     : customerDocuments;
 
@@ -513,7 +569,11 @@ export default function DocumentManagementPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+
+    return date.toLocaleString('en-US', {
       timeZone: "America/Los_Angeles",
       year: 'numeric',
       month: 'short',
@@ -566,21 +626,19 @@ export default function DocumentManagementPage() {
           <nav className="flex space-x-8 px-6">
             <button
               onClick={() => setActiveTab('customer')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'customer'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'customer'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               Customer Documents ({customerDocuments.length})
             </button>
             <button
               onClick={() => setActiveTab('stop')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'stop'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'stop'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               Today's Stops ({stops.length})
             </button>
@@ -752,8 +810,8 @@ export default function DocumentManagementPage() {
                               <p className="text-xs font-medium text-gray-600 mb-1">Assigned Documents:</p>
                               <div className="flex flex-wrap gap-1">
                                 {stop.stopDocuments.map(stopDoc => (
-                                  <span key={stopDoc.id} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                                    {stopDoc.document.title}
+                                  <span key={stopDoc.id} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded" title={`Uploaded: ${formatDate(stopDoc.document.createdAt)}`}>
+                                    {stopDoc.document.title} <span className="text-gray-500 ml-1">({new Date(stopDoc.document.createdAt).toLocaleDateString()})</span>
                                   </span>
                                 ))}
                               </div>
@@ -795,7 +853,7 @@ export default function DocumentManagementPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleUploadSubmit} className="space-y-4">
+              <form onSubmit={handleUploadSubmit} className="space-y-4" data-upload-form>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Document Type
@@ -831,18 +889,18 @@ export default function DocumentManagementPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Select Customer
                     </label>
-                    <select
-                      name="customerId"
+                    <SearchableSelect
+                      options={customers.map(customer => ({
+                        value: customer.id,
+                        label: `${customer.name}${customer.groupCode ? ` (${customer.groupCode})` : ''}`,
+                        searchText: `${customer.name} ${customer.groupCode || ''} ${customer.email || ''}`
+                      }))}
+                      value={selectedCustomerForUpload}
+                      onChange={setSelectedCustomerForUpload}
+                      placeholder="Search for a customer..."
                       required
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Choose a customer...</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} {customer.groupCode && `(${customer.groupCode})`}
-                        </option>
-                      ))}
-                    </select>
+                      emptyMessage="No customers available. Create customers first."
+                    />
                   </div>
                 )}
 
@@ -851,19 +909,18 @@ export default function DocumentManagementPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Select Stop
                     </label>
-                    <select
+                    <SearchableSelect
+                      options={stops.map(stop => ({
+                        value: stop.id,
+                        label: `Route ${stop.route.routeNumber} - Stop ${stop.sequence}: ${stop.customerNameFromUpload}`,
+                        searchText: `Route ${stop.route.routeNumber} Stop ${stop.sequence} ${stop.customerNameFromUpload} ${stop.driverNameFromUpload || ''} ${stop.address || ''}`
+                      }))}
                       value={selectedStopForUpload}
-                      onChange={(e) => setSelectedStopForUpload(e.target.value)}
+                      onChange={setSelectedStopForUpload}
+                      placeholder="Search for a stop..."
                       required
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    >
-                      <option value="">Choose a stop...</option>
-                      {stops.map(stop => (
-                        <option key={stop.id} value={stop.id}>
-                          Route {stop.route.routeNumber} - Stop {stop.sequence}: {stop.customerNameFromUpload}
-                        </option>
-                      ))}
-                    </select>
+                      emptyMessage="No stops available. Upload routes for today to see stops."
+                    />
                     {stops.length === 0 && (
                       <p className="text-sm text-gray-500 mt-1">
                         No stops available. Upload routes for today to see stops.
@@ -894,22 +951,28 @@ export default function DocumentManagementPage() {
 
                 {/* Invoice-specific fields for stop documents */}
                 {uploadType === 'stop' && selectedDocumentType === 'INVOICE' && (
-                  <>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center mb-2">
+                      <svg className="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-yellow-800">Invoice Information (Recommended)</span>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Invoice Number
+                        Invoice Number <span className="text-yellow-600">(Recommended)</span>
                       </label>
                       <input
                         type="text"
                         value={invoiceNumber}
                         onChange={(e) => setInvoiceNumber(e.target.value)}
                         placeholder="Enter invoice number..."
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-yellow-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Total Amount
+                        Total Amount <span className="text-yellow-600">(Recommended)</span>
                       </label>
                       <input
                         type="number"
@@ -918,10 +981,13 @@ export default function DocumentManagementPage() {
                         value={invoiceAmount}
                         onChange={(e) => setInvoiceAmount(e.target.value)}
                         placeholder="Enter total amount..."
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-yellow-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                       />
                     </div>
-                  </>
+                    <p className="text-xs text-yellow-700">
+                      Adding invoice number and amount helps with tracking and prevents upload warnings.
+                    </p>
+                  </div>
                 )}
 
                 <div>
@@ -964,6 +1030,17 @@ export default function DocumentManagementPage() {
                     Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB)
                   </p>
                 </div>
+
+                {/* Invoice Validation Alert */}
+                {showValidationAlert && validationResult && (
+                  <InvoiceValidationAlert
+                    validationResult={validationResult}
+                    onConfirm={handleValidationConfirm}
+                    onCancel={handleValidationCancel}
+                    showActions={needsUserConfirmation(validationResult)}
+                    className="mt-4"
+                  />
+                )}
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <button
@@ -1031,13 +1108,19 @@ export default function DocumentManagementPage() {
                         {selectedStopForDetails.customer.documents.map((doc: Document) => (
                           <div key={doc.id} className="p-3">
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-medium text-gray-900">{doc.title}</p>
                                 <p className="text-sm text-gray-500">{doc.type.replace('_', ' ')} • {doc.fileName}</p>
+                                <p className="text-xs text-gray-400 mt-1 flex items-center">
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Uploaded {formatDate(doc.uploadedAt)}
+                                </p>
                               </div>
                               <button
                                 onClick={() => handleViewDocument(doc)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex-shrink-0 ml-4"
                               >
                                 View
                               </button>
@@ -1069,11 +1152,17 @@ export default function DocumentManagementPage() {
                         {selectedStopForDetails.stopDocuments.map(stopDoc => (
                           <div key={stopDoc.id} className="p-3">
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <p className="font-medium text-gray-900">{stopDoc.document.title}</p>
                                 <p className="text-sm text-gray-500">{stopDoc.document.type.replace('_', ' ')} • {stopDoc.document.fileName}</p>
+                                <p className="text-xs text-gray-400 mt-1 flex items-center">
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Uploaded {formatDate(stopDoc.document.createdAt)}
+                                </p>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
                                 <button
                                   onClick={() => handleViewDocument(stopDoc.document)}
                                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"

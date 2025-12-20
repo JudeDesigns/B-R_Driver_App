@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { createPSTDateFromString, toPSTEndOfDay } from "@/lib/timezone";
 
 // GET /api/admin/routes - Get all routes
 export async function GET(request: NextRequest) {
@@ -60,11 +61,21 @@ export async function GET(request: NextRequest) {
 
     // Add filters based on query parameters
     if (date) {
-      const dateObj = new Date(date);
+      // Use proper PST timezone conversion for date filtering
+      const startDate = createPSTDateFromString(date);
+      const endDate = toPSTEndOfDay(startDate);
       query.where.date = {
-        gte: new Date(dateObj.setHours(0, 0, 0, 0)),
-        lt: new Date(dateObj.setHours(23, 59, 59, 999)),
+        gte: startDate,
+        lt: endDate,
       };
+
+      // Debug logging for admin route date filtering
+      console.log(`[ADMIN ROUTES API] Date filter: ${date}`, {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        startPST: startDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+        endPST: endDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+      });
     }
 
     if (driverId) {

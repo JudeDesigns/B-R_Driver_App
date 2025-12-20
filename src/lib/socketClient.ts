@@ -6,10 +6,15 @@ export enum SocketEvents {
   DISCONNECT = "disconnect",
   CONNECT_ERROR = "connect_error",
   ERROR = "error",
+  // Authentication events
+  AUTH_ERROR = "auth_error",
+  TOKEN_REFRESH_REQUIRED = "token_refresh_required",
+  // Data events
   STOP_STATUS_UPDATED = "stop_status_updated",
   ROUTE_STATUS_UPDATED = "route_status_updated",
   ADMIN_NOTE_CREATED = "admin_note_created",
   DRIVER_LOCATION_UPDATED = "driver_location_updated",
+  // Room events
   JOIN_ROUTE_ROOM = "join_route_room",
   JOIN_DRIVER_ROOM = "join_driver_room",
   JOIN_ADMIN_ROOM = "join_admin_room",
@@ -54,5 +59,12 @@ export interface DriverLocationData {
   driverName: string;
   latitude: number;
   longitude: number;
+  timestamp: string;
+}
+
+export interface AuthErrorData {
+  type: 'TOKEN_EXPIRED' | 'INVALID_TOKEN' | 'VERIFICATION_ERROR' | 'MISSING_TOKEN' | 'REAUTH_FAILED' | 'REAUTH_TOKEN_EXPIRED';
+  message: string;
+  code: string;
   timestamp: string;
 }

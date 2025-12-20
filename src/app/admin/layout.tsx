@@ -468,6 +468,125 @@ export default function AdminLayout({
                 </Link>
               </li>
 
+              {/* Vehicle Management */}
+              <li>
+                <Link
+                  href="/admin/vehicles"
+                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                    pathname === "/admin/vehicles" ||
+                    pathname.startsWith("/admin/vehicles/")
+                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                      : "hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  {(pathname === "/admin/vehicles" ||
+                    pathname.startsWith("/admin/vehicles/")) && (
+                    <span className="absolute left-0 top-0 h-full w-1 bg-orange-500"></span>
+                  )}
+                  <span
+                    className={`absolute inset-0 w-1 bg-orange-500 transition-all duration-300 ${
+                      pathname === "/admin/vehicles" ||
+                      pathname.startsWith("/admin/vehicles/")
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-5 w-5 mr-3 text-orange-500 transition-transform duration-300 ${
+                      pathname === "/admin/vehicles" ||
+                      pathname.startsWith("/admin/vehicles/")
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
+                    />
+                  </svg>
+                  <span
+                    className={`font-medium transition-all duration-300 ${
+                      pathname === "/admin/vehicles" ||
+                      pathname.startsWith("/admin/vehicles/")
+                        ? "text-white"
+                        : "group-hover:translate-x-1"
+                    }`}
+                  >
+                    Vehicle Management
+                  </span>
+                </Link>
+              </li>
+
+              {/* Driver Locations */}
+              <li>
+                <Link
+                  href="/admin/drivers/locations"
+                  className={`flex items-center py-2.5 px-4 text-white rounded-lg transition-all duration-300 relative overflow-hidden group ${
+                    pathname === "/admin/drivers/locations"
+                      ? "bg-gradient-to-r from-gray-800 to-gray-700 shadow-md"
+                      : "hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  {pathname === "/admin/drivers/locations" && (
+                    <span className="absolute left-0 top-0 h-full w-1 bg-green-500"></span>
+                  )}
+                  <span
+                    className={`absolute inset-0 w-1 bg-green-500 transition-all duration-300 ${
+                      pathname === "/admin/drivers/locations"
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  ></span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-5 w-5 mr-3 text-green-500 transition-transform duration-300 ${
+                      pathname === "/admin/drivers/locations"
+                        ? "scale-110"
+                        : "group-hover:scale-110"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span
+                    className={`font-medium transition-all duration-300 ${
+                      pathname === "/admin/drivers/locations"
+                        ? "text-white"
+                        : "group-hover:translate-x-1"
+                    }`}
+                  >
+                    Driver Locations
+                  </span>
+                </Link>
+              </li>
+
               {/* Super Admin Only - User Management */}
               {userRole === "SUPER_ADMIN" && (
                 <li>

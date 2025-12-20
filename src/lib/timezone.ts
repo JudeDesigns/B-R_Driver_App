@@ -24,15 +24,26 @@ export function getPSTDateRange(): { start: Date; end: Date } {
     timeZone: "America/Los_Angeles"
   }); // YYYY-MM-DD format
 
-  // Create start of day in PST (00:00:00 PST)
-  const startPST = new Date(`${pstDateString}T00:00:00`);
-  // Convert PST time to UTC by adding PST offset
-  const pstOffset = getPSTOffset();
-  const start = new Date(startPST.getTime() - (pstOffset * 60 * 60 * 1000));
+  // Create start of day in PST timezone using proper timezone-aware construction
+  const startPSTString = `${pstDateString}T00:00:00.000-08:00`; // Always use PST offset for consistency
+  const start = new Date(startPSTString);
 
-  // Create end of day in PST (23:59:59.999 PST)
-  const endPST = new Date(`${pstDateString}T23:59:59.999`);
-  const end = new Date(endPST.getTime() - (pstOffset * 60 * 60 * 1000));
+  // Adjust for PDT if needed (PDT is UTC-7, PST is UTC-8)
+  const isDST = isCurrentlyDST();
+  if (isDST) {
+    // If we're in PDT, add 1 hour to convert from PST to PDT
+    start.setHours(start.getHours() + 1);
+  }
+
+  // Create end of day in PST timezone
+  const endPSTString = `${pstDateString}T23:59:59.999-08:00`; // Always use PST offset for consistency
+  const end = new Date(endPSTString);
+
+  // Adjust for PDT if needed
+  if (isDST) {
+    // If we're in PDT, add 1 hour to convert from PST to PDT
+    end.setHours(end.getHours() + 1);
+  }
 
   return { start, end };
 }
@@ -41,12 +52,18 @@ export function getPSTDateRange(): { start: Date; end: Date } {
  * Get PST offset in hours (8 for PST, 7 for PDT)
  */
 function getPSTOffset(): number {
+  return isCurrentlyDST() ? 7 : 8; // PDT is UTC-7, PST is UTC-8
+}
+
+/**
+ * Check if we're currently in Daylight Saving Time (PDT)
+ */
+function isCurrentlyDST(): boolean {
   const now = new Date();
   const january = new Date(now.getFullYear(), 0, 1);
   const july = new Date(now.getFullYear(), 6, 1);
   const stdOffset = Math.max(january.getTimezoneOffset(), july.getTimezoneOffset());
-  const isDST = now.getTimezoneOffset() < stdOffset;
-  return isDST ? 7 : 8; // PDT is UTC-7, PST is UTC-8
+  return now.getTimezoneOffset() < stdOffset;
 }
 
 /**
@@ -129,14 +146,34 @@ export function getTodayEndUTC(): Date {
  */
 export function createPSTDate(year?: number, month?: number, day?: number): Date {
   if (year && month && day) {
-    // Create date at noon PST and convert to UTC
-    const pstDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T12:00:00`;
-    const tempDate = new Date(pstDateString);
-    const pstOffset = getPSTOffset();
-    return new Date(tempDate.getTime() - (pstOffset * 60 * 60 * 1000));
+    // Create date at noon PST using proper timezone-aware construction
+    const pstDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T12:00:00.000-08:00`;
+    const date = new Date(pstDateString);
+
+    // Adjust for PDT if needed
+    if (isCurrentlyDST()) {
+      date.setHours(date.getHours() + 1);
+    }
+
+    return date;
   }
 
-  return new Date(); // Return current UTC time
+  // For "today" case, get the current date in PST timezone and set to start of day
+  const now = new Date();
+  const pstDateString = now.toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles"
+  });
+
+  // Create start of day in PST timezone
+  const startOfDayPST = `${pstDateString}T00:00:00.000-08:00`;
+  const date = new Date(startOfDayPST);
+
+  // Adjust for PDT if needed
+  if (isCurrentlyDST()) {
+    date.setHours(date.getHours() + 1);
+  }
+
+  return date;
 }
 
 /**
@@ -158,17 +195,74 @@ export function formatStopDateTime(date: Date | string | null): string {
  * Get timezone info for display
  */
 export function getTimezoneInfo(): { name: string; abbreviation: string; offset: string } {
-  const now = new Date();
-
-  // Check if we're in daylight saving time for PST/PDT
-  const january = new Date(now.getFullYear(), 0, 1);
-  const july = new Date(now.getFullYear(), 6, 1);
-  const stdOffset = Math.max(january.getTimezoneOffset(), july.getTimezoneOffset());
-  const isDST = now.getTimezoneOffset() < stdOffset;
+  const isDST = isCurrentlyDST();
 
   return {
     name: "America/Los_Angeles",
     abbreviation: isDST ? "PDT" : "PST",
     offset: isDST ? "UTC-7" : "UTC-8"
   };
+}
+
+/**
+ * Create a PST date from a date string (YYYY-MM-DD format)
+ * Ensures the date represents the correct day in PST timezone
+ */
+export function createPSTDateFromString(dateString: string): Date {
+  // Parse the date string (YYYY-MM-DD)
+  const [year, month, day] = dateString.split('-').map(Number);
+  return createPSTDate(year, month, day);
+}
+
+/**
+ * Convert any date to start of day in PST timezone
+ */
+export function toPSTStartOfDay(date: Date): Date {
+  const pstDateString = date.toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles"
+  });
+
+  return createPSTDateFromString(pstDateString);
+}
+
+/**
+ * Convert any date to end of day in PST timezone
+ */
+export function toPSTEndOfDay(date: Date): Date {
+  const pstDateString = date.toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles"
+  });
+
+  // Create end of day in PST timezone
+  const endOfDayPST = `${pstDateString}T23:59:59.999-08:00`;
+  const endDate = new Date(endOfDayPST);
+
+  // Adjust for PDT if needed
+  if (isCurrentlyDST()) {
+    endDate.setHours(endDate.getHours() + 1);
+  }
+
+  return endDate;
+}
+
+/**
+ * Debug function to log timezone conversion details
+ */
+export function debugTimezoneConversion(label: string, date: Date): void {
+  const utcString = date.toISOString();
+  const pstString = date.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+
+  console.log(`[TIMEZONE DEBUG] ${label}:`);
+  console.log(`  UTC: ${utcString}`);
+  console.log(`  PST: ${pstString}`);
+  console.log(`  DST: ${isCurrentlyDST() ? 'Yes (PDT)' : 'No (PST)'}`);
 }

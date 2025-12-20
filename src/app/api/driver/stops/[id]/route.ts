@@ -467,13 +467,6 @@ export async function PATCH(
               } else {
                 console.warn(`⚠️ No PDF found for stop ${updatedStop.id}, skipping email notification`);
               }
-
-              if (emailResult.success) {
-                console.log(`✅ Automatic delivery confirmation email sent to office for: ${customer.name}`);
-                console.log(`📧 Message ID: ${emailResult.messageId}`);
-              } else {
-                console.error(`❌ Failed to send automatic email for ${customer.name}: ${emailResult.error}`);
-              }
             } else {
               console.log(
                 `❌ Customer not found for stop ${updatedStop.customerId} - cannot send automatic email`
