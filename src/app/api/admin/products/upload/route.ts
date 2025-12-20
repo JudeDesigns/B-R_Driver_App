@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { parseProductFile, processProducts } from "@/lib/productParser";
 
+// Configure body size limit for this route (Next.js 15)
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     console.log("=== Product Upload Started ===");

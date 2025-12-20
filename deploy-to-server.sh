@@ -25,19 +25,23 @@ else
     git checkout "$TARGET_VERSION"
 fi
 
-# 3. Install dependencies
+# 3. Clean old build artifacts
+echo "🧹 Cleaning old build artifacts..."
+rm -rf .next
+
+# 4. Install dependencies
 echo "📦 Installing dependencies..."
 npm ci
 
-# 4. Build application
+# 5. Build application
 echo "🏗️ Building application..."
 npm run build
 
-# 5. Run database migrations
+# 6. Run database migrations
 echo "🗄️ Running database migrations..."
 npm run db:setup:prod
 
-# 6. Restart application with PM2
+# 7. Restart application with PM2
 echo "🔄 Restarting application..."
 # We use 'pm2 reload' for zero-downtime reloads if the app is running,
 # otherwise 'pm2 start' to launch it.

@@ -4,6 +4,11 @@ import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import { debugTimezoneConversion } from "@/lib/timezone";
 
+// Configure route settings for large file uploads (Next.js 15)
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
