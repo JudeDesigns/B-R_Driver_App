@@ -45,6 +45,8 @@ interface Customer {
   address: string;
   contactInfo: string | null;
   preferences: string | null;
+  paymentTerms?: string | null;
+  deliveryInstructions?: string | null;
   documents?: Document[];
 }
 
@@ -86,6 +88,9 @@ interface Stop {
   driverPaymentAmount?: number;
   driverPaymentMethods?: string[];
   payments?: Payment[];
+  // Stop-specific payment terms
+  paymentTerms?: string | null;
+  paymentTermsOther?: string | null;
   customer: Customer;
   route: {
     id: string;

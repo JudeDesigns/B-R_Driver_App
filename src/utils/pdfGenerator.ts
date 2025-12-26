@@ -553,6 +553,15 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
       line-height: 1.6;
     }
 
+    .footer-contact a {
+      color: white;
+      text-decoration: underline;
+    }
+
+    .footer-contact a:hover {
+      color: #f0f0f0;
+    }
+
     /* Returns table styling */
     .returns-table {
       width: 100%;
@@ -691,7 +700,7 @@ function createHTMLTemplate(stop: Stop, embeddedImages: EmbeddedImage[], returns
     <!-- Footer Section -->
     <div class="footer-section">
       <div class="footer-contact">
-        24/7 customer service | (323) 366-0887 | customer.services@brfood.us
+        24/7 customer service | <a href="tel:+13233660887">(323) 366-0887</a> | <a href="mailto:customer.services@brfood.us">customer.services@brfood.us</a>
       </div>
     </div>
   </div>

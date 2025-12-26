@@ -19,6 +19,7 @@ export interface SimpleSafetyCheckData {
   truckNumber: string;
   mileage: string;
   fuelLevel: string;
+  odometerStart: string; // Starting odometer reading for KPI tracking
 
   // Essential safety items
   lightsWorking: boolean;
@@ -49,6 +50,7 @@ export default function SimpleSafetyChecklist({
     truckNumber: vehicle?.vehicleNumber || "",
     mileage: "",
     fuelLevel: "FULL",
+    odometerStart: "",
     lightsWorking: false,
     tiresCondition: false,
     braksWorking: false,
@@ -235,6 +237,27 @@ export default function SimpleSafetyChecklist({
               <option value="QUARTER">1/4</option>
               <option value="LOW">Low - Need Fuel</option>
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="odometerStart" className="block text-sm font-medium text-gray-700 mb-1">
+              Starting Odometer <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="odometerStart"
+              name="odometerStart"
+              value={formData.odometerStart}
+              onChange={handleChange}
+              required
+              placeholder="e.g., 125432"
+              min="0"
+              step="0.1"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              📊 Used for daily mileage tracking
+            </p>
           </div>
         </div>
 

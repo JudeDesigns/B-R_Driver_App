@@ -49,6 +49,10 @@ const nextConfig = {
   // Simplified experimental features
   experimental: {
     optimizeCss: true,
+    // Increase body size limit for file uploads (product/route Excel files)
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
 };
 

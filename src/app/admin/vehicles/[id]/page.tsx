@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
@@ -19,7 +19,7 @@ interface Vehicle {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  vehicleAssignments: VehicleAssignment[];
+  assignments: VehicleAssignment[];
 }
 
 interface VehicleAssignment {
@@ -39,7 +39,11 @@ interface VehicleAssignment {
   } | null;
 }
 
-export default function VehicleDetailsPage({ params }: { params: { id: string } }) {
+export default function VehicleDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  // Unwrap the params object using React.use()
+  const unwrappedParams = use(params);
+  const vehicleId = unwrappedParams.id;
+
   const { token, isLoading: authLoading, isAuthenticated } = useAdminAuth();
   const router = useRouter();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
@@ -55,7 +59,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
     }
 
     fetchVehicle();
-  }, [authLoading, isAuthenticated, params.id]);
+  }, [authLoading, isAuthenticated, vehicleId]);
 
   const fetchVehicle = async () => {
     setLoading(true);
@@ -68,7 +72,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
         return;
       }
 
-      const response = await fetch(`/api/admin/vehicles/${params.id}`, {
+      const response = await fetch(`/api/admin/vehicles/${vehicleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -99,7 +103,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
         return;
       }
 
-      const response = await fetch(`/api/admin/vehicles/${params.id}`, {
+      const response = await fetch(`/api/admin/vehicles/${vehicleId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -125,7 +129,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const response = await fetch(`/api/admin/vehicles/${params.id}/assign`, {
+    const response = await fetch(`/api/admin/vehicles/${vehicleId}/assign`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -205,7 +209,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
     );
   }
 
-  const activeAssignment = vehicle.vehicleAssignments?.find(a => a.isActive);
+  const activeAssignment = vehicle.assignments?.find((a: any) => a.isActive && !a.isDeleted);
 
   return (
     <div className="space-y-6">
@@ -332,7 +336,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
       {/* Assignment History */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h2 className="text-xl font-medium text-gray-900 mb-4">Assignment History</h2>
-        {!vehicle.vehicleAssignments || vehicle.vehicleAssignments.length === 0 ? (
+        {!vehicle.assignments || vehicle.assignments.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
             No assignments found for this vehicle.
           </p>
@@ -356,7 +360,7 @@ export default function VehicleDetailsPage({ params }: { params: { id: string } 
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {vehicle.vehicleAssignments.map((assignment) => (
+                {vehicle.assignments.map((assignment) => (
                   <tr key={assignment.id} className={`hover:bg-gray-50 ${assignment.isActive ? 'bg-green-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(assignment.assignedAt).toLocaleDateString()}

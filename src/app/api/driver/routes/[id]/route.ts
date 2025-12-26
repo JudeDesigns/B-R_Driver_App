@@ -83,6 +83,8 @@ export async function GET(
                 address: true,
                 contactInfo: true,
                 preferences: true,
+                paymentTerms: true,
+                deliveryInstructions: true,
               },
             },
             adminNotes: {

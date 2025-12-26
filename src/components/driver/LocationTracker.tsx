@@ -92,7 +92,10 @@ export default function LocationTracker({
   }
 
   // Show permission denied message
-  if (permissionDenied) {
+  if (permissionDenied || error) {
+    const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : '';
+
     return (
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
         <div className="flex items-start">
@@ -111,11 +114,21 @@ export default function LocationTracker({
           </svg>
           <div className="flex-1">
             <h3 className="text-sm font-medium text-yellow-800">
-              Location Permission Required
+              Location Tracking Unavailable
             </h3>
             <p className="text-sm text-yellow-700 mt-1">
-              Please enable location access in your browser settings to track deliveries.
+              {error || 'Please enable location access in your browser settings to track deliveries.'}
             </p>
+            {!isSecureContext && protocol === 'http:' && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                <p className="text-xs text-red-700 font-medium">
+                  ⚠️ HTTPS Required: Location tracking requires a secure connection (HTTPS).
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  You are currently using HTTP. Please access the application via HTTPS for location tracking to work.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

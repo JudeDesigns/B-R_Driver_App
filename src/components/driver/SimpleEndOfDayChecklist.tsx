@@ -13,6 +13,7 @@ export interface SimpleEndOfDayCheckData {
   truckNumber: string;
   mileage: string;
   fuelLevel: string;
+  odometerEnd: string; // Ending odometer reading for KPI tracking
   lightsWorking: boolean;
   tiresCondition: boolean;
   braksWorking: boolean;
@@ -34,6 +35,7 @@ export default function SimpleEndOfDayChecklist({
     truckNumber: "",
     mileage: "",
     fuelLevel: "FULL",
+    odometerEnd: "",
     lightsWorking: false,
     tiresCondition: false,
     braksWorking: false,
@@ -142,6 +144,27 @@ export default function SimpleEndOfDayChecklist({
               <option value="1/4">1/4</option>
               <option value="EMPTY">Empty</option>
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="odometerEnd" className="block text-sm font-medium text-gray-700 mb-1">
+              Ending Odometer <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="odometerEnd"
+              name="odometerEnd"
+              value={formData.odometerEnd}
+              onChange={handleChange}
+              required
+              placeholder="e.g., 125650"
+              min="0"
+              step="0.1"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              📊 Used for daily mileage tracking
+            </p>
           </div>
         </div>
       </div>

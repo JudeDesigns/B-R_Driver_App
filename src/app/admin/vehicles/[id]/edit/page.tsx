@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
@@ -18,7 +18,11 @@ interface Vehicle {
   notes: string | null;
 }
 
-export default function EditVehiclePage({ params }: { params: { id: string } }) {
+export default function EditVehiclePage({ params }: { params: Promise<{ id: string }> }) {
+  // Unwrap the params object using React.use()
+  const unwrappedParams = use(params);
+  const vehicleId = unwrappedParams.id;
+
   const { token, isLoading: authLoading, isAuthenticated } = useAdminAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -42,7 +46,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
     }
 
     fetchVehicle();
-  }, [authLoading, isAuthenticated, params.id]);
+  }, [authLoading, isAuthenticated, vehicleId]);
 
   const fetchVehicle = async () => {
     setLoading(true);
@@ -55,7 +59,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
         return;
       }
 
-      const response = await fetch(`/api/admin/vehicles/${params.id}`, {
+      const response = await fetch(`/api/admin/vehicles/${vehicleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -124,7 +128,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
       if (formData.vin) submitData.vin = formData.vin;
       if (formData.notes) submitData.notes = formData.notes;
 
-      const response = await fetch(`/api/admin/vehicles/${params.id}`, {
+      const response = await fetch(`/api/admin/vehicles/${vehicleId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -138,7 +142,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
         throw new Error(data.message || "Failed to update vehicle");
       }
 
-      router.push(`/admin/vehicles/${params.id}`);
+      router.push(`/admin/vehicles/${vehicleId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Error updating vehicle:", err);
@@ -169,7 +173,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-medium text-gray-900">Edit Vehicle</h1>
           <Link
-            href={`/admin/vehicles/${params.id}`}
+            href={`/admin/vehicles/${vehicleId}`}
             className="text-gray-600 hover:text-gray-800 font-medium"
           >
             ← Back to Vehicle
@@ -339,7 +343,7 @@ export default function EditVehiclePage({ params }: { params: { id: string } }) 
           {/* Submit Buttons */}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Link
-              href={`/admin/vehicles/${params.id}`}
+              href={`/admin/vehicles/${vehicleId}`}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition duration-200"
             >
               Cancel

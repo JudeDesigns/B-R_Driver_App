@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
           where: {
             driverId: decoded.id,
             isActive: true,
+            isDeleted: false,
           },
           include: {
             vehicle: true,
@@ -143,6 +144,7 @@ export async function GET(request: NextRequest) {
           where: {
             driverId: decoded.id,
             isActive: true,
+            isDeleted: false,
           },
           include: {
             vehicle: true,
@@ -192,6 +194,7 @@ export async function GET(request: NextRequest) {
             where: {
               driverId: decoded.id,
               isActive: true,
+              isDeleted: false,
             },
             include: {
               vehicle: true,

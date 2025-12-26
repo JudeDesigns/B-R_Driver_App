@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SimpleSafetyChecklist, {
   SimpleSafetyCheckData,
 } from "@/components/driver/SimpleSafetyChecklist";
+import DocumentReviewStep from "@/components/driver/DocumentReviewStep";
 import { getPSTDateString } from "@/lib/timezone";
 
 export default function SafetyCheckPage() {
@@ -13,6 +14,7 @@ export default function SafetyCheckPage() {
   const [routes, setRoutes] = useState<any[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>("");
   const [error, setError] = useState("");
+  const [documentsAcknowledged, setDocumentsAcknowledged] = useState(false);
   const router = useRouter();
 
   // We'll use the EnhancedSafetyChecklist component instead of individual form states
@@ -265,7 +267,14 @@ export default function SafetyCheckPage() {
             </div>
           </div>
 
-          {selectedRouteId && (
+          {selectedRouteId && !documentsAcknowledged && token && (
+            <DocumentReviewStep
+              token={token}
+              onComplete={() => setDocumentsAcknowledged(true)}
+            />
+          )}
+
+          {selectedRouteId && documentsAcknowledged && (
             <SimpleSafetyChecklist
               onSubmit={handleSubmit}
               isSubmitting={loading}

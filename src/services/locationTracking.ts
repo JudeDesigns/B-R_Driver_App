@@ -46,6 +46,13 @@ class LocationTrackingService {
   }
 
   /**
+   * Check if the current context is secure (HTTPS or localhost)
+   */
+  isSecureContext(): boolean {
+    return window.isSecureContext;
+  }
+
+  /**
    * Check if location tracking is enabled
    */
   isEnabled(): boolean {
@@ -57,21 +64,68 @@ class LocationTrackingService {
    */
   async requestPermission(): Promise<boolean> {
     if (!this.isSupported()) {
+      console.warn('Location tracking is disabled in environment');
       return false;
+    }
+
+    // Check if we're in a secure context (HTTPS or localhost)
+    if (!this.isSecureContext()) {
+      console.error('Geolocation requires a secure context (HTTPS). Current protocol:', window.location.protocol);
+      console.error('Please access the application via HTTPS or use localhost with a valid SSL certificate.');
+      return false;
+    }
+
+    // Check if Permissions API is available
+    if ('permissions' in navigator) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+
+        if (result.state === 'denied') {
+          console.error('Location permission is denied. Please enable location access in your browser settings.');
+          return false;
+        }
+
+        if (result.state === 'granted') {
+          return true;
+        }
+
+        // If state is 'prompt', we need to request permission
+      } catch (error) {
+        console.warn('Permissions API not fully supported, falling back to direct request');
+      }
     }
 
     try {
       // Try to get current position to trigger permission prompt
       await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false, // Low-power mode
-          timeout: 10000,
-          maximumAge: 60000, // Cache for 1 minute
-        });
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          (error) => {
+            // Provide more detailed error messages
+            let errorMessage = 'Location permission denied';
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information is unavailable.';
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'Location request timed out.';
+                break;
+            }
+            reject(new Error(errorMessage));
+          },
+          {
+            enableHighAccuracy: true, // CHANGED: High accuracy required for HTTP contexts
+            timeout: 15000, // Increased timeout for better reliability
+            maximumAge: 10000, // CHANGED: Reduced cache to 10 seconds
+          }
+        );
       });
       return true;
     } catch (error) {
-      console.error('Location permission denied:', error);
+      console.error('Location permission error:', error instanceof Error ? error.message : 'Unknown error');
       return false;
     }
   }
@@ -112,13 +166,19 @@ class LocationTrackingService {
         };
       },
       (error) => {
-        console.error('Geolocation error:', error);
-        this.options?.onError?.(new Error(error.message));
+        // GeolocationPositionError doesn't always have a message property
+        const errorMessage = error.message || `Geolocation error code ${error.code}: ${
+          error.code === 1 ? 'Permission denied' :
+          error.code === 2 ? 'Position unavailable' :
+          error.code === 3 ? 'Timeout' : 'Unknown error'
+        }`;
+        console.error('Geolocation error:', errorMessage, error);
+        this.options?.onError?.(new Error(errorMessage));
       },
       {
-        enableHighAccuracy: false, // Low-power mode for battery efficiency
+        enableHighAccuracy: true, // CHANGED: High accuracy required for HTTP contexts
         timeout: 30000,
-        maximumAge: 60000, // Cache for 1 minute
+        maximumAge: 10000, // CHANGED: Reduced cache to 10 seconds for better reliability
       }
     );
 
@@ -165,7 +225,12 @@ class LocationTrackingService {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      // Get token from both localStorage and sessionStorage
+      let token = localStorage.getItem('token');
+      if (!token) {
+        token = sessionStorage.getItem('token');
+      }
+
       if (!token) {
         throw new Error('No authentication token');
       }
@@ -186,6 +251,11 @@ class LocationTrackingService {
       });
 
       if (!response.ok) {
+        // If 401, token might be expired - log user out
+        if (response.status === 401) {
+          console.error('Location update failed: Unauthorized (token expired)');
+          throw new Error('Authentication failed - please log in again');
+        }
         throw new Error(`Failed to update location: ${response.statusText}`);
       }
 

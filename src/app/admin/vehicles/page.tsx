@@ -19,7 +19,7 @@ interface Vehicle {
   fuelType: string | null;
   status: string;
   _count?: {
-    vehicleAssignments: number;
+    assignments: number;
   };
   createdAt: string;
 }
@@ -277,7 +277,7 @@ export default function VehiclesPage() {
               },
               {
                 header: "Assignments",
-                accessor: (vehicle) => vehicle._count?.vehicleAssignments || 0,
+                accessor: (vehicle) => vehicle._count?.assignments || 0,
                 align: "center",
               },
               {

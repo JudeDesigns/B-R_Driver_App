@@ -310,6 +310,8 @@ export async function PUT(
             : undefined,
         driverRemarkInitial: data.driverRemarkInitial || undefined,
         amount: data.amount !== undefined ? data.amount : undefined,
+        paymentTerms: data.paymentTerms !== undefined ? data.paymentTerms : undefined,
+        paymentTermsOther: data.paymentTermsOther !== undefined ? data.paymentTermsOther : undefined,
       },
       include: {
         customer: true,

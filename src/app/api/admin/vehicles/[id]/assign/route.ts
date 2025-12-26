@@ -8,7 +8,7 @@ import { verifyToken } from "@/lib/auth";
  */
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // Verify authentication
@@ -24,7 +24,7 @@ export async function POST(
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
-        const { id } = params;
+        const { id } = await params;
         const data = await request.json();
 
         if (!data.driverId) {

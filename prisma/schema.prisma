@@ -34,14 +34,17 @@ model User {
   locationAccuracy   Float? // GPS accuracy in meters
 
   // Relations
-  routes             Route[]              @relation("DriverRoutes")
-  adminNotes         AdminNote[]          @relation("AdminNotes")
-  safetyChecks       SafetyCheck[]        @relation("DriverSafetyChecks")
-  safetyDeclarations SafetyDeclaration[]  @relation("DriverSafetyDeclarations")
-  documents          Document[]           @relation("DocumentUploads")
-  files              File[]               @relation("FileUploads")
-  vehicleAssignments VehicleAssignment[]  @relation("DriverVehicleAssignments")
-  driverLocations    DriverLocation[]     @relation("DriverLocationUpdates")
+  routes                    Route[]                    @relation("DriverRoutes")
+  adminNotes                AdminNote[]                @relation("AdminNotes")
+  safetyChecks              SafetyCheck[]              @relation("DriverSafetyChecks")
+  safetyDeclarations        SafetyDeclaration[]        @relation("DriverSafetyDeclarations")
+  documents                 Document[]                 @relation("DocumentUploads")
+  files                     File[]                     @relation("FileUploads")
+  vehicleAssignments        VehicleAssignment[]        @relation("DriverVehicleAssignments")
+  driverLocations           DriverLocation[]           @relation("DriverLocationUpdates")
+  systemDocumentUploads     SystemDocument[]           @relation("SystemDocumentUploads")
+  documentAcknowledgments   DocumentAcknowledgment[]   @relation("DriverDocumentAcknowledgments")
+  dailyKPIs                 DailyKPI[]                 @relation("DriverKPIs")
 
   @@index([role])
   @@index([isDeleted])
@@ -99,6 +102,7 @@ model Route {
   safetyDeclarations SafetyDeclaration[] @relation("RouteSafetyDeclarations")
   vehicleAssignments VehicleAssignment[]
   driverLocations    DriverLocation[]
+  dailyKPIs          DailyKPI[]          @relation("RouteKPIs")
 
   @@index([routeNumber])
   @@index([date])
@@ -139,22 +143,72 @@ model Vehicle {
 }
 
 model SystemDocument {
-  id           String             @id @default(uuid())
+  id           String                   @id @default(uuid())
+  title        String                   // "New Safety Policy", "Fueling Procedures"
+  description  String?                  // Brief description
   documentType SystemDocumentType
+  category     DocumentCategory         // SAFETY, COMPLIANCE, PROCEDURE, POLICY
   filePath     String
   fileName     String
-  isActive     Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  isDeleted    Boolean            @default(false)
+  fileSize     Int
+  mimeType     String
+  isRequired   Boolean                  @default(false) // Must be acknowledged?
+  isActive     Boolean                  @default(true)
+  uploadedBy   String                   // Admin who uploaded
+  uploader     User                     @relation("SystemDocumentUploads", fields: [uploadedBy], references: [id])
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  isDeleted    Boolean                  @default(false)
 
+  // Relations
+  acknowledgments DocumentAcknowledgment[]
+
+  @@index([isRequired])
+  @@index([isActive])
+  @@index([category])
+  @@index([uploadedBy])
+  @@index([isDeleted])
   @@map("system_documents")
+}
+
+// Track which drivers have acknowledged which documents
+model DocumentAcknowledgment {
+  id             String         @id @default(uuid())
+  documentId     String
+  document       SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  driverId       String
+  driver         User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
+  acknowledgedAt DateTime       @default(now())
+  ipAddress      String?        // Audit trail
+  userAgent      String?        // Audit trail
+
+  @@unique([documentId, driverId]) // One acknowledgment per driver per document
+  @@index([driverId])
+  @@index([documentId])
+  @@index([acknowledgedAt])
+  @@map("document_acknowledgments")
+}
+
+enum DocumentCategory {
+  SAFETY
+  COMPLIANCE
+  PROCEDURE
+  POLICY
+  TRAINING
+  REFERENCE
 }
 
 enum SystemDocumentType {
   DAILY_SAFETY_DECLARATION
   SAFETY_INSTRUCTIONS
   COMPANY_POLICY
+  FUELING_PROCEDURE
+  CUSTOMER_SERVICE_GUIDE
+  BREAK_COMPLIANCE
+  CALIFORNIA_LAW
+  VEHICLE_MAINTENANCE
+  EMERGENCY_PROCEDURES
+  OTHER
 }
 
 model VehicleAssignment {
@@ -218,6 +272,9 @@ model Stop {
   // Driver-recorded payment information (for future use)
   driverPaymentAmount    Float? // Payment amount recorded by driver during delivery
   driverPaymentMethods   String[]   @default([]) // Payment methods selected by driver (Cash, Check, CC)
+  // Stop-specific payment terms (overrides customer default if set)
+  paymentTerms           String? // Payment terms for this specific stop (COD, Prepaid, Post Paid, etc.)
+  paymentTermsOther      String? // Custom payment terms when "Other" is selected
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
   isDeleted              Boolean    @default(false)
@@ -686,4 +743,42 @@ model DriverLocation {
   @@index([timestamp]) // For efficient cleanup queries
   @@index([createdAt]) // For 7-day cleanup
   @@map("driver_locations")
+}
+
+// Milestone 5: Driver Performance Tracking (KPI System)
+// Captures daily key performance indicators for each driver
+model DailyKPI {
+  id        String   @id @default(uuid())
+  driverId  String
+  driver    User     @relation("DriverKPIs", fields: [driverId], references: [id])
+  routeId   String?
+  route     Route?   @relation("RouteKPIs", fields: [routeId], references: [id])
+  date      DateTime // Date of the route/shift
+
+  // Mileage tracking
+  milesStart  Float? // Starting odometer reading
+  milesEnd    Float? // Ending odometer reading
+  milesDriven Float? // Calculated: milesEnd - milesStart
+
+  // Delivery metrics
+  totalDelivered Float   @default(0) // Total dollar amount delivered
+  stopsCompleted Int     @default(0) // Number of stops completed
+  stopsTotal     Int     @default(0) // Total stops assigned
+
+  // Time tracking
+  timeStart DateTime? // When driver started their route (safety check completed)
+  timeEnd   DateTime? // When driver completed their route (end-of-day submitted)
+  totalTime Int? // Total time in minutes (calculated)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  @@unique([driverId, date]) // One KPI record per driver per day
+  @@index([driverId])
+  @@index([routeId])
+  @@index([date])
+  @@index([createdAt])
+  @@map("daily_kpis")
 }

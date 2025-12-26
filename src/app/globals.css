@@ -62,3 +62,22 @@ h6 {
   font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont,
     var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* Custom scrollbar for sidebar navigation */
+nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+nav::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

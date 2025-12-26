@@ -46,6 +46,8 @@ interface Customer {
   contactInfo: string | null;
   preferences: string | null;
   groupCode: string | null;
+  paymentTerms: string | null;
+  deliveryInstructions: string | null;
 }
 
 interface Stop {
@@ -80,6 +82,9 @@ interface Stop {
   driverPaymentMethods?: string[];
   invoiceImageUrls?: string[];
   hasReturns?: boolean;
+  // Stop-specific payment terms
+  paymentTerms?: string | null;
+  paymentTermsOther?: string | null;
 }
 
 
@@ -157,6 +162,12 @@ export default function RouteDetailPage({
   // Sequence editing state
   const [editingSequence, setEditingSequence] = useState<string | null>(null);
   const [tempSequence, setTempSequence] = useState<number>(0);
+
+  // Payment terms editing state
+  const [editingPaymentTerms, setEditingPaymentTerms] = useState<string | null>(null);
+  const [tempPaymentTerms, setTempPaymentTerms] = useState<string>("");
+  const [tempPaymentTermsOther, setTempPaymentTermsOther] = useState<string>("");
+  const [savingPaymentTerms, setSavingPaymentTerms] = useState(false);
 
   const router = useRouter();
 
@@ -620,6 +631,57 @@ export default function RouteDetailPage({
     setTempSequence(0);
   };
 
+  // Payment Terms Editing Functions
+  const startEditingPaymentTerms = (stop: Stop) => {
+    setEditingPaymentTerms(stop.id);
+    setTempPaymentTerms(stop.paymentTerms || stop.customer?.paymentTerms || "COD");
+    setTempPaymentTermsOther(stop.paymentTermsOther || "");
+  };
+
+  const cancelEditingPaymentTerms = () => {
+    setEditingPaymentTerms(null);
+    setTempPaymentTerms("");
+    setTempPaymentTermsOther("");
+  };
+
+  const savePaymentTerms = async (stopId: string) => {
+    if (!token) return;
+
+    setSavingPaymentTerms(true);
+    try {
+      const response = await fetch(`/api/admin/stops/${stopId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          paymentTerms: tempPaymentTerms,
+          paymentTermsOther: tempPaymentTerms === "Other" ? tempPaymentTermsOther : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update payment terms");
+      }
+
+      // Refresh route details
+      await fetchRouteDetails();
+      setEditingPaymentTerms(null);
+      setTempPaymentTerms("");
+      setTempPaymentTermsOther("");
+    } catch (err) {
+      if (err instanceof Error && err.message === "Authentication required") {
+        router.push("/login");
+        return;
+      }
+      console.error("Error updating payment terms:", err);
+      alert("Failed to update payment terms. Please try again.");
+    } finally {
+      setSavingPaymentTerms(false);
+    }
+  };
+
   // Add Stop Functions
   const handleCustomerSelect = (customerName: string, customer?: any) => {
     setAddStopForm(prev => ({
@@ -850,7 +912,64 @@ export default function RouteDetailPage({
           </span>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-          {stop.isCOD ? "Yes" : "No"}
+          {editingPaymentTerms === stop.id ? (
+            <div className="flex flex-col gap-2">
+              <select
+                value={tempPaymentTerms}
+                onChange={(e) => setTempPaymentTerms(e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={savingPaymentTerms}
+              >
+                <option value="COD">COD</option>
+                <option value="Prepaid">Prepaid</option>
+                <option value="Post Paid">Post Paid</option>
+                <option value="Other">Other</option>
+              </select>
+              {tempPaymentTerms === "Other" && (
+                <input
+                  type="text"
+                  value={tempPaymentTermsOther}
+                  onChange={(e) => setTempPaymentTermsOther(e.target.value)}
+                  placeholder="Enter custom terms..."
+                  className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={savingPaymentTerms}
+                />
+              )}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => savePaymentTerms(stop.id)}
+                  disabled={savingPaymentTerms}
+                  className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  {savingPaymentTerms ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={cancelEditingPaymentTerms}
+                  disabled={savingPaymentTerms}
+                  className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <button
+                onClick={() => startEditingPaymentTerms(stop)}
+                className="font-medium text-left hover:text-blue-600 hover:underline"
+              >
+                {stop.paymentTerms || stop.customer?.paymentTerms || "COD"}
+                {stop.paymentTerms === "Other" && stop.paymentTermsOther && (
+                  <span className="text-xs text-gray-500 ml-1">({stop.paymentTermsOther})</span>
+                )}
+              </button>
+              {stop.isCOD && (
+                <span className="mt-1 px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md bg-yellow-100 text-yellow-800 w-fit">
+                  COD Flag
+                </span>
+              )}
+            </div>
+          )}
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           {getPaymentMethod(stop)}
@@ -951,7 +1070,7 @@ export default function RouteDetailPage({
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  COD
+                  Payment Terms
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Status
@@ -1653,11 +1772,9 @@ export default function RouteDetailPage({
                                 <span className="text-sm font-medium text-gray-900">
                                   {getPaymentMethod(stop)}
                                 </span>
-                                {stop.isCOD && (
-                                  <span className="mt-1 px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-md bg-red-100 text-red-800 w-fit">
-                                    COD
-                                  </span>
-                                )}
+                                <span className="mt-1 text-xs text-gray-500">
+                                  Terms: {stop.customer?.paymentTerms || "COD"}
+                                </span>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import { sendDeliveryConfirmationEmail } from "@/lib/email";
+import { toPSTStartOfDay } from "@/lib/timezone";
 import {
   emitStopStatusUpdate,
   emitRouteStatusUpdate,
@@ -542,6 +543,89 @@ export async function PATCH(
       }
     }
 
+    // Update KPI data when stop is completed (PST timezone)
+    console.log(`[KPI DEBUG] Checking KPI update: data.status=${data.status}, stop.status=${stop.status}`);
+    if (data.status === "COMPLETED" && stop.status !== "COMPLETED") {
+      console.log(`[KPI DEBUG] Stop is being completed, updating KPI for driver ${decoded.username} (ID: ${decoded.id})`);
+      try {
+        // Get the route to find the date
+        const route = await prisma.route.findUnique({
+          where: { id: stop.routeId },
+          select: { date: true },
+        });
+
+        console.log(`[KPI DEBUG] Route date: ${route?.date}`);
+
+        if (route) {
+          // Normalize to PST start of day (the entire system works in PST)
+          const routeDate = toPSTStartOfDay(new Date(route.date));
+          console.log(`[KPI DEBUG] Normalized route date (PST start of day): ${routeDate.toISOString()}`);
+          console.log(`[KPI DEBUG] Route date in PST: ${routeDate.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })}`);
+
+          // Get all stops for this driver on this route (total assigned)
+          const allDriverStops = await prisma.stop.findMany({
+            where: {
+              routeId: stop.routeId,
+              isDeleted: false,
+              OR: [
+                { driverNameFromUpload: decoded.username },
+                ...(stop.driverNameFromUpload ? [{ driverNameFromUpload: stop.driverNameFromUpload }] : []),
+              ],
+            },
+            select: {
+              status: true,
+              amount: true,
+            },
+          });
+
+          console.log(`[KPI DEBUG] Found ${allDriverStops.length} stops for driver ${decoded.username}`);
+
+          const stopsTotal = allDriverStops.length;
+          const completedStops = allDriverStops.filter(s => s.status === "COMPLETED");
+          const stopsCompleted = completedStops.length;
+          const totalDelivered = completedStops.reduce(
+            (sum, s) => sum + (s.amount || 0),
+            0
+          );
+
+          console.log(`[KPI DEBUG] Stops: ${stopsCompleted}/${stopsTotal} completed, $${totalDelivered} delivered`);
+
+          // Update or create KPI record
+          const kpiResult = await prisma.dailyKPI.upsert({
+            where: {
+              driverId_date: {
+                driverId: decoded.id,
+                date: routeDate,
+              },
+            },
+            create: {
+              driverId: decoded.id,
+              routeId: stop.routeId,
+              date: routeDate,
+              stopsCompleted,
+              totalDelivered,
+              stopsTotal,
+            },
+            update: {
+              stopsCompleted,
+              totalDelivered,
+              stopsTotal,
+            },
+          });
+
+          console.log(`✅ KPI updated for ${decoded.username}: ${stopsCompleted}/${stopsTotal} stops completed, $${totalDelivered} delivered`);
+          console.log(`[KPI DEBUG] KPI record ID: ${kpiResult.id}`);
+        } else {
+          console.error(`[KPI DEBUG] Route not found for stop ${stop.id}`);
+        }
+      } catch (error) {
+        console.error("[KPI DEBUG] Error updating KPI on stop completion:", error);
+        // Continue execution even if KPI update fails
+      }
+    } else {
+      console.log(`[KPI DEBUG] Skipping KPI update - condition not met`);
+    }
+
     // If all stops in the route are completed, update the route status to COMPLETED
     if (data.status === "COMPLETED" && stop.status !== "COMPLETED") {
       // Get all stops for this route
@@ -616,85 +700,9 @@ export async function PATCH(
           console.error("Error updating route status to completed:", error);
           // Continue execution even if route update fails
         }
-      } else {
-        // Find the current stop's index
-        const currentStopIndex = routeStops.findIndex((s) => s.id === id);
-
-        // Find the next stop that's PENDING and assigned to the same driver
-        const nextPendingStop = routeStops.find(
-          (s, index) =>
-            index > currentStopIndex &&
-            s.status === "PENDING" &&
-            s.driverNameFromUpload === decoded.username
-        );
-
-        // If there's a next pending stop for the same driver, update it to ON_THE_WAY
-        if (nextPendingStop) {
-          try {
-            // First check if the stop still exists and is still PENDING
-            const checkStop = await prisma.stop.findUnique({
-              where: {
-                id: nextPendingStop.id,
-              },
-              select: {
-                id: true,
-                status: true,
-              },
-            });
-
-            if (checkStop && checkStop.status === "PENDING") {
-              const updatedNextStop = await prisma.stop.update({
-                where: {
-                  id: nextPendingStop.id,
-                },
-                data: {
-                  status: "ON_THE_WAY",
-                  onTheWayTime: getPSTDate(), // Set timestamp when automatically updating to ON_THE_WAY (PST)
-                },
-                include: {
-                  customer: {
-                    select: {
-                      name: true,
-                    },
-                  },
-                },
-              });
-
-              // Emit stop status update event for the next stop
-              const driver = await prisma.user.findUnique({
-                where: { id: decoded.id },
-                select: { username: true, fullName: true },
-              });
-
-              emitStopStatusUpdate({
-                stopId: updatedNextStop.id,
-                routeId: stop.routeId,
-                status: "ON_THE_WAY",
-                driverId: decoded.id,
-                driverName:
-                  driver?.fullName || driver?.username || "Unknown Driver",
-                customerName: updatedNextStop.customer.name,
-                timestamp: new Date().toISOString(),
-              });
-
-              if (process.env.NODE_ENV !== "production") {
-                console.log(
-                  `Automatically updated next stop ${updatedNextStop.id} to ON_THE_WAY for driver ${decoded.username}`
-                );
-              }
-            } else {
-              if (process.env.NODE_ENV !== "production") {
-                console.log(
-                  `Next stop ${nextPendingStop.id} not found or not in PENDING status. Current status: ${checkStop?.status}`
-                );
-              }
-            }
-          } catch (error) {
-            console.error("Error updating next stop:", error);
-            // Continue execution even if next stop update fails
-          }
-        }
       }
+      // Auto-start next stop feature has been disabled per user request
+      // Drivers will manually start the next stop when ready
     }
 
     return NextResponse.json(updatedStop);

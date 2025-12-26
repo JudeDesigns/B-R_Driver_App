@@ -57,8 +57,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const driverName = driver.fullName || driver.username;
-
     // Get all routes where the driver is either the primary driver or assigned to stops
     // Use more precise matching to prevent cross-driver safety check issues
     const driverRoutes = await prisma.route.findMany({
@@ -172,10 +170,17 @@ export async function GET(request: NextRequest) {
               },
               isDeleted: false,
             },
-            select: {
-              id: true,
-              routeNumber: true,
-              date: true,
+            include: {
+              vehicleAssignments: {
+                where: {
+                  driverId: decoded.id,
+                  isActive: true,
+                  isDeleted: false,
+                },
+                include: {
+                  vehicle: true,
+                },
+              },
             },
           })
         : [];

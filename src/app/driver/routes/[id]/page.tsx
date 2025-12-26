@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSocket } from "@/hooks/useSocket";
@@ -65,8 +65,12 @@ interface Route {
 export default function DriverRouteDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  // Unwrap the params object using React.use()
+  const unwrappedParams = use(params);
+  const routeId = unwrappedParams.id;
+
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -95,7 +99,7 @@ export default function DriverRouteDetailPage({
     try {
       // Use the new endpoint that only returns stops assigned to this driver
       const response = await fetch(
-        `/api/driver/routes/${params.id}/assigned-stops`,
+        `/api/driver/routes/${routeId}/assigned-stops`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -115,14 +119,14 @@ export default function DriverRouteDetailPage({
 
       // If safety check is not completed and route is pending, redirect to safety check
       if (!data.safetyCheckCompleted && data.status === "PENDING") {
-        router.push(`/driver/safety-check/${params.id}`);
+        router.push(`/driver/safety-check/${routeId}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
-  }, [token, params.id, router]);
+  }, [token, routeId, router]);
 
   useEffect(() => {
     if (token) {
@@ -132,7 +136,7 @@ export default function DriverRouteDetailPage({
 
   // Set up WebSocket connection and event listeners
   useEffect(() => {
-    if (!isConnected || !params.id) return;
+    if (!isConnected || !routeId) return;
 
     console.log("Setting up WebSocket connection for driver route detail page");
 
@@ -157,15 +161,15 @@ export default function DriverRouteDetailPage({
     }
 
     // Join the route room
-    console.log("Joining route room:", `route:${params.id}`);
-    joinRoom(`route:${params.id}`);
+    console.log("Joining route room:", `route:${routeId}`);
+    joinRoom(`route:${routeId}`);
 
     // Subscribe to route status update events
     const unsubscribeRouteStatus = subscribe(
       SocketEvents.ROUTE_STATUS_UPDATED,
       (data: any) => {
         console.log("Received route status update event:", data);
-        if (data.routeId === params.id) {
+        if (data.routeId === routeId) {
           // Refresh route details to get the latest status
           fetchRouteDetails();
         }
@@ -177,7 +181,7 @@ export default function DriverRouteDetailPage({
       SocketEvents.STOP_STATUS_UPDATED,
       (data: any) => {
         console.log("Received stop status update event:", data);
-        if (data.routeId === params.id) {
+        if (data.routeId === routeId) {
           // Refresh route details to get the latest stop status
           fetchRouteDetails();
         }
@@ -189,7 +193,7 @@ export default function DriverRouteDetailPage({
       SocketEvents.ADMIN_NOTE_CREATED,
       (data: any) => {
         console.log("Received admin note event:", data);
-        if (data.routeId === params.id) {
+        if (data.routeId === routeId) {
           // Refresh route details to get the latest admin notes
           fetchRouteDetails();
         }
@@ -201,7 +205,7 @@ export default function DriverRouteDetailPage({
       unsubscribeStopStatus();
       unsubscribeAdminNote();
     };
-  }, [isConnected, joinRoom, subscribe, params.id, fetchRouteDetails]);
+  }, [isConnected, joinRoom, subscribe, routeId, fetchRouteDetails]);
 
   const handleCompleteRoute = async () => {
     if (!token || !route) return;
@@ -210,7 +214,7 @@ export default function DriverRouteDetailPage({
     setError("");
 
     try {
-      const response = await fetch(`/api/driver/routes/${params.id}`, {
+      const response = await fetch(`/api/driver/routes/${routeId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

@@ -7,7 +7,13 @@ export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 seconds timeout
 export const dynamic = 'force-dynamic';
 
+// Log at module level to verify route is loaded
+console.log("🔥 PRODUCT UPLOAD ROUTE MODULE LOADED - " + new Date().toISOString());
+
 export async function POST(request: NextRequest) {
+  // Log IMMEDIATELY when function is called
+  console.log("🚀 POST FUNCTION CALLED - " + new Date().toISOString());
+
   try {
     console.log("=== Product Upload Started ===");
 

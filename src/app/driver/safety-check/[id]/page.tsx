@@ -1,22 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import EnhancedSafetyChecklist, {
   SafetyCheckData,
 } from "@/components/driver/EnhancedSafetyChecklist";
+import DocumentReviewStep from "@/components/driver/DocumentReviewStep";
 
 export default function RouteSpecificSafetyCheckPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  // Unwrap the params object using React.use()
+  const unwrappedParams = use(params);
+  const routeId = unwrappedParams.id;
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [route, setRoute] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [documentsAcknowledged, setDocumentsAcknowledged] = useState(false);
   const router = useRouter();
 
   // We'll use the EnhancedSafetyChecklist component instead of individual form states
@@ -37,7 +42,7 @@ export default function RouteSpecificSafetyCheckPage({
     if (token) {
       fetchRouteDetails();
     }
-  }, [token, params.id]);
+  }, [token, routeId]);
 
   const fetchRouteDetails = async () => {
     if (!token) return;
@@ -47,7 +52,7 @@ export default function RouteSpecificSafetyCheckPage({
 
     try {
       const response = await fetch(
-        `/api/driver/routes/${params.id}/assigned-stops`,
+        `/api/driver/routes/${routeId}/assigned-stops`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -65,7 +70,7 @@ export default function RouteSpecificSafetyCheckPage({
 
       // If safety check is already completed, redirect to route details
       if (data.safetyCheckCompleted) {
-        router.push(`/driver/routes/${params.id}`);
+        router.push(`/driver/routes/${routeId}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -88,7 +93,7 @@ export default function RouteSpecificSafetyCheckPage({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          routeId: params.id,
+          routeId: routeId,
           type: "START_OF_DAY",
           details: safetyData,
         }),
@@ -151,19 +156,30 @@ export default function RouteSpecificSafetyCheckPage({
             </div>
 
             <div className="border-t border-gray-200 pt-6">
-              <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-6 bg-yellow-50">
-                <p className="text-sm text-gray-600">
-                  You must complete this safety checklist before starting your
-                  route. This helps ensure both your safety and the safety of
-                  others.
-                </p>
-              </div>
+              {!documentsAcknowledged && token && (
+                <DocumentReviewStep
+                  token={token}
+                  onComplete={() => setDocumentsAcknowledged(true)}
+                />
+              )}
 
-              <EnhancedSafetyChecklist
-                onSubmit={handleSubmit}
-                isSubmitting={submitting}
-                checklistType="START_OF_DAY"
-              />
+              {documentsAcknowledged && (
+                <>
+                  <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-6 bg-yellow-50">
+                    <p className="text-sm text-gray-600">
+                      You must complete this safety checklist before starting your
+                      route. This helps ensure both your safety and the safety of
+                      others.
+                    </p>
+                  </div>
+
+                  <EnhancedSafetyChecklist
+                    onSubmit={handleSubmit}
+                    isSubmitting={submitting}
+                    checklistType="START_OF_DAY"
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>

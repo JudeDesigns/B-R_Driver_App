@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { toPSTStartOfDay } from "@/lib/timezone";
 
 // POST /api/driver/safety-check - Submit a safety check
 export async function POST(request: NextRequest) {
@@ -114,6 +115,18 @@ export async function POST(request: NextRequest) {
         throw new Error("Route not found");
       }
 
+      // Get total stops for this driver on this route
+      const totalStops = await tx.stop.count({
+        where: {
+          routeId,
+          isDeleted: false,
+          OR: [
+            { driverNameFromUpload: driver.username },
+            ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+          ],
+        },
+      });
+
       // Extract safety check fields (both enhanced and simplified)
       const {
         // Enhanced Vehicle & Fuel Check fields
@@ -148,6 +161,8 @@ export async function POST(request: NextRequest) {
         // Simplified Safety Check fields
         mileage,
         fuelLevel,
+        odometerStart,
+        odometerEnd,
         lightsWorking,
         tiresCondition,
         braksWorking,
@@ -163,7 +178,7 @@ export async function POST(request: NextRequest) {
       } = details || {};
 
       // Then create the safety check with enhanced fields
-      return await tx.safetyCheck.create({
+      const createdSafetyCheck = await tx.safetyCheck.create({
         data: {
           type,
           responses: details || {}, // Keep original responses for backward compatibility
@@ -226,6 +241,114 @@ export async function POST(request: NextRequest) {
           routeReviewed,
         },
       });
+
+      // If this is a START_OF_DAY check, create or update the DailyKPI record
+      if (type === "START_OF_DAY" && odometerStart) {
+        // Normalize to PST start of day (the entire system works in PST)
+        const routeDate = toPSTStartOfDay(new Date(routeExists.date));
+
+        await tx.dailyKPI.upsert({
+          where: {
+            driverId_date: {
+              driverId: decoded.id,
+              date: routeDate,
+            },
+          },
+          create: {
+            driverId: decoded.id,
+            routeId: routeId,
+            date: routeDate,
+            milesStart: parseFloat(odometerStart),
+            timeStart: new Date(),
+            stopsTotal: totalStops,
+          },
+          update: {
+            milesStart: parseFloat(odometerStart),
+            timeStart: new Date(),
+            stopsTotal: totalStops,
+            routeId: routeId,
+          },
+        });
+      }
+
+      // If this is an END_OF_DAY check, update the DailyKPI record with completion data
+      if (type === "END_OF_DAY" && odometerEnd) {
+        // Normalize to PST start of day (the entire system works in PST)
+        const routeDate = toPSTStartOfDay(new Date(routeExists.date));
+
+        // Get completed stops count and total delivered amount
+        const completedStops = await tx.stop.findMany({
+          where: {
+            routeId,
+            isDeleted: false,
+            status: "COMPLETED",
+            OR: [
+              { driverNameFromUpload: driver.username },
+              ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+            ],
+          },
+          select: {
+            amount: true,
+          },
+        });
+
+        const stopsCompleted = completedStops.length;
+        const totalDelivered = completedStops.reduce(
+          (sum, stop) => sum + (stop.amount || 0),
+          0
+        );
+
+        // Find existing KPI record to calculate miles driven and total time
+        const existingKPI = await tx.dailyKPI.findUnique({
+          where: {
+            driverId_date: {
+              driverId: decoded.id,
+              date: routeDate,
+            },
+          },
+        });
+
+        const milesEnd = parseFloat(odometerEnd);
+        const milesDriven = existingKPI?.milesStart
+          ? milesEnd - existingKPI.milesStart
+          : null;
+
+        const timeEnd = new Date();
+        const totalTime = existingKPI?.timeStart
+          ? Math.floor((timeEnd.getTime() - existingKPI.timeStart.getTime()) / 60000) // Convert to minutes
+          : null;
+
+        await tx.dailyKPI.upsert({
+          where: {
+            driverId_date: {
+              driverId: decoded.id,
+              date: routeDate,
+            },
+          },
+          create: {
+            driverId: decoded.id,
+            routeId: routeId,
+            date: routeDate,
+            milesEnd,
+            milesDriven,
+            timeEnd,
+            totalTime,
+            stopsCompleted,
+            totalDelivered,
+            stopsTotal: totalStops,
+          },
+          update: {
+            milesEnd,
+            milesDriven,
+            timeEnd,
+            totalTime,
+            stopsCompleted,
+            totalDelivered,
+          },
+        });
+      }
+
+      return createdSafetyCheck;
     });
 
     // Update route status based on safety check type - but only for END_OF_DAY checks

@@ -12,6 +12,8 @@ interface Customer {
   email: string | null;
   preferences: string | null;
   groupCode: string | null;
+  paymentTerms: string | null;
+  deliveryInstructions: string | null;
 }
 
 export default function EditCustomerPage({
@@ -31,6 +33,8 @@ export default function EditCustomerPage({
     email: "",
     preferences: "",
     groupCode: "",
+    paymentTerms: "COD",
+    deliveryInstructions: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,6 +73,8 @@ export default function EditCustomerPage({
           email: data.customer.email || "",
           preferences: data.customer.preferences || "",
           groupCode: data.customer.groupCode || "",
+          paymentTerms: data.customer.paymentTerms || "COD",
+          deliveryInstructions: data.customer.deliveryInstructions || "",
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -371,6 +377,46 @@ export default function EditCustomerPage({
                     onChange={handleChange}
                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                   />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="paymentTerms"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Payment Terms
+                  </label>
+                  <select
+                    id="paymentTerms"
+                    name="paymentTerms"
+                    value={formData.paymentTerms}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  >
+                    <option value="COD">COD (Cash on Delivery)</option>
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 60">Net 60</option>
+                    <option value="Prepaid">Prepaid</option>
+                    <option value="Due on Receipt">Due on Receipt</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="deliveryInstructions"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Delivery Instructions
+                  </label>
+                  <textarea
+                    id="deliveryInstructions"
+                    name="deliveryInstructions"
+                    value={formData.deliveryInstructions}
+                    onChange={handleChange}
+                    rows={3}
+                    placeholder="Special delivery instructions for this customer..."
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  ></textarea>
                 </div>
 
                 <div className="md:col-span-2">

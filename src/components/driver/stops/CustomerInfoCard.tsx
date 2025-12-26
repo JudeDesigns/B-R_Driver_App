@@ -9,6 +9,8 @@ interface Customer {
   address: string;
   contactInfo: string | null;
   preferences: string | null;
+  paymentTerms?: string | null;
+  deliveryInstructions?: string | null;
 }
 
 interface Stop {
@@ -17,6 +19,8 @@ interface Stop {
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
   initialDriverNotes: string | null;
+  paymentTerms?: string | null;
+  paymentTermsOther?: string | null;
   customer: Customer;
   route: {
     id: string;
@@ -153,6 +157,19 @@ export default function CustomerInfoCard({ stop, formatDate }: CustomerInfoCardP
               </span>
               <span className="font-medium text-gray-900 text-sm sm:text-base">
                 {stop.amount ? `$${stop.amount.toFixed(2)}` : "N/A"}
+              </span>
+            </div>
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <div className="flex flex-col">
+              <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+                Payment Terms
+              </span>
+              <span className="font-medium text-gray-900 text-sm sm:text-base">
+                {stop.paymentTerms || stop.customer.paymentTerms || "COD"}
+                {stop.paymentTerms === "Other" && stop.paymentTermsOther && (
+                  <span className="text-xs text-gray-500 ml-1">({stop.paymentTermsOther})</span>
+                )}
               </span>
             </div>
           </div>

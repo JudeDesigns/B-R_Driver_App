@@ -9,6 +9,7 @@ import Image from "next/image";
 import { getPSTDateString } from "@/lib/timezone";
 import { formatDriverNotes } from "@/utils/notesFormatter";
 import GoogleMapsLink, { RouteMapLink } from "@/components/ui/GoogleMapsLink";
+import LocationTracker from "@/components/driver/LocationTracker";
 
 interface Customer {
   id: string;
@@ -749,6 +750,28 @@ export default function DriverStopsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-20 px-3 sm:px-6">
+      {/* Location Tracker - Runs in background when driver has active stops */}
+      {safetyCheckCompleted && filteredStops.length > 0 && (() => {
+        // Find the first active (non-completed) stop to track location
+        const activeStop = filteredStops.find(stop => stop.status !== 'COMPLETED');
+        if (activeStop) {
+          return (
+            <LocationTracker
+              stopId={activeStop.id}
+              routeId={activeStop.route.id}
+              isActive={true}
+              onLocationUpdate={(location) => {
+                console.log('Location updated:', location);
+              }}
+              onError={(error) => {
+                console.error('Location tracking error:', error);
+              }}
+            />
+          );
+        }
+        return null;
+      })()}
+
       {/* Notification */}
       <Notification />
 

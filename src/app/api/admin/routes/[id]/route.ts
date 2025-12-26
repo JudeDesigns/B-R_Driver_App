@@ -60,6 +60,8 @@ export async function GET(
                 contactInfo: true,
                 preferences: true,
                 groupCode: true,
+                paymentTerms: true,
+                deliveryInstructions: true,
               },
             },
             payments: {
