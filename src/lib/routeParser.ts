@@ -564,6 +564,7 @@ export async function saveRouteToDatabase(
     const driverMap = new Map<string, User>();
 
     // Performance optimization: Batch query existing drivers first
+    // Query for active drivers with DRIVER role
     const existingDrivers = await tx.user.findMany({
       where: {
         username: {
@@ -579,10 +580,38 @@ export async function saveRouteToDatabase(
       driverMap.set(driver.username, driver);
     }
 
+    // IMPORTANT: Also check for ANY users with these usernames (regardless of role/deletion status)
+    // to prevent unique constraint violations
+    const allExistingUsers = await tx.user.findMany({
+      where: {
+        username: {
+          in: driverNames,
+        },
+      },
+      select: {
+        username: true,
+        role: true,
+        isDeleted: true,
+      },
+    });
+
+    // Create a set of usernames that already exist in the database
+    const existingUsernames = new Set(allExistingUsers.map(u => u.username));
+
     // Process each missing driver
     const missingDriverNames = driverNames.filter(
-      (name) => !driverMap.has(name)
+      (name) => !driverMap.has(name) && !existingUsernames.has(name)
     );
+
+    // Log warnings for usernames that exist but aren't active drivers
+    for (const user of allExistingUsers) {
+      if (!driverMap.has(user.username)) {
+        console.warn(
+          `[ROUTE UPLOAD] Username "${user.username}" already exists with role: ${user.role}, isDeleted: ${user.isDeleted}. ` +
+          `Cannot create as DRIVER. Please use a different username or update the existing user.`
+        );
+      }
+    }
 
     // Performance optimization: Process drivers in parallel batches
     const driverCreationPromises = missingDriverNames.map(
@@ -604,28 +633,50 @@ export async function saveRouteToDatabase(
             },
           });
 
-          if (process.env.NODE_ENV !== "production") {
-            console.log(
-              `Created new driver: ${driverName} with default password`
-            );
-          }
+          console.log(
+            `[ROUTE UPLOAD] Created new driver: ${driverName} with default password`
+          );
 
           return driver;
         } catch (error) {
           // If there's an error creating the driver (e.g., duplicate username with different case)
-          throw new Error(
-            `Failed to create driver "${driverName}": ${
+          // Log the error but don't throw - this allows the route upload to continue
+          console.error(
+            `[ROUTE UPLOAD] Failed to create driver "${driverName}": ${
               (error as Error).message
             }`
           );
+
+          // Try to find if this user exists with a different case or status
+          const existingUser = await tx.user.findFirst({
+            where: {
+              username: {
+                equals: driverName,
+                mode: 'insensitive', // Case-insensitive search
+              },
+            },
+          });
+
+          if (existingUser) {
+            console.warn(
+              `[ROUTE UPLOAD] Found existing user "${existingUser.username}" (role: ${existingUser.role}, isDeleted: ${existingUser.isDeleted}). ` +
+              `Using this user for stops assigned to "${driverName}".`
+            );
+            return existingUser;
+          }
+
+          // If we still can't find the user, return null and we'll handle it below
+          return null;
         }
       }
     );
 
     // Wait for all driver creations to complete
-    const newDrivers = await Promise.all(driverCreationPromises);
+    const newDriversResults = await Promise.all(driverCreationPromises);
 
-    // Add new drivers to the map
+    // Filter out null results and add valid drivers to the map
+    const newDrivers = newDriversResults.filter((driver): driver is User => driver !== null);
+
     for (const driver of newDrivers) {
       driverMap.set(driver.username, driver);
     }
