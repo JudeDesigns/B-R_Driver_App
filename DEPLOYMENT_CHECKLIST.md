@@ -47,12 +47,20 @@
 
 **Choose ONE option:**
 
-#### Option A: All at Once (Fastest)
+#### Option A: Smart Safe Deployment (RECOMMENDED - Handles Existing Changes)
+- [ ] Run: `bash deploy-safe.sh`
+- [ ] Script will check what already exists in the database
+- [ ] Script will skip migrations for things already there
+- [ ] Script will only apply what's needed
+- [ ] No "column already exists" errors!
+
+#### Option B: All at Once (Only if database is clean)
 - [ ] Run: `npx prisma migrate deploy`
 - [ ] Wait for completion (2-5 minutes)
 - [ ] Verify all migrations applied successfully
+- [ ] **Warning**: Will fail if columns/tables already exist
 
-#### Option B: Step-by-Step (Safest - RECOMMENDED)
+#### Option C: Step-by-Step (Manual control)
 - [ ] Run: `bash apply-migrations-step-by-step.sh`
 - [ ] Confirm backup when prompted
 - [ ] Review each migration before applying
