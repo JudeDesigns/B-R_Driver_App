@@ -7,19 +7,26 @@ CREATE TABLE "daily_kpis" (
     "driverId" TEXT NOT NULL,
     "routeId" TEXT,
     "date" TIMESTAMP(3) NOT NULL,
+
+    -- Mileage tracking
+    "milesStart" DOUBLE PRECISION,
+    "milesEnd" DOUBLE PRECISION,
+    "milesDriven" DOUBLE PRECISION,
+
+    -- Delivery metrics
+    "totalDelivered" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "stopsCompleted" INTEGER NOT NULL DEFAULT 0,
-    "totalStops" INTEGER NOT NULL DEFAULT 0,
-    "amountDelivered" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "totalAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
-    "returnsCount" INTEGER NOT NULL DEFAULT 0,
-    "onTimeDeliveries" INTEGER NOT NULL DEFAULT 0,
-    "lateDeliveries" INTEGER NOT NULL DEFAULT 0,
-    "averageStopTime" DOUBLE PRECISION,
-    "totalDistance" DOUBLE PRECISION,
-    "startTime" TIMESTAMP(3),
-    "endTime" TIMESTAMP(3),
+    "stopsTotal" INTEGER NOT NULL DEFAULT 0,
+
+    -- Time tracking
+    "timeStart" TIMESTAMP(3),
+    "timeEnd" TIMESTAMP(3),
+    "totalTime" INTEGER,
+
+    -- Metadata
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "daily_kpis_pkey" PRIMARY KEY ("id")
 );
