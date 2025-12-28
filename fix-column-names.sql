@@ -131,7 +131,80 @@ BEGIN
 END $$;
 
 -- ============================================
+-- Create missing tables from migration #10
+-- ============================================
+
+DO $$
+BEGIN
+    -- Create document_acknowledgments table if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'document_acknowledgments') THEN
+        CREATE TABLE "document_acknowledgments" (
+            "id" TEXT NOT NULL,
+            "documentId" TEXT NOT NULL,
+            "driverId" TEXT NOT NULL,
+            "acknowledgedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "ipAddress" TEXT,
+            "userAgent" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL,
+
+            CONSTRAINT "document_acknowledgments_pkey" PRIMARY KEY ("id")
+        );
+
+        CREATE INDEX "document_acknowledgments_documentId_idx" ON "document_acknowledgments"("documentId");
+        CREATE INDEX "document_acknowledgments_driverId_idx" ON "document_acknowledgments"("driverId");
+        CREATE INDEX "document_acknowledgments_acknowledgedAt_idx" ON "document_acknowledgments"("acknowledgedAt");
+        CREATE UNIQUE INDEX "document_acknowledgments_documentId_driverId_key" ON "document_acknowledgments"("documentId", "driverId");
+
+        ALTER TABLE "document_acknowledgments" ADD CONSTRAINT "document_acknowledgments_documentId_fkey"
+            FOREIGN KEY ("documentId") REFERENCES "system_documents"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+        ALTER TABLE "document_acknowledgments" ADD CONSTRAINT "document_acknowledgments_driverId_fkey"
+            FOREIGN KEY ("driverId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+        RAISE NOTICE 'Created document_acknowledgments table';
+    ELSE
+        RAISE NOTICE 'document_acknowledgments table already exists - skipping';
+    END IF;
+
+    -- Create safety_declarations table if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'safety_declarations') THEN
+        CREATE TABLE "safety_declarations" (
+            "id" TEXT NOT NULL,
+            "driverId" TEXT NOT NULL,
+            "routeId" TEXT,
+            "declarationType" TEXT NOT NULL,
+            "declarationText" TEXT NOT NULL,
+            "acknowledged" BOOLEAN NOT NULL DEFAULT false,
+            "acknowledgedAt" TIMESTAMP(3),
+            "signature" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL,
+            "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+
+            CONSTRAINT "safety_declarations_pkey" PRIMARY KEY ("id")
+        );
+
+        CREATE INDEX "safety_declarations_driverId_idx" ON "safety_declarations"("driverId");
+        CREATE INDEX "safety_declarations_routeId_idx" ON "safety_declarations"("routeId");
+        CREATE INDEX "safety_declarations_declarationType_idx" ON "safety_declarations"("declarationType");
+        CREATE INDEX "safety_declarations_acknowledgedAt_idx" ON "safety_declarations"("acknowledgedAt");
+        CREATE INDEX "safety_declarations_isDeleted_idx" ON "safety_declarations"("isDeleted");
+
+        ALTER TABLE "safety_declarations" ADD CONSTRAINT "safety_declarations_driverId_fkey"
+            FOREIGN KEY ("driverId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+        ALTER TABLE "safety_declarations" ADD CONSTRAINT "safety_declarations_routeId_fkey"
+            FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+        RAISE NOTICE 'Created safety_declarations table';
+    ELSE
+        RAISE NOTICE 'safety_declarations table already exists - skipping';
+    END IF;
+END $$;
+
+-- ============================================
 -- Done!
 -- ============================================
-SELECT 'Column name fixes completed!' AS status;
+SELECT 'Column name fixes and missing tables completed!' AS status;
 
