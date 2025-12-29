@@ -32,6 +32,7 @@ export interface AttendanceCheckResult {
 }
 
 // Configuration
+const ATTENDANCE_ENABLED = process.env.ATTENDANCE_ENABLED === "true";
 const ATTENDANCE_API_URL = process.env.ATTENDANCE_API_URL || "http://localhost:4000/api";
 const ATTENDANCE_API_KEY = process.env.ATTENDANCE_API_KEY || "";
 const CACHE_DURATION = parseInt(process.env.ATTENDANCE_STATUS_CACHE_DURATION || "300"); // 5 minutes default
@@ -45,6 +46,15 @@ export async function checkAttendanceStatus(
   userId: string,
   username: string
 ): Promise<AttendanceStatus> {
+  // If attendance is disabled, return default "clocked in" status
+  if (!ATTENDANCE_ENABLED) {
+    return {
+      isClockedIn: true,
+      lastChecked: new Date(),
+      source: "fallback",
+    };
+  }
+
   try {
     // Step 1: Check cache first
     const cachedStatus = await getCachedStatus(userId);

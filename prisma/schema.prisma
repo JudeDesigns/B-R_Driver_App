@@ -181,6 +181,8 @@ model DocumentAcknowledgment {
   acknowledgedAt DateTime       @default(now())
   ipAddress      String?        // Audit trail
   userAgent      String?        // Audit trail
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@unique([documentId, driverId]) // One acknowledgment per driver per document
   @@index([driverId])
