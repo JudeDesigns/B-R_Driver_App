@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Interactive SuperAdmin User Creation Script
-# This script creates a new SuperAdmin user with secure credentials
+# Simple SuperAdmin User Creation Script (No Node.js dependencies)
+# This version uses PostgreSQL's pgcrypto extension for password hashing
 
 set -e
 
@@ -19,15 +19,11 @@ DB_USER="br_user"
 DB_NAME="br_food_services"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  Create SuperAdmin User${NC}"
+echo -e "${CYAN}  Create SuperAdmin User (Simple)${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
 echo -e "${YELLOW}This script will create a new SuperAdmin user.${NC}"
-echo -e "${YELLOW}SuperAdmin has full access to all features including:${NC}"
-echo "  - Delete routes, customers, products"
-echo "  - Manage users and roles"
-echo "  - Access sensitive operations"
 echo ""
 
 # ============================================
@@ -38,7 +34,7 @@ echo -e "${BLUE}Step 1: Username${NC}"
 echo ""
 
 while true; do
-    read -p "Enter username (e.g., 'superadmin' or 'john.doe'): " USERNAME
+    read -p "Enter username: " USERNAME
     
     if [ -z "$USERNAME" ]; then
         echo -e "${RED}✗ Username cannot be empty!${NC}"
@@ -112,14 +108,6 @@ echo ""
 
 read -p "Enter full name (or press Enter to skip): " FULL_NAME
 
-if [ -z "$FULL_NAME" ]; then
-    FULL_NAME_SQL="NULL"
-    echo -e "${YELLOW}✓ No full name provided${NC}"
-else
-    FULL_NAME_SQL="'$FULL_NAME'"
-    echo -e "${GREEN}✓ Full name: $FULL_NAME${NC}"
-fi
-
 echo ""
 
 # ============================================
@@ -146,52 +134,43 @@ fi
 echo ""
 
 # ============================================
-# Step 5: Hash password and create user
+# Step 5: Create user with SQL
 # ============================================
 
 echo -e "${YELLOW}Creating SuperAdmin user...${NC}"
 echo ""
 
-# Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Escape single quotes in password and full name
+PASSWORD_ESCAPED="${PASSWORD//\'/\'\'}"
+FULL_NAME_ESCAPED="${FULL_NAME//\'/\'\'}"
 
-# Check if bcryptjs is installed
-if [ ! -d "$SCRIPT_DIR/node_modules/bcryptjs" ]; then
-    echo -e "${RED}✗ bcryptjs module not found!${NC}"
-    echo -e "${YELLOW}Installing bcryptjs...${NC}"
-    cd "$SCRIPT_DIR"
-    npm install bcryptjs --no-save
-    echo ""
+# Create SQL for full name
+if [ -z "$FULL_NAME" ]; then
+    FULL_NAME_SQL="NULL"
+else
+    FULL_NAME_SQL="'$FULL_NAME_ESCAPED'"
 fi
 
-# Create a temporary Node.js script to hash the password
-cat > /tmp/hash-password.js << 'EOF'
-const bcrypt = require('bcryptjs');
-const password = process.argv[2];
-const hash = bcrypt.hashSync(password, 10);
-console.log(hash);
-EOF
-
-# Hash the password using the project's node_modules
-cd "$SCRIPT_DIR"
-PASSWORD_HASH=$(node /tmp/hash-password.js "$PASSWORD")
-
-# Clean up temp file
-rm /tmp/hash-password.js
-
-# Insert the user into the database
+# Insert the user (password will be hashed by the application on first login)
+# For now, we'll use a bcrypt hash generated with a simple method
 psql -U $DB_USER -d $DB_NAME << EOF
+-- Enable pgcrypto extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Insert the user with bcrypt-hashed password
 INSERT INTO users (id, username, password, role, "fullName", "createdAt", "updatedAt", "isDeleted")
 VALUES (
     gen_random_uuid()::text,
     '$USERNAME',
-    '$PASSWORD_HASH',
+    crypt('$PASSWORD_ESCAPED', gen_salt('bf', 10)),
     'SUPER_ADMIN',
     $FULL_NAME_SQL,
     NOW(),
     NOW(),
     false
 );
+
+SELECT '✓ SuperAdmin user created successfully!' AS status;
 EOF
 
 echo ""
