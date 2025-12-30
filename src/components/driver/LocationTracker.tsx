@@ -172,6 +172,32 @@ export default function LocationTracker({
     );
   }
 
+  // Show "Waiting to Start" if enabled but not yet active
+  if (!isActive) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+        <div className="flex items-center">
+          <svg
+            className="w-4 h-4 text-blue-500 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p className="text-sm font-medium text-blue-800">
+            Location tracking ready. Starting when delivery begins.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 }
 

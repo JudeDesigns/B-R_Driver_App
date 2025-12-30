@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from '@/hooks/useAuth';
+import { useSocket } from '@/hooks/useSocket';
 
 interface DriverLocation {
   id: string;
@@ -29,14 +30,18 @@ export default function DriverLocationsPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [activeOnly, setActiveOnly] = useState(true);
 
-  const fetchDriverLocations = async () => {
-    setLoading(true);
+  // Initialize socket
+  const { isConnected, joinRoom, subscribe } = useSocket(null);
+  const pollingInterval = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchDriverLocations = async (isAutoRefresh = false) => {
+    if (!isAutoRefresh) setLoading(true);
     setError('');
 
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        router.push('/admin/login');
+        if (!isAutoRefresh) router.push('/admin/login');
         return;
       }
 
@@ -47,6 +52,7 @@ export default function DriverLocationsPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -57,17 +63,70 @@ export default function DriverLocationsPage() {
       setDrivers(data.drivers);
       setLastRefresh(new Date());
     } catch (err) {
-      setError((err as Error).message);
+      if (!isAutoRefresh) setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (!isAutoRefresh) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchDriverLocations();
+
+      // Set up polling (every 30 seconds)
+      pollingInterval.current = setInterval(() => {
+        fetchDriverLocations(true);
+      }, 30000);
     }
+
+    return () => {
+      if (pollingInterval.current) {
+        clearInterval(pollingInterval.current);
+      }
+    };
   }, [isAuthenticated, activeOnly]);
+
+  useEffect(() => {
+    if (isConnected && isAuthenticated) {
+      joinRoom('admin');
+
+      // Listen for real-time location updates
+      const unsubscribe = subscribe('DRIVER_LOCATION_UPDATED', (data: any) => {
+        console.log('Real-time location update received:', data);
+
+        setDrivers(prevDrivers => {
+          // Check if driver already in list
+          const existingDriverIndex = prevDrivers.findIndex(d => d.id === data.driverId);
+
+          if (existingDriverIndex !== -1) {
+            // Update existing driver
+            const updatedDrivers = [...prevDrivers];
+            updatedDrivers[existingDriverIndex] = {
+              ...updatedDrivers[existingDriverIndex],
+              lastKnownLatitude: data.latitude,
+              lastKnownLongitude: data.longitude,
+              lastLocationUpdate: data.timestamp,
+              locationAccuracy: data.accuracy,
+            };
+            return updatedDrivers;
+          } else if (!activeOnly) {
+            // Add new driver if not filtering for active only (or let polling handle it)
+            // For now, let's just trigger a silent refresh to be safe and consistent with filters
+            fetchDriverLocations(true);
+            return prevDrivers;
+          }
+
+          return prevDrivers;
+        });
+
+        setLastRefresh(new Date());
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [isConnected, isAuthenticated, joinRoom, subscribe, activeOnly]);
 
   if (authLoading) {
     return <AuthLoadingSpinner message="Loading driver locations..." />;
@@ -127,7 +186,7 @@ export default function DriverLocationsPage() {
               </span>
             )}
             <button
-              onClick={fetchDriverLocations}
+              onClick={() => fetchDriverLocations(false)}
               disabled={loading}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >

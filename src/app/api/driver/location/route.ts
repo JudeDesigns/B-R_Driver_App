@@ -61,8 +61,18 @@ export async function POST(request: NextRequest) {
               stops: {
                 some: {
                   OR: [
-                    { driverNameFromUpload: driver.username },
-                    { driverNameFromUpload: driver.fullName },
+                    {
+                      driverNameFromUpload: {
+                        equals: driver.username,
+                        mode: "insensitive",
+                      },
+                    },
+                    {
+                      driverNameFromUpload: {
+                        equals: driver.fullName || "",
+                        mode: "insensitive",
+                      },
+                    },
                   ],
                 },
               },
