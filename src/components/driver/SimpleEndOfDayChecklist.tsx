@@ -1,10 +1,10 @@
-"use client";
-
 import { useState } from "react";
+import SafetyPhotoBox from "./SafetyPhotoBox";
 
 interface SimpleEndOfDayChecklistProps {
   onSubmit: (data: SimpleEndOfDayCheckData) => void;
   isSubmitting: boolean;
+  routeId?: string;
 }
 
 export interface SimpleEndOfDayCheckData {
@@ -14,21 +14,25 @@ export interface SimpleEndOfDayCheckData {
   mileage: string;
   fuelLevel: string;
   odometerEnd: string; // Ending odometer reading for KPI tracking
-  lightsWorking: boolean;
-  tiresCondition: boolean;
-  braksWorking: boolean;
-  vehicleClean: boolean;
-  palletJackWorking: boolean;
-  dolliesSecured: boolean;
-  strapsAvailable: boolean;
-  routeReviewed: boolean;
-  warehouseContacted: boolean;
+
+  // Post-Trip Documentation
+  equipmentCheckPhotoUrl?: string; // dollies, pallet jacks, empty pallets
+  powerConverterPhotoUrl?: string; // power converter OFF
+  dashboardPhotoUrl?: string; // fuel, engine light, DEF
+
+  // Truck Exterior
+  exteriorFrontPhotoUrl?: string;
+  exteriorBackPhotoUrl?: string;
+  exteriorLeftPhotoUrl?: string;
+  exteriorRightPhotoUrl?: string;
+
   notes: string;
 }
 
 export default function SimpleEndOfDayChecklist({
   onSubmit,
   isSubmitting,
+  routeId,
 }: SimpleEndOfDayChecklistProps) {
   const [formData, setFormData] = useState<SimpleEndOfDayCheckData>({
     date: new Date().toISOString().split("T")[0],
@@ -36,15 +40,13 @@ export default function SimpleEndOfDayChecklist({
     mileage: "",
     fuelLevel: "FULL",
     odometerEnd: "",
-    lightsWorking: false,
-    tiresCondition: false,
-    braksWorking: false,
-    vehicleClean: false,
-    palletJackWorking: false,
-    dolliesSecured: false,
-    strapsAvailable: false,
-    routeReviewed: false,
-    warehouseContacted: false,
+    equipmentCheckPhotoUrl: "",
+    powerConverterPhotoUrl: "",
+    dashboardPhotoUrl: "",
+    exteriorFrontPhotoUrl: "",
+    exteriorBackPhotoUrl: "",
+    exteriorLeftPhotoUrl: "",
+    exteriorRightPhotoUrl: "",
     notes: "",
   });
 
@@ -77,7 +79,7 @@ export default function SimpleEndOfDayChecklist({
       {/* Basic Information */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
@@ -169,44 +171,81 @@ export default function SimpleEndOfDayChecklist({
         </div>
       </div>
 
-      {/* Safety Checklist - Exactly same as Start of Day */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Safety Checklist</h3>
 
-        <div className="space-y-3">
-          {[
-            { key: "lightsWorking", label: "All lights working properly" },
-            { key: "tiresCondition", label: "Tires in good condition" },
-            { key: "braksWorking", label: "Brakes working properly" },
-            { key: "vehicleClean", label: "Vehicle is clean and presentable" },
-            { key: "palletJackWorking", label: "Pallet jack working properly" },
-            { key: "dolliesSecured", label: "Dollies secured and in good condition" },
-            { key: "strapsAvailable", label: "Straps available and in good condition" },
-            { key: "routeReviewed", label: "Route reviewed and understood" },
-            { key: "warehouseContacted", label: "Warehouse contacted if needed" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                id={item.key}
-                name={item.key}
-                checked={formData[item.key as keyof SimpleEndOfDayCheckData] as boolean}
-                onChange={handleChange}
-                required
-                className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
-              />
-              <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
-              </label>
-            </div>
-          ))}
+      {/* Post-Trip Documentation */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">📸 Post-Trip Documentation</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SafetyPhotoBox
+            label="Equipment (Dollies, Pallet Jacks, Pallets)"
+            type="end_equipment"
+            routeId={routeId || ""}
+            onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, equipmentCheckPhotoUrl: url }))}
+            required
+            currentUrl={formData.equipmentCheckPhotoUrl}
+          />
+          <SafetyPhotoBox
+            label="Power Converter (Showing OFF status)"
+            type="end_power_converter"
+            routeId={routeId || ""}
+            onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, powerConverterPhotoUrl: url }))}
+            required
+            currentUrl={formData.powerConverterPhotoUrl}
+          />
+          <SafetyPhotoBox
+            label="Dashboard (Fuel, Engine Light, DEF)"
+            type="end_dashboard"
+            routeId={routeId || ""}
+            onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, dashboardPhotoUrl: url }))}
+            required
+            currentUrl={formData.dashboardPhotoUrl}
+          />
+        </div>
+
+        <div className="space-y-4 pt-4">
+          <h4 className="text-sm font-medium text-gray-700">Truck Exterior (All 4 Sides)</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SafetyPhotoBox
+              label="Front Side"
+              type="end_exterior_front"
+              routeId={routeId || ""}
+              onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorFrontPhotoUrl: url }))}
+              required
+              currentUrl={formData.exteriorFrontPhotoUrl}
+            />
+            <SafetyPhotoBox
+              label="Back Side"
+              type="end_exterior_back"
+              routeId={routeId || ""}
+              onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorBackPhotoUrl: url }))}
+              required
+              currentUrl={formData.exteriorBackPhotoUrl}
+            />
+            <SafetyPhotoBox
+              label="Left Side"
+              type="end_exterior_left"
+              routeId={routeId || ""}
+              onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorLeftPhotoUrl: url }))}
+              required
+              currentUrl={formData.exteriorLeftPhotoUrl}
+            />
+            <SafetyPhotoBox
+              label="Right Side"
+              type="end_exterior_right"
+              routeId={routeId || ""}
+              onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorRightPhotoUrl: url }))}
+              required
+              currentUrl={formData.exteriorRightPhotoUrl}
+            />
+          </div>
         </div>
       </div>
 
       {/* Notes */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Notes</h3>
-        
+
         <div>
           <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
             Notes (Optional)
@@ -227,10 +266,19 @@ export default function SimpleEndOfDayChecklist({
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-3 px-8 rounded-lg transition duration-200 touch-manipulation mobile-button"
+          disabled={
+            isSubmitting ||
+            !formData.equipmentCheckPhotoUrl ||
+            !formData.powerConverterPhotoUrl ||
+            !formData.dashboardPhotoUrl ||
+            !formData.exteriorFrontPhotoUrl ||
+            !formData.exteriorBackPhotoUrl ||
+            !formData.exteriorLeftPhotoUrl ||
+            !formData.exteriorRightPhotoUrl
+          }
+          className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-4 px-8 rounded-lg transition duration-200 touch-manipulation mobile-button text-lg"
         >
-          {isSubmitting ? "Submitting..." : "Submit Safety Check"}
+          {isSubmitting ? "Submitting..." : "🏁 Complete End-of-Day Check"}
         </button>
       </div>
     </form>

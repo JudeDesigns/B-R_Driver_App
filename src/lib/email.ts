@@ -51,7 +51,8 @@ const createDeliveryConfirmationEmail = (
   orderNumber: string,
   invoiceNumber: string,
   deliveryTime: string,
-  totalAmount: number = 0
+  totalAmount: number = 0,
+  driverNotes?: string | null // Add driverNotes parameter
 ) => {
   return `
     <!DOCTYPE html>
@@ -172,6 +173,12 @@ const createDeliveryConfirmationEmail = (
             <span class="detail-label">Delivery time:</span>
             <span class="detail-value">${deliveryTime}</span>
           </div>
+          ${driverNotes ? `
+          <div class="detail-row" style="background-color: #f8f9fa; padding: 10px; border-left: 3px solid #007bff; margin-top: 20px;">
+            <span class="detail-label" style="display: block; margin-bottom: 5px; color: #0056b3;">Driver Notes:</span>
+            <span class="detail-value" style="font-style: italic;">${driverNotes}</span>
+          </div>
+          ` : ''}
         </div>
 
         <div class="attachment-note">
@@ -236,7 +243,8 @@ export const sendDeliveryConfirmationEmail = async (
       orderNumber,
       invoiceNumber,
       deliveryTime,
-      totalAmount // Add total amount parameter
+      totalAmount, // Add total amount parameter
+      stopData.driverNotes // Pass driverNotes
     );
 
     // Determine email recipients based on configuration

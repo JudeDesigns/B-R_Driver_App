@@ -48,6 +48,7 @@ interface SafetyCheck {
   vehicleConditionVideo: boolean | null;
   calledWarehouse: boolean | null;
   notes: string | null;
+  responses: any;
 }
 
 export default function SafetyChecksPage() {
@@ -79,15 +80,15 @@ export default function SafetyChecksPage() {
       const params = new URLSearchParams();
       params.append("limit", limit.toString());
       params.append("offset", offset.toString());
-      
+
       if (filterType) {
         params.append("type", filterType);
       }
-      
+
       if (dateFrom) {
         params.append("dateFrom", dateFrom);
       }
-      
+
       if (dateTo) {
         params.append("dateTo", dateTo);
       }
@@ -127,9 +128,35 @@ export default function SafetyChecksPage() {
     setShowDetails(true);
   };
 
-  const formatBoolean = (value: boolean | null) => {
-    if (value === null) return "N/A";
+  const formatBoolean = (value: boolean | null | undefined) => {
+    if (value === null || value === undefined) return "N/A";
     return value ? "Yes" : "No";
+  };
+
+  const renderPhotoProof = (label: string, url: string | null | undefined) => {
+    if (!url) return (
+      <div className="flex flex-col items-center justify-center p-2 bg-gray-100 rounded border border-gray-200 text-gray-400">
+        <span className="text-xs font-medium">{label}</span>
+        <span className="text-[10px]">No photo</span>
+      </div>
+    );
+
+    return (
+      <div className="flex flex-col space-y-1">
+        <span className="text-xs font-medium text-gray-600">{label}</span>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative group block aspect-video bg-gray-200 rounded overflow-hidden border border-gray-300"
+        >
+          <img src={url} alt={label} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all">
+            <span className="text-white opacity-0 group-hover:opacity-100 text-[10px] font-bold uppercase">View Full</span>
+          </div>
+        </a>
+      </div>
+    );
   };
 
   return (
@@ -205,24 +232,24 @@ export default function SafetyChecksPage() {
                   columns={[
                     {
                       header: "Type",
-                      accessor: (check) => 
+                      accessor: (check) =>
                         check.type === "START_OF_DAY" ? "Start of Day" : "End of Day",
                     },
                     {
                       header: "Driver",
-                      accessor: (check) => 
+                      accessor: (check) =>
                         check.driver.fullName || check.driver.username,
                     },
                     {
                       header: "Route",
-                      accessor: (check) => 
-                        check.route.routeNumber 
+                      accessor: (check) =>
+                        check.route.routeNumber
                           ? `Route ${check.route.routeNumber}`
                           : `Route from ${new Date(check.route.date).toLocaleDateString()}`,
                     },
                     {
                       header: "Date Submitted",
-                      accessor: (check) => 
+                      accessor: (check) =>
                         new Date(check.createdAt).toLocaleString(),
                     },
                     {
@@ -279,7 +306,7 @@ export default function SafetyChecksPage() {
                 </svg>
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
@@ -287,14 +314,14 @@ export default function SafetyChecksPage() {
                 </h4>
                 <div className="space-y-2">
                   <p><span className="font-medium">Driver:</span> {selectedSafetyCheck.driver.fullName || selectedSafetyCheck.driver.username}</p>
-                  <p><span className="font-medium">Route:</span> {selectedSafetyCheck.route.routeNumber 
+                  <p><span className="font-medium">Route:</span> {selectedSafetyCheck.route.routeNumber
                     ? `Route ${selectedSafetyCheck.route.routeNumber}`
                     : `Route from ${new Date(selectedSafetyCheck.route.date).toLocaleDateString()}`}</p>
                   <p><span className="font-medium">Submitted:</span> {new Date(selectedSafetyCheck.createdAt).toLocaleString()}</p>
                   <p><span className="font-medium">Check Type:</span> {selectedSafetyCheck.type === "START_OF_DAY" ? "Start of Day" : "End of Day"}</p>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
                   Vehicle Information
@@ -307,7 +334,7 @@ export default function SafetyChecksPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
@@ -320,7 +347,7 @@ export default function SafetyChecksPage() {
                   <p><span className="font-medium">Strap Level:</span> {selectedSafetyCheck.strapLevel || "N/A"}</p>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
                   Fuel Information
@@ -334,7 +361,7 @@ export default function SafetyChecksPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mb-6">
               <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
                 Safety Verification
@@ -347,9 +374,60 @@ export default function SafetyChecksPage() {
                 <p><span className="font-medium">Called Warehouse:</span> {formatBoolean(selectedSafetyCheck.calledWarehouse)}</p>
               </div>
             </div>
-            
+
+            {/* New Route Procedure Updates */}
+            {selectedSafetyCheck.responses && (
+              <div className="border-t pt-6 mt-6">
+                <h4 className="text-lg font-bold text-gray-900 mb-4">Route Procedure Documentation</h4>
+
+                {selectedSafetyCheck.type === "START_OF_DAY" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h5 className="font-semibold text-blue-800 mb-2">Printer & Supplies</h5>
+                      <div className="space-y-2 text-sm p-3 bg-blue-50 rounded">
+                        <p><span className="font-medium">Printer Test:</span> {formatBoolean(selectedSafetyCheck.responses.printerTestDone)}</p>
+                        <p><span className="font-medium">Has Copy Paper:</span> {formatBoolean(selectedSafetyCheck.responses.hasCopyPaper)}</p>
+                        <p><span className="font-medium">Has Staples:</span> {formatBoolean(selectedSafetyCheck.responses.hasStaples)}</p>
+                        <p><span className="font-medium">Has Stapler:</span> {formatBoolean(selectedSafetyCheck.responses.hasStapler)}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {renderPhotoProof("Printer Test Proof", selectedSafetyCheck.responses.printerTestPhotoUrl)}
+                      {renderPhotoProof("Route Equipment", selectedSafetyCheck.responses.equipmentPhotoUrl)}
+                    </div>
+                    <div className="col-span-full">
+                      <h5 className="font-semibold text-gray-800 mb-2">Truck Exterior Proof</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {renderPhotoProof("Front", selectedSafetyCheck.responses.exteriorFrontPhotoUrl)}
+                        {renderPhotoProof("Back", selectedSafetyCheck.responses.exteriorBackPhotoUrl)}
+                        {renderPhotoProof("Left", selectedSafetyCheck.responses.exteriorLeftPhotoUrl)}
+                        {renderPhotoProof("Right", selectedSafetyCheck.responses.exteriorRightPhotoUrl)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {renderPhotoProof("Equipment (End)", selectedSafetyCheck.responses.equipmentCheckPhotoUrl)}
+                      {renderPhotoProof("Power Converter (OFF)", selectedSafetyCheck.responses.powerConverterPhotoUrl)}
+                      {renderPhotoProof("Dashboard Info", selectedSafetyCheck.responses.dashboardPhotoUrl)}
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-800 mb-2">Truck Exterior Proof (End)</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {renderPhotoProof("Front", selectedSafetyCheck.responses.exteriorFrontPhotoUrl)}
+                        {renderPhotoProof("Back", selectedSafetyCheck.responses.exteriorBackPhotoUrl)}
+                        {renderPhotoProof("Left", selectedSafetyCheck.responses.exteriorLeftPhotoUrl)}
+                        {renderPhotoProof("Right", selectedSafetyCheck.responses.exteriorRightPhotoUrl)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {selectedSafetyCheck.notes && (
-              <div className="mb-6">
+              <div className="mb-6 mt-6">
                 <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
                   Additional Notes
                 </h4>
@@ -358,7 +436,7 @@ export default function SafetyChecksPage() {
                 </div>
               </div>
             )}
-            
+
             <div className="flex justify-end">
               <button
                 onClick={() => setShowDetails(false)}

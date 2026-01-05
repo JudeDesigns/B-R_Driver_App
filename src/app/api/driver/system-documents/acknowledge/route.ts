@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const driverId = decoded.id;
     const body = await request.json();
-    const { documentId } = body;
+    const { documentId, routeId } = body;
 
     if (!documentId) {
       return NextResponse.json(
@@ -44,14 +44,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already acknowledged
-    const existingAcknowledgment = await prisma.documentAcknowledgment.findUnique({
+    // Check if already acknowledged for this specific route
+    // Use findFirst because routeId can be null, which findUnique doesn't handle well for composite keys
+    const existingAcknowledgment = await prisma.documentAcknowledgment.findFirst({
       where: {
-        documentId_driverId: {
-          documentId,
-          driverId,
-        },
-      },
+        documentId,
+        driverId,
+        routeId: routeId || null,
+      } as any,
     });
 
     if (existingAcknowledgment) {
@@ -62,9 +62,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get client IP and user agent for audit trail
-    const ipAddress = request.headers.get("x-forwarded-for") || 
-                      request.headers.get("x-real-ip") || 
-                      "unknown";
+    const ipAddress = request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
     // Create acknowledgment
@@ -72,9 +72,10 @@ export async function POST(request: NextRequest) {
       data: {
         documentId,
         driverId,
+        routeId: routeId || null,
         ipAddress,
         userAgent,
-      },
+      } as any,
       include: {
         document: {
           select: {
@@ -120,6 +121,8 @@ export async function GET(request: NextRequest) {
     }
 
     const driverId = decoded.id;
+    const url = new URL(request.url);
+    const routeId = url.searchParams.get("routeId");
 
     // Get all required documents
     const requiredDocuments = await prisma.systemDocument.findMany({
@@ -132,13 +135,14 @@ export async function GET(request: NextRequest) {
         acknowledgments: {
           where: {
             driverId: driverId,
-          },
+            routeId: routeId || null,
+          } as any,
         },
       },
     });
 
     // Filter to only unacknowledged documents
-    const unacknowledgedDocuments = requiredDocuments.filter(
+    const unacknowledgedDocuments = (requiredDocuments as any[]).filter(
       doc => doc.acknowledgments.length === 0
     );
 

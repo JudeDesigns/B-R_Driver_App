@@ -151,7 +151,7 @@ export async function PUT(
       // Invalidate all sessions for this user when password is changed
       try {
         sessionManager.invalidateUserSessions(userId, 'Password changed by super admin');
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Failed to invalidate user sessions:", error.message);
       }
     }
@@ -226,9 +226,10 @@ export async function DELETE(
       );
     }
 
-    // Delete user
-    await prisma.user.delete({
+    // Soft delete user
+    await prisma.user.update({
       where: { id: userId },
+      data: { isDeleted: true },
     });
 
     return NextResponse.json(

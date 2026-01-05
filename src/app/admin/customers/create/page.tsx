@@ -297,19 +297,15 @@ export default function NewCustomerPage() {
                 >
                   Payment Terms
                 </label>
-                <select
+                <input
+                  type="text"
                   id="paymentTerms"
                   name="paymentTerms"
                   value={formData.paymentTerms}
                   onChange={handleChange}
+                  placeholder="e.g. COD, Net 30"
                   className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
-                >
-                  <option value="COD">COD (Cash on Delivery)</option>
-                  <option value="Net 30">Net 30</option>
-                  <option value="Net 60">Net 60</option>
-                  <option value="Prepaid">Prepaid</option>
-                  <option value="Due on Receipt">Due on Receipt</option>
-                </select>
+                />
               </div>
 
               <div className="md:col-span-2">

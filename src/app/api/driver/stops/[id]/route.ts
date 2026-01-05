@@ -701,8 +701,72 @@ export async function PATCH(
           // Continue execution even if route update fails
         }
       }
-      // Auto-start next stop feature has been disabled per user request
-      // Drivers will manually start the next stop when ready
+
+      // Auto-start next stop feature (Re-enabled with Auto-Status Update)
+      // Find the next pending stop in the sequence
+      const nextStop = routeStops.find(
+        (s) =>
+          s.sequence > stop.sequence &&
+          s.status !== "COMPLETED" &&
+          s.status !== "CANCELLED"
+      );
+
+      if (nextStop) {
+        try {
+          // Update the next stop status to ON_THE_WAY
+          // Uses PST time for consistency
+          const now = getPSTDate();
+
+          await prisma.stop.update({
+            where: { id: nextStop.id },
+            data: {
+              status: "ON_THE_WAY",
+              onTheWayTime: now,
+            },
+          });
+
+          // Emit WebSocket event for the next stop status update
+          try {
+            // Get driver info
+            const driver = await prisma.user.findUnique({
+              where: { id: decoded.id },
+              select: { username: true, fullName: true },
+            });
+
+            // To get customerName, we need to fetch the next stop with its customer relation
+            const nextStopWithCustomer = await prisma.stop.findUnique({
+              where: { id: nextStop.id },
+              select: {
+                customer: {
+                  select: { name: true }
+                },
+                routeId: true, // Ensure routeId is available for the event
+              },
+            });
+
+            emitStopStatusUpdate({
+              stopId: nextStop.id,
+              routeId: nextStopWithCustomer?.routeId || nextStop.routeId, // Use fetched routeId if available, fallback to original
+              status: "ON_THE_WAY",
+              driverId: decoded.id,
+              driverName: driver?.fullName || driver?.username || "Unknown Driver",
+              customerName: nextStopWithCustomer?.customer?.name || "Unknown Customer",
+              timestamp: new Date().toISOString(),
+            });
+          } catch (wsError) {
+            console.error("Error emitting WS event for next stop:", wsError);
+          }
+
+          return NextResponse.json({
+            ...updatedStop,
+            nextStopId: nextStop.id,
+          });
+
+        } catch (autoStartError) {
+          console.error("Error auto-starting next stop:", autoStartError);
+          // If auto-start fails, still return the updated current stop, just without the nextStopId
+        }
+      }
     }
 
     return NextResponse.json(updatedStop);

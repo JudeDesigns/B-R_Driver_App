@@ -1,6 +1,5 @@
-"use client";
-
 import { useState, useEffect } from "react";
+import SafetyPhotoBox from "./SafetyPhotoBox";
 
 interface SimpleSafetyChecklistProps {
   onSubmit: (data: SimpleSafetyCheckData) => void;
@@ -11,6 +10,7 @@ interface SimpleSafetyChecklistProps {
     fuelInstructions?: string | null;
     fuelType?: string | null;
   } | null;
+  routeId?: string;
 }
 
 export interface SimpleSafetyCheckData {
@@ -21,20 +21,23 @@ export interface SimpleSafetyCheckData {
   fuelLevel: string;
   odometerStart: string; // Starting odometer reading for KPI tracking
 
-  // Essential safety items
-  lightsWorking: boolean;
-  tiresCondition: boolean;
-  braksWorking: boolean;
-  vehicleClean: boolean;
+  // Printer Test
+  printerTestDone: boolean;
+  printerTestPhotoUrl?: string;
 
-  // Equipment check
-  palletJackWorking: boolean;
-  dolliesSecured: boolean;
-  strapsAvailable: boolean;
+  // Equipment Proof
+  equipmentPhotoUrl?: string;
 
-  // Pre-departure
-  routeReviewed: boolean;
-  warehouseContacted: boolean;
+  // Truck Exterior
+  exteriorFrontPhotoUrl?: string;
+  exteriorBackPhotoUrl?: string;
+  exteriorLeftPhotoUrl?: string;
+  exteriorRightPhotoUrl?: string;
+
+  // Supplies
+  hasCopyPaper: boolean;
+  hasStaples: boolean;
+  hasStapler: boolean;
 
   // Notes
   notes: string;
@@ -44,6 +47,7 @@ export default function SimpleSafetyChecklist({
   onSubmit,
   isSubmitting,
   vehicle,
+  routeId,
 }: SimpleSafetyChecklistProps) {
   const [formData, setFormData] = useState<SimpleSafetyCheckData>({
     date: new Date().toISOString().split("T")[0],
@@ -51,15 +55,16 @@ export default function SimpleSafetyChecklist({
     mileage: "",
     fuelLevel: "FULL",
     odometerStart: "",
-    lightsWorking: false,
-    tiresCondition: false,
-    braksWorking: false,
-    vehicleClean: false,
-    palletJackWorking: false,
-    dolliesSecured: false,
-    strapsAvailable: false,
-    routeReviewed: false,
-    warehouseContacted: false,
+    printerTestDone: false,
+    printerTestPhotoUrl: "",
+    equipmentPhotoUrl: "",
+    exteriorFrontPhotoUrl: "",
+    exteriorBackPhotoUrl: "",
+    exteriorLeftPhotoUrl: "",
+    exteriorRightPhotoUrl: "",
+    hasCopyPaper: false,
+    hasStaples: false,
+    hasStapler: false,
     notes: "",
   });
 
@@ -284,48 +289,107 @@ export default function SimpleSafetyChecklist({
         )}
       </div>
 
-      {/* Safety Checks */}
+
+      {/* Printer Test */}
       <div className="space-y-4">
         <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          ✅ Safety Inspection
+          🖨️ Printer Test
+        </h3>
+        <p className="text-sm text-gray-500">Print a test page and show proof to ensure operational status.</p>
+
+        <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
+          <input
+            type="checkbox"
+            id="printerTestDone"
+            name="printerTestDone"
+            checked={formData.printerTestDone}
+            onChange={handleChange}
+            required
+            className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
+          />
+          <label htmlFor="printerTestDone" className="ml-3 text-sm text-gray-700 font-medium">
+            I have printed a test page
+          </label>
+        </div>
+
+        <SafetyPhotoBox
+          label="Proof of Printer Test"
+          type="printer"
+          routeId={routeId || ""}
+          onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, printerTestPhotoUrl: url }))}
+          required
+          currentUrl={formData.printerTestPhotoUrl}
+        />
+      </div>
+
+      {/* Documentation & Proof */}
+      <div className="space-y-4">
+        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
+          📸 Documentation & Proof
         </h3>
 
-        <div className="space-y-3">
-          {[
-            { key: "lightsWorking", label: "All lights working (headlights, taillights, signals)" },
-            { key: "tiresCondition", label: "Tires in good condition (no visible damage)" },
-            { key: "braksWorking", label: "Brakes working properly" },
-            { key: "vehicleClean", label: "Vehicle is clean and presentable" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                id={item.key}
-                name={item.key}
-                checked={formData[item.key as keyof SimpleSafetyCheckData] as boolean}
-                onChange={handleChange}
+        <div className="space-y-4">
+          <SafetyPhotoBox
+            label="Route Equipment (Dollies, Pallet Jacks, etc.)"
+            type="equipment"
+            routeId={routeId || ""}
+            onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, equipmentPhotoUrl: url }))}
+            required
+            currentUrl={formData.equipmentPhotoUrl}
+          />
+
+          <div className="grid grid-cols-1 gap-4">
+            <h4 className="text-sm font-medium text-gray-700">Truck Exterior (All 4 Sides)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SafetyPhotoBox
+                label="Front Side"
+                type="exterior_front"
+                routeId={routeId || ""}
+                onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorFrontPhotoUrl: url }))}
                 required
-                className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
+                currentUrl={formData.exteriorFrontPhotoUrl}
               />
-              <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
-              </label>
+              <SafetyPhotoBox
+                label="Back Side"
+                type="exterior_back"
+                routeId={routeId || ""}
+                onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorBackPhotoUrl: url }))}
+                required
+                currentUrl={formData.exteriorBackPhotoUrl}
+              />
+              <SafetyPhotoBox
+                label="Left Side"
+                type="exterior_left"
+                routeId={routeId || ""}
+                onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorLeftPhotoUrl: url }))}
+                required
+                currentUrl={formData.exteriorLeftPhotoUrl}
+              />
+              <SafetyPhotoBox
+                label="Right Side"
+                type="exterior_right"
+                routeId={routeId || ""}
+                onUploadSuccess={(url: string) => setFormData(prev => ({ ...prev, exteriorRightPhotoUrl: url }))}
+                required
+                currentUrl={formData.exteriorRightPhotoUrl}
+              />
             </div>
-          ))}
+          </div>
         </div>
       </div>
 
-      {/* Equipment Check */}
+      {/* Supplies Check */}
       <div className="space-y-4">
         <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          🔧 Equipment Check
+          📦 Supplies Check
         </h3>
+        <p className="text-sm text-gray-500">Confirm you have the following supplies:</p>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
           {[
-            { key: "palletJackWorking", label: "Pallet jack working properly" },
-            { key: "dolliesSecured", label: "Dollies secured and in good condition" },
-            { key: "strapsAvailable", label: "Straps available and in good condition" },
+            { key: "hasCopyPaper", label: "Copy Paper" },
+            { key: "hasStaples", label: "Staples" },
+            { key: "hasStapler", label: "Stapler" },
           ].map((item) => (
             <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
               <input
@@ -338,36 +402,7 @@ export default function SimpleSafetyChecklist({
                 className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
               />
               <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Pre-Departure */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-gray-900 border-b pb-2 mobile-heading">
-          📋 Pre-Departure
-        </h3>
-
-        <div className="space-y-3">
-          {[
-            { key: "routeReviewed", label: "Route reviewed and understood" },
-            { key: "warehouseContacted", label: "Warehouse contacted if needed" },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                id={item.key}
-                name={item.key}
-                checked={formData[item.key as keyof SimpleSafetyCheckData] as boolean}
-                onChange={handleChange}
-                required
-                className="h-5 w-5 text-black border-gray-300 rounded focus:ring-black focus:ring-2"
-              />
-              <label htmlFor={item.key} className="ml-3 text-sm text-gray-700 font-medium">
-                {item.label}
+                I have {item.label}
               </label>
             </div>
           ))}
@@ -394,7 +429,15 @@ export default function SimpleSafetyChecklist({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={
+          isSubmitting ||
+          !formData.printerTestPhotoUrl ||
+          !formData.equipmentPhotoUrl ||
+          !formData.exteriorFrontPhotoUrl ||
+          !formData.exteriorBackPhotoUrl ||
+          !formData.exteriorLeftPhotoUrl ||
+          !formData.exteriorRightPhotoUrl
+        }
         className="w-full bg-black hover:bg-gray-800 text-white font-medium py-4 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation mobile-button text-base"
       >
         {isSubmitting ? "Submitting..." : "✅ Complete Start-of-Day Check"}

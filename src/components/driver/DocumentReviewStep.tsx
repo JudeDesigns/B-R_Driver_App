@@ -16,11 +16,13 @@ interface UnacknowledgedDocument {
 interface DocumentReviewStepProps {
   onComplete: () => void;
   token: string;
+  routeId: string;
 }
 
 export default function DocumentReviewStep({
   onComplete,
   token,
+  routeId,
 }: DocumentReviewStepProps) {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<UnacknowledgedDocument[]>([]);
@@ -29,11 +31,11 @@ export default function DocumentReviewStep({
 
   useEffect(() => {
     fetchUnacknowledgedDocuments();
-  }, []);
+  }, [routeId]);
 
   const fetchUnacknowledgedDocuments = async () => {
     try {
-      const response = await fetch("/api/driver/system-documents/acknowledge", {
+      const response = await fetch(`/api/driver/system-documents/acknowledge?routeId=${routeId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -69,7 +71,7 @@ export default function DocumentReviewStep({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ documentId }),
+        body: JSON.stringify({ documentId, routeId }),
       });
 
       if (!response.ok) {

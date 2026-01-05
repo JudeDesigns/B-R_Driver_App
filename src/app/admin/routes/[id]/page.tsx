@@ -634,8 +634,14 @@ export default function RouteDetailPage({
   // Payment Terms Editing Functions
   const startEditingPaymentTerms = (stop: Stop) => {
     setEditingPaymentTerms(stop.id);
-    setTempPaymentTerms(stop.paymentTerms || stop.customer?.paymentTerms || "COD");
-    setTempPaymentTermsOther(stop.paymentTermsOther || "");
+    // Use the stored text value, falling back to customer terms or "COD"
+    // If "Other" was used previously, try to use the 'paymentTermsOther' value, effectively migrating it to the main field for display
+    let initialValue = stop.paymentTerms || stop.customer?.paymentTerms || "COD";
+    if (initialValue === "Other" && stop.paymentTermsOther) {
+      initialValue = stop.paymentTermsOther;
+    }
+    setTempPaymentTerms(initialValue);
+    setTempPaymentTermsOther(""); // No longer needed
   };
 
   const cancelEditingPaymentTerms = () => {
@@ -657,7 +663,7 @@ export default function RouteDetailPage({
         },
         body: JSON.stringify({
           paymentTerms: tempPaymentTerms,
-          paymentTermsOther: tempPaymentTerms === "Other" ? tempPaymentTermsOther : null,
+          paymentTermsOther: null, // Clear 'Other' field as we are moving to free text
         }),
       });
 
@@ -914,27 +920,15 @@ export default function RouteDetailPage({
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           {editingPaymentTerms === stop.id ? (
             <div className="flex flex-col gap-2">
-              <select
+              <input
+                type="text"
                 value={tempPaymentTerms}
                 onChange={(e) => setTempPaymentTerms(e.target.value)}
                 className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter terms..."
+                autoFocus
                 disabled={savingPaymentTerms}
-              >
-                <option value="COD">COD</option>
-                <option value="Prepaid">Prepaid</option>
-                <option value="Post Paid">Post Paid</option>
-                <option value="Other">Other</option>
-              </select>
-              {tempPaymentTerms === "Other" && (
-                <input
-                  type="text"
-                  value={tempPaymentTermsOther}
-                  onChange={(e) => setTempPaymentTermsOther(e.target.value)}
-                  placeholder="Enter custom terms..."
-                  className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  disabled={savingPaymentTerms}
-                />
-              )}
+              />
               <div className="flex gap-1">
                 <button
                   onClick={() => savePaymentTerms(stop.id)}
@@ -1721,9 +1715,8 @@ export default function RouteDetailPage({
                         .map((stop, index) => (
                           <tr
                             key={stop.id}
-                            className={`hover:bg-gray-50 transition-colors duration-150 ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }`}
+                            className={`hover:bg-gray-50 transition-colors duration-150 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              }`}
                           >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">

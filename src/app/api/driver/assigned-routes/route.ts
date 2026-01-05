@@ -245,8 +245,35 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Fetch global vehicle assignment (not specific to a route)
+    const globalVehicleAssignment = await prisma.vehicleAssignment.findFirst({
+      where: {
+        driverId: decoded.id,
+        isActive: true,
+        isDeleted: false,
+        routeId: null,
+      },
+      include: {
+        vehicle: true,
+      },
+    });
+
     // Apply pagination
     const paginatedRoutes = allRoutes.slice(offset, offset + limit);
+
+    // Inject global vehicle assignment if no route-specific assignment exists
+    if (globalVehicleAssignment) {
+      paginatedRoutes.forEach((route) => {
+        if (!route.vehicleAssignments || route.vehicleAssignments.length === 0) {
+          // Initialize array if it doesn't exist (though include should make it exist)
+          if (!route.vehicleAssignments) {
+            route.vehicleAssignments = [];
+          }
+          // Cast the type to avoid strict type issues since we're modifying the return object
+          (route.vehicleAssignments as any[]).push(globalVehicleAssignment);
+        }
+      });
+    }
 
     const response = NextResponse.json({
       routes: paginatedRoutes,

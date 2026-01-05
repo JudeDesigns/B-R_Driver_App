@@ -13,7 +13,7 @@ datasource db {
 // User model
 model User {
   id        String   @id @default(uuid())
-  username  String   
+  username  String   @unique
   password  String
   role      Role     @default(DRIVER)
   fullName  String?
@@ -103,6 +103,7 @@ model Route {
   vehicleAssignments VehicleAssignment[]
   driverLocations    DriverLocation[]
   dailyKPIs          DailyKPI[]          @relation("RouteKPIs")
+  documentAcknowledgments DocumentAcknowledgment[]
 
   @@index([routeNumber])
   @@index([date])
@@ -178,15 +179,18 @@ model DocumentAcknowledgment {
   document       SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   driverId       String
   driver         User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
+  routeId        String?        // Specific route for which this was acknowledged
+  route          Route?         @relation(fields: [routeId], references: [id])
   acknowledgedAt DateTime       @default(now())
   ipAddress      String?        // Audit trail
   userAgent      String?        // Audit trail
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  @@unique([documentId, driverId]) // One acknowledgment per driver per document
+  @@unique([documentId, driverId, routeId]) // One acknowledgment per driver per document per route
   @@index([driverId])
   @@index([documentId])
+  @@index([routeId])
   @@index([acknowledgedAt])
   @@map("document_acknowledgments")
 }

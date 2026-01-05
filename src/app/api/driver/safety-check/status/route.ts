@@ -68,11 +68,11 @@ export async function GET(request: NextRequest) {
             isDeleted: false,
             ...(pstStartDate && pstEndDate
               ? {
-                  date: {
-                    gte: pstStartDate,
-                    lt: pstEndDate,
-                  },
-                }
+                date: {
+                  gte: pstStartDate,
+                  lt: pstEndDate,
+                },
+              }
               : {}),
           },
           // Routes where the driver is assigned to stops - use exact matching
@@ -91,11 +91,11 @@ export async function GET(request: NextRequest) {
             isDeleted: false,
             ...(pstStartDate && pstEndDate
               ? {
-                  date: {
-                    gte: pstStartDate,
-                    lt: pstEndDate,
-                  },
-                }
+                date: {
+                  gte: pstStartDate,
+                  lt: pstEndDate,
+                },
+              }
               : {}),
           },
         ],
@@ -164,44 +164,44 @@ export async function GET(request: NextRequest) {
     const routesNeedingStartDetails =
       routesNeedingStartChecks.length > 0
         ? await prisma.route.findMany({
-            where: {
-              id: {
-                in: routesNeedingStartChecks,
-              },
-              isDeleted: false,
+          where: {
+            id: {
+              in: routesNeedingStartChecks,
             },
-            include: {
-              vehicleAssignments: {
-                where: {
-                  driverId: decoded.id,
-                  isActive: true,
-                  isDeleted: false,
-                },
-                include: {
-                  vehicle: true,
-                },
+            isDeleted: false,
+          },
+          include: {
+            vehicleAssignments: {
+              where: {
+                driverId: decoded.id,
+                isActive: true,
+                isDeleted: false,
+              },
+              include: {
+                vehicle: true,
               },
             },
-          })
+          },
+        })
         : [];
 
     // Get details for routes needing end-of-day checks
     const routesNeedingEndDetails =
       routesNeedingEndChecks.length > 0
         ? await prisma.route.findMany({
-            where: {
-              id: {
-                in: routesNeedingEndChecks,
-              },
-              isDeleted: false,
+          where: {
+            id: {
+              in: routesNeedingEndChecks,
             },
-            select: {
-              id: true,
-              routeNumber: true,
-              date: true,
-              status: true,
-            },
-          })
+            isDeleted: false,
+          },
+          select: {
+            id: true,
+            routeNumber: true,
+            date: true,
+            status: true,
+          },
+        })
         : [];
 
     // Log detailed information for debugging in development only
@@ -215,6 +215,32 @@ export async function GET(request: NextRequest) {
         completedEndOfDayIds: Array.from(completedEndOfDayRouteIds),
         routesNeedingStartChecks: routesNeedingStartChecks,
         routesNeedingEndChecks: routesNeedingEndChecks,
+      });
+    }
+
+    // Fetch global vehicle assignment
+    // Use the same more precise matching logic
+    const globalVehicleAssignment = await prisma.vehicleAssignment.findFirst({
+      where: {
+        driverId: decoded.id,
+        isActive: true,
+        isDeleted: false,
+        routeId: null,
+      },
+      include: {
+        vehicle: true,
+      },
+    });
+
+    // Inject global vehicle assignment into routesNeedingChecks if needed
+    if (globalVehicleAssignment) {
+      routesNeedingStartDetails.forEach((route) => {
+        if (!route.vehicleAssignments || route.vehicleAssignments.length === 0) {
+          if (!route.vehicleAssignments) {
+            (route as any).vehicleAssignments = [];
+          }
+          (route.vehicleAssignments as any[]).push(globalVehicleAssignment);
+        }
       });
     }
 

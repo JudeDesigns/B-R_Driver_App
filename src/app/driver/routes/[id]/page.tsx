@@ -12,6 +12,7 @@ interface Customer {
   address: string;
   contactInfo: string | null;
   preferences: string | null;
+  paymentTerms: string | null;
 }
 
 interface AdminNote {
@@ -282,6 +283,11 @@ export default function DriverRouteDetailPage({
 
   const getPaymentMethod = (stop: Stop) => {
     // Check if driver has recorded payments
+    if (stop.driverPaymentMethods && stop.driverPaymentMethods.length > 0) {
+      return stop.driverPaymentMethods.join(", ");
+    }
+
+    // Check if driver recorded payment amount (without methods)
     if (stop.driverPaymentAmount && stop.driverPaymentAmount > 0) {
       return "Paid";
     }
@@ -290,8 +296,12 @@ export default function DriverRouteDetailPage({
     if (stop.paymentFlagCash) return "Cash";
     if (stop.paymentFlagCheck) return "Check";
     if (stop.paymentFlagCC) return "Credit Card";
-    if (stop.paymentFlagNotPaid) return "Not Paid";
-    return "Not Paid";
+
+    // Return specified payment terms (from stop) or customer default terms
+    // If neither exists, fallback to "Not Paid"
+    // Note: Stop interface needs paymentTerms? but it's optional on the object from API so accessed safely
+    const stopTerms = (stop as any).paymentTerms;
+    return stopTerms || stop.customer.paymentTerms || (stop.paymentFlagNotPaid ? "Not Paid" : "Not Paid");
   };
 
   const hasUnreadNotes = (stop: Stop) => {

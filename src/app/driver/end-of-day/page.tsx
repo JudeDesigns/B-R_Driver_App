@@ -154,21 +154,19 @@ export default function EndOfDayCheckPage() {
           console.log("Using routes from API that need end-of-day checks");
           // Use the routes directly from the API that need end-of-day checks
           eligibleRoutes = safetyCheckData.routesNeedingEndOfDayChecks.filter(
-            (route) => route.status !== "COMPLETED"
+            (route: any) => route.status !== "COMPLETED"
           );
         } else {
           console.log("Manually filtering routes that need end-of-day checks");
           // Fall back to manual filtering
-          eligibleRoutes = (data.routes || []).filter((route) => {
+          eligibleRoutes = (data.routes || []).filter((route: any) => {
             const hasStartOfDayCheck = completedRouteIds.has(route.id);
             const hasEndOfDayCheck = completedEndOfDayRouteIds.has(route.id);
             const isCompleted = route.status === "COMPLETED";
 
             console.log(
-              `Route ${route.id} (${
-                route.routeNumber || "unnamed"
-              }) - Status: ${
-                route.status
+              `Route ${route.id} (${route.routeNumber || "unnamed"
+              }) - Status: ${route.status
               }, Has start-of-day: ${hasStartOfDayCheck}, Has end-of-day: ${hasEndOfDayCheck}`
             );
 
@@ -186,7 +184,7 @@ export default function EndOfDayCheckPage() {
             "No eligible routes found, checking for IN_PROGRESS routes"
           );
           const inProgressRoutes = (data.routes || []).filter(
-            (route) => route.status === "IN_PROGRESS"
+            (route: any) => route.status === "IN_PROGRESS"
           );
 
           if (inProgressRoutes.length > 0) {
@@ -335,11 +333,11 @@ export default function EndOfDayCheckPage() {
                     <option key={route.id} value={route.id}>
                       {route.routeNumber
                         ? `Route ${route.routeNumber} - ${new Date(
-                            route.date
-                          ).toLocaleDateString()}`
+                          route.date
+                        ).toLocaleDateString()}`
                         : `Route from ${new Date(
-                            route.date
-                          ).toLocaleDateString()}`}
+                          route.date
+                        ).toLocaleDateString()}`}
                     </option>
                   ))}
                 </select>
@@ -349,6 +347,7 @@ export default function EndOfDayCheckPage() {
                 <SimpleEndOfDayChecklist
                   onSubmit={handleSubmit}
                   isSubmitting={submitting}
+                  routeId={selectedRouteId}
                 />
               )}
             </>

@@ -464,11 +464,19 @@ export default function StopDetailPage({
         }
       }
 
-      // If status is COMPLETED, redirect to stops page after a short delay
+      const responseData = await response.json();
+
+      // If status is COMPLETED, redirect to next stop or stops page after a short delay
       if (newStatus === "COMPLETED") {
-        console.log("Delivery completed successfully, redirecting to stops page...");
+        console.log("Delivery completed successfully");
         setTimeout(() => {
-          router.push("/driver/stops");
+          if (responseData.nextStopId) {
+            console.log(`Redirecting to next stop: ${responseData.nextStopId}`);
+            router.push(`/driver/stops/${responseData.nextStopId}`);
+          } else {
+            console.log("No next stop found, redirecting to stops list");
+            router.push("/driver/stops");
+          }
         }, 1500);
       } else {
         // Refresh stop details for other status updates
@@ -754,12 +762,12 @@ export default function StopDetailPage({
               onClick={() => canAccessStep(step.id) && goToStep(step.id)}
               disabled={!canAccessStep(step.id)}
               className={`flex flex-col items-center p-2 sm:p-3 rounded-lg transition-all duration-200 min-w-0 flex-1 max-w-[80px] sm:max-w-none ${currentStep === step.id
-                  ? "bg-blue-100 border-2 border-blue-500 text-blue-700"
-                  : isStepCompleted(step.id)
-                    ? "bg-green-100 border-2 border-green-500 text-green-700"
-                    : canAccessStep(step.id)
-                      ? "bg-gray-50 border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
-                      : "bg-gray-50 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
+                ? "bg-blue-100 border-2 border-blue-500 text-blue-700"
+                : isStepCompleted(step.id)
+                  ? "bg-green-100 border-2 border-green-500 text-green-700"
+                  : canAccessStep(step.id)
+                    ? "bg-gray-50 border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
+                    : "bg-gray-50 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
             >
               <div className="text-lg sm:text-xl mb-1">

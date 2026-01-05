@@ -38,12 +38,7 @@ const nextConfig = {
 
   // Configure static file serving
   async rewrites() {
-    return [
-      {
-        source: "/uploads/:path*",
-        destination: "/uploads/:path*",
-      },
-    ];
+    return [];
   },
 
   // Simplified experimental features

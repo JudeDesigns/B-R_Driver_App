@@ -65,6 +65,10 @@ interface StopPaymentData {
   paymentFlagCheck?: boolean;
   paymentFlagCC?: boolean;
   paymentFlagNotPaid?: boolean;
+  paymentTerms?: string | null;
+  customer?: {
+    paymentTerms?: string | null;
+  };
 }
 
 /**
@@ -88,8 +92,10 @@ export const getPaymentMethod = (stop: StopPaymentData): string => {
   if (stop.paymentFlagCC) flags.push("Credit Card");
 
   if (flags.length > 0) return flags.join(", ");
-  if (stop.paymentFlagNotPaid) return "Not Paid";
-  return "Not Paid";
+
+  // Return specified payment terms or customer default terms, or "Not Paid"
+  // This allows "Net 30" etc to determine the status
+  return stop.paymentTerms || stop.customer?.paymentTerms || (stop.paymentFlagNotPaid ? "Not Paid" : "Not Paid");
 };
 
 /**

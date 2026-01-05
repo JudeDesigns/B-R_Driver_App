@@ -270,6 +270,7 @@ export default function SafetyCheckPage() {
           {selectedRouteId && !documentsAcknowledged && token && (
             <DocumentReviewStep
               token={token}
+              routeId={selectedRouteId}
               onComplete={() => setDocumentsAcknowledged(true)}
             />
           )}
@@ -278,6 +279,7 @@ export default function SafetyCheckPage() {
             <SimpleSafetyChecklist
               onSubmit={handleSubmit}
               isSubmitting={loading}
+              routeId={selectedRouteId}
               vehicle={
                 routes.find((r) => r.id === selectedRouteId)?.vehicleAssignments?.[0]?.vehicle
               }

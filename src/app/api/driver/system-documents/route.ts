@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         const type = url.searchParams.get("type");
         const category = url.searchParams.get("category");
         const isRequired = url.searchParams.get("isRequired");
+        const routeId = url.searchParams.get("routeId");
 
         const whereClause: any = {
             isActive: true,
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
                 acknowledgments: {
                     where: {
                         driverId: driverId,
-                    },
+                        routeId: routeId || null,
+                    } as any,
                     select: {
                         id: true,
                         acknowledgedAt: true,
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
         });
 
         // Transform the response to include isAcknowledged flag
-        const documentsWithStatus = documents.map(doc => ({
+        const documentsWithStatus = (documents as any[]).map(doc => ({
             ...doc,
             isAcknowledged: doc.acknowledgments.length > 0,
             acknowledgedAt: doc.acknowledgments[0]?.acknowledgedAt || null,
