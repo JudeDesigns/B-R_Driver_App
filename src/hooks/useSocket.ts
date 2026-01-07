@@ -153,22 +153,23 @@ export const useSocket = (
           username: user,
         },
       // Optimize transport configuration for better performance
-      // Use WebSocket first for faster connection if available, fallback to polling
-      transports: ["websocket", "polling"],
-      // Optimize reconnection settings for better reliability
+      // IMPORTANT: Match server configuration - polling first, then upgrade to WebSocket
+      // This prevents connection issues on mobile networks
+      transports: ["polling", "websocket"],
+      // Optimize reconnection settings for mobile reliability
       reconnection: true,
-      reconnectionAttempts: 5, // Reduced to improve performance
+      reconnectionAttempts: 10, // Increased for mobile network recovery
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 3000, // Reduced for faster reconnection
-      randomizationFactor: 0.3, // Reduced for more predictable reconnection
-      // Optimize timeout settings for better performance
-      timeout: 10000, // Reduced for faster timeout detection
+      reconnectionDelayMax: 10000, // Increased to 10s for slow mobile networks
+      randomizationFactor: 0.3,
+      // Optimize timeout settings for mobile devices
+      timeout: 20000, // Increased to 20s for mobile networks
       // Enable auto-connect
       autoConnect: true,
       // Optimize buffer size and memory usage
       rememberUpgrade: true,
-      // Avoid reusing problematic connections
-      forceNew: true,
+      // Use connection pooling instead of forcing new connections
+      forceNew: false,
       // Additional performance optimizations
       upgrade: true, // Enable transport upgrades
       // Removed other options due to type compatibility issues
@@ -415,6 +416,53 @@ export const useSocket = (
       }, 500);
     }
   }, []);
+
+  // Handle network online/offline events for mobile
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      console.log('Network connection restored, reconnecting socket...');
+      if (socketRef.current && !isConnected) {
+        reconnect();
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('Network connection lost');
+      setIsConnected(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isConnected, reconnect]);
+
+  // Handle page visibility changes for mobile (when driver switches apps)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, checking socket connection...');
+        // Check if socket is disconnected and reconnect
+        if (socketRef.current && !isConnected) {
+          console.log('Socket disconnected while page was hidden, reconnecting...');
+          reconnect();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isConnected, reconnect]);
 
   return {
     socket: socketRef.current,

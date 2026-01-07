@@ -96,9 +96,10 @@ function initSocketIO(httpServer) {
     allowUpgrades: true,
     // Increase upgrade timeout for slower connections
     upgradeTimeout: 15000,
-    // Optimize ping settings for better performance and reliability
-    pingTimeout: 30000,
-    pingInterval: 25000,
+    // Optimize ping settings for mobile devices and unreliable networks
+    // Increased timeouts prevent disconnections when drivers' phones go to background
+    pingTimeout: 60000,  // 60 seconds - allows for mobile background/sleep
+    pingInterval: 45000, // 45 seconds - less aggressive for mobile battery
     // Increase buffer size for better performance with many concurrent connections
     maxHttpBufferSize: 1e6, // 1MB
     // Optimize connection timeout

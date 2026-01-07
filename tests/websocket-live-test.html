@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Stability Live Test</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        .connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-warning { color: #dcdcaa; }
+        .log-info { color: #9cdcfe; }
+        .metric {
+            display: inline-block;
+            margin: 10px 20px 10px 0;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 12px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Stability Live Test</h1>
+        <p>This test verifies the fixes for driver disconnection issues</p>
+
+        <div id="status" class="status disconnected">
+            ⚠️ Not Connected
+        </div>
+
+        <div class="test-section">
+            <h3>Connection Metrics</h3>
+            <div class="metric">
+                <div class="metric-label">Disconnections</div>
+                <div class="metric-value" id="disconnectCount">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Reconnections</div>
+                <div class="metric-value" id="reconnectCount">0</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Uptime</div>
+                <div class="metric-value" id="uptime">0s</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>Stability Tests</h3>
+            <button onclick="testNetworkChange()">🌐 Simulate Network Change</button>
+            <button onclick="testVisibilityChange()">👁️ Simulate App Switch</button>
+            <button onclick="testManualDisconnect()">🔌 Manual Disconnect</button>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Event Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let disconnectCount = 0;
+        let reconnectCount = 0;
+        let connectedAt = null;
+        let uptimeInterval = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = '✅ Connected';
+                connectedAt = Date.now();
+                startUptimeCounter();
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = '❌ Disconnected';
+                stopUptimeCounter();
+            }
+        }
+
+        function startUptimeCounter() {
+            stopUptimeCounter();
+            uptimeInterval = setInterval(() => {
+                if (connectedAt) {
+                    const uptime = Math.floor((Date.now() - connectedAt) / 1000);
+                    document.getElementById('uptime').textContent = uptime + 's';
+                }
+            }, 1000);
+        }
+
+        function stopUptimeCounter() {
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+        }
+
+        function connectSocket() {
+            log('Initializing WebSocket connection...', 'info');
+            
+            socket = io('http://localhost:3000', {
+                transports: ['polling', 'websocket'], // FIXED: Matches server
+                reconnection: true,
+                reconnectionAttempts: 10, // FIXED: Increased from 5
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 10000, // FIXED: Increased from 3000
+                timeout: 20000,
+                autoConnect: true,
+                forceNew: false, // FIXED: Changed from true
+            });
+
+            socket.on('connect', () => {
+                log('✅ Connected successfully!', 'success');
+                updateStatus(true);
+            });
+
+            socket.on('disconnect', (reason) => {
+                disconnectCount++;
+                document.getElementById('disconnectCount').textContent = disconnectCount;
+                log(`❌ Disconnected: ${reason}`, 'error');
+                updateStatus(false);
+            });
+
+            socket.on('reconnect', (attemptNumber) => {
+                reconnectCount++;
+                document.getElementById('reconnectCount').textContent = reconnectCount;
+                log(`🔄 Reconnected after ${attemptNumber} attempts`, 'success');
+            });
+
+            socket.on('reconnect_attempt', (attemptNumber) => {
+                log(`🔄 Reconnection attempt ${attemptNumber}/10`, 'warning');
+            });
+
+            socket.on('reconnect_error', (error) => {
+                log(`⚠️ Reconnection error: ${error.message}`, 'error');
+            });
+
+            socket.on('reconnect_failed', () => {
+                log('❌ Reconnection failed after 10 attempts', 'error');
+            });
+        }
+
+        function testNetworkChange() {
+            log('🌐 Simulating network change...', 'warning');
+            socket.disconnect();
+            setTimeout(() => {
+                log('🌐 Network restored, reconnecting...', 'info');
+                socket.connect();
+            }, 2000);
+        }
+
+        function testVisibilityChange() {
+            log('👁️ Simulating app switch (visibility change)...', 'warning');
+            socket.disconnect();
+            setTimeout(() => {
+                log('👁️ App visible again, reconnecting...', 'info');
+                socket.connect();
+            }, 3000);
+        }
+
+        function testManualDisconnect() {
+            log('🔌 Manual disconnect triggered', 'warning');
+            socket.disconnect();
+        }
+
+        function clearLogs() {
+            document.getElementById('log').innerHTML = '';
+            log('Logs cleared', 'info');
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            log('🚀 WebSocket Stability Test Started', 'success');
+            log('Configuration: polling first, 10 reconnect attempts, 60s timeout', 'info');
+            connectSocket();
+        });
+    </script>
+</body>
+</html>
+
