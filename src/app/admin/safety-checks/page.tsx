@@ -148,11 +148,17 @@ export default function SafetyChecksPage() {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="relative group block aspect-square bg-gray-200 rounded overflow-hidden border border-gray-300"
+          className="block bg-gray-50 rounded border border-gray-300 hover:border-blue-500 hover:shadow-md transition-all p-2 group"
         >
-          <img src={url} alt={label} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all">
-            <span className="text-white opacity-0 group-hover:opacity-100 text-[10px] font-bold uppercase">View Full</span>
+          <div className="w-full h-48 flex items-center justify-center bg-white rounded">
+            <img
+              src={url}
+              alt={label}
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
+          <div className="text-center mt-2 text-xs text-gray-500 group-hover:text-blue-600 transition-colors">
+            📸 Click to view full size
           </div>
         </a>
       </div>
