@@ -148,9 +148,9 @@ export default function SafetyChecksPage() {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="relative group block aspect-video bg-gray-200 rounded overflow-hidden border border-gray-300"
+          className="relative group block aspect-square bg-gray-200 rounded overflow-hidden border border-gray-300"
         >
-          <img src={url} alt={label} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+          <img src={url} alt={label} className="w-full h-full object-contain transition-transform group-hover:scale-110" />
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all">
             <span className="text-white opacity-0 group-hover:opacity-100 text-[10px] font-bold uppercase">View Full</span>
           </div>

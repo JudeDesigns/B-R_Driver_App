@@ -177,7 +177,7 @@ export default function CustomerInfoCard({ stop, formatDate }: CustomerInfoCardP
         </div>
 
         {/* All Instructions - Mobile Optimized */}
-        {(stop.initialDriverNotes || (stop.adminNotes && stop.adminNotes.length > 0)) && (
+        {(stop.initialDriverNotes || (stop.adminNotes && stop.adminNotes.length > 0) || stop.customer.preferences || stop.customer.deliveryInstructions) && (
           <div className="mt-5 sm:mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
