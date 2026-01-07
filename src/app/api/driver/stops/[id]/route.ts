@@ -703,12 +703,15 @@ export async function PATCH(
       }
 
       // Auto-start next stop feature (Re-enabled with Auto-Status Update)
-      // Find the next pending stop in the sequence
+      // Find the next pending stop in the sequence that belongs to THIS driver
       const nextStop = routeStops.find(
         (s) =>
           s.sequence > stop.sequence &&
           s.status !== "COMPLETED" &&
-          s.status !== "CANCELLED"
+          s.status !== "CANCELLED" &&
+          // IMPORTANT: Only auto-start stops assigned to the current driver
+          (s.driverNameFromUpload === driver.username ||
+           s.driverNameFromUpload === driver.fullName)
       );
 
       if (nextStop) {
