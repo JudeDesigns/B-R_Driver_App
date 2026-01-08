@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Notification from '@/components/ui/Notification';
 import InvoiceValidationAlert from '@/components/ui/InvoiceValidationAlert';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { validateInvoiceData, shouldBlockUpload, needsUserConfirmation, InvoiceValidationResult } from '@/utils/invoiceValidation';
+import { validateInvoiceData, validateCreditMemoData, shouldBlockUpload, needsUserConfirmation, InvoiceValidationResult } from '@/utils/invoiceValidation';
 
 interface Customer {
   id: string;
@@ -95,6 +95,10 @@ export default function DocumentManagementPage() {
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
   const [invoiceNumber, setInvoiceNumber] = useState<string>('');
   const [invoiceAmount, setInvoiceAmount] = useState<string>('');
+
+  // Credit Memo-specific fields for stop documents
+  const [creditMemoNumber, setCreditMemoNumber] = useState<string>('');
+  const [creditMemoAmount, setCreditMemoAmount] = useState<string>('');
 
   // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -228,6 +232,7 @@ export default function DocumentManagementPage() {
   const allDocumentTypes = [
     { value: "INVOICE", label: "Invoice" },
     { value: "CREDIT_MEMO", label: "Credit Memo" },
+    { value: "PURCHASE_ORDER", label: "P.O. (Purchase Order)" },
     { value: "DELIVERY_RECEIPT", label: "Statement" },
     { value: "RETURN_FORM", label: "Return Form" },
     { value: "OTHER", label: "Other" },
@@ -394,6 +399,31 @@ export default function DocumentManagementPage() {
       }
     }
 
+    // Validate credit memo data if this is a credit memo document
+    if (type === 'CREDIT_MEMO') {
+      const validation = validateCreditMemoData({
+        creditMemoNumber,
+        creditMemoAmount,
+        documentType: type,
+        fileName: file.name
+      });
+
+      // Block upload if there are errors
+      if (shouldBlockUpload(validation)) {
+        setValidationResult(validation);
+        setShowValidationAlert(true);
+        return;
+      }
+
+      // Show warning and ask for confirmation if there are warnings
+      if (needsUserConfirmation(validation) && !pendingUpload) {
+        setValidationResult(validation);
+        setShowValidationAlert(true);
+        setPendingUpload(true);
+        return;
+      }
+    }
+
     try {
       // Get token
       let token;
@@ -422,6 +452,12 @@ export default function DocumentManagementPage() {
         if (type === 'INVOICE') {
           uploadFormData.append('invoiceNumber', invoiceNumber);
           uploadFormData.append('invoiceAmount', invoiceAmount);
+        }
+
+        // Add credit memo-specific data if this is a credit memo document
+        if (type === 'CREDIT_MEMO') {
+          uploadFormData.append('creditMemoNumber', creditMemoNumber);
+          uploadFormData.append('creditMemoAmount', creditMemoAmount);
         }
       }
 
@@ -455,6 +491,8 @@ export default function DocumentManagementPage() {
       setSelectedDocumentType('');
       setInvoiceNumber('');
       setInvoiceAmount('');
+      setCreditMemoNumber('');
+      setCreditMemoAmount('');
 
       // Refresh data
       fetchDocuments();
@@ -986,6 +1024,47 @@ export default function DocumentManagementPage() {
                     </div>
                     <p className="text-xs text-yellow-700">
                       Adding invoice number and amount helps with tracking and prevents upload warnings.
+                    </p>
+                  </div>
+                )}
+
+                {/* Credit Memo-specific fields for stop documents */}
+                {uploadType === 'stop' && selectedDocumentType === 'CREDIT_MEMO' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center mb-2">
+                      <svg className="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-purple-800">Credit Memo Information (Recommended)</span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Credit Memo Number <span className="text-purple-600">(Recommended)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={creditMemoNumber}
+                        onChange={(e) => setCreditMemoNumber(e.target.value)}
+                        placeholder="Enter credit memo number..."
+                        className="w-full border border-purple-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Credit Amount <span className="text-purple-600">(Recommended)</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={creditMemoAmount}
+                        onChange={(e) => setCreditMemoAmount(e.target.value)}
+                        placeholder="Enter credit amount..."
+                        className="w-full border border-purple-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+                    <p className="text-xs text-purple-700">
+                      Adding credit memo number and amount helps with tracking and prevents upload warnings.
                     </p>
                   </div>
                 )}

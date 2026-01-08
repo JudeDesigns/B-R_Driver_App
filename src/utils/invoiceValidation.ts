@@ -17,6 +17,13 @@ export interface InvoiceData {
   fileName: string;
 }
 
+export interface CreditMemoData {
+  creditMemoNumber?: string;
+  creditMemoAmount?: string;
+  documentType: string;
+  fileName: string;
+}
+
 /**
  * Validates invoice data and returns warnings/errors
  */
@@ -139,4 +146,64 @@ export function shouldBlockUpload(result: InvoiceValidationResult): boolean {
  */
 export function needsUserConfirmation(result: InvoiceValidationResult): boolean {
   return result.warnings.length > 0;
+}
+
+/**
+ * Validates credit memo data and returns warnings/errors
+ */
+export function validateCreditMemoData(data: CreditMemoData): InvoiceValidationResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  let isValid = true;
+  let severity: 'error' | 'warning' | 'info' = 'info';
+
+  // Check if this is a credit memo document
+  if (data.documentType === 'CREDIT_MEMO') {
+    // Check for missing credit memo number
+    if (!data.creditMemoNumber || data.creditMemoNumber.trim() === '') {
+      warnings.push('Credit memo number is missing. This may cause issues with tracking and accounting.');
+      severity = 'warning';
+    }
+
+    // Check for missing credit memo amount/total
+    if (!data.creditMemoAmount || data.creditMemoAmount.trim() === '') {
+      warnings.push('Credit memo amount is missing. This may cause issues with credit processing and reconciliation.');
+      severity = 'warning';
+    }
+
+    // Validate credit memo amount format if provided
+    if (data.creditMemoAmount && data.creditMemoAmount.trim() !== '') {
+      const amount = parseFloat(data.creditMemoAmount.replace(/[,$]/g, ''));
+      if (isNaN(amount)) {
+        warnings.push('Credit memo amount format is invalid. Please enter a valid number (e.g., 100.50).');
+        severity = 'warning';
+      } else if (amount <= 0) {
+        warnings.push('Credit memo amount should be greater than zero.');
+        severity = 'warning';
+      }
+    }
+
+    // Check credit memo number format (basic validation)
+    if (data.creditMemoNumber && data.creditMemoNumber.trim() !== '') {
+      const memoNum = data.creditMemoNumber.trim();
+      if (memoNum.length < 3) {
+        warnings.push('Credit memo number seems too short. Please verify it is correct.');
+        severity = 'warning';
+      }
+    }
+
+    // File name validation for credit memos
+    const fileName = data.fileName.toLowerCase();
+    if (!fileName.includes('credit') && !fileName.includes('memo') && !fileName.includes('cm')) {
+      warnings.push('File name does not contain "credit", "memo", or "cm". Consider renaming for better organization.');
+      severity = 'warning';
+    }
+  }
+
+  return {
+    isValid,
+    warnings,
+    errors,
+    severity
+  };
 }

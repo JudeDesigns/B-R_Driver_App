@@ -114,6 +114,10 @@ export async function POST(request: NextRequest) {
     const invoiceNumber = formData.get("invoiceNumber") as string;
     const invoiceAmount = formData.get("invoiceAmount") as string;
 
+    // Credit Memo-specific fields for stop documents
+    const creditMemoNumber = formData.get("creditMemoNumber") as string;
+    const creditMemoAmount = formData.get("creditMemoAmount") as string;
+
     if (!file || !title || !type) {
       return NextResponse.json(
         { message: "File, title, and type are required" },
@@ -227,6 +231,47 @@ export async function POST(request: NextRequest) {
           });
 
           console.log(`Updated stop ${stopId} with invoice data:`, updateData);
+        }
+      }
+
+      // If this is a credit memo document with credit memo data, create a CreditMemo record
+      if (type === 'CREDIT_MEMO' && (creditMemoNumber || creditMemoAmount)) {
+        const creditMemoData: any = {
+          stopId: stopId,
+          creditMemoNumber: creditMemoNumber?.trim() || 'N/A',
+          creditMemoAmount: 0,
+          documentId: document.id, // Link to the uploaded document
+        };
+
+        if (creditMemoAmount && creditMemoAmount.trim()) {
+          const amount = parseFloat(creditMemoAmount);
+          if (!isNaN(amount)) {
+            creditMemoData.creditMemoAmount = amount;
+          }
+        }
+
+        // Create CreditMemo record
+        const creditMemo = await prisma.creditMemo.create({
+          data: creditMemoData,
+        });
+
+        console.log(`Created CreditMemo record for stop ${stopId}:`, creditMemo);
+
+        // Also update the Stop fields for backward compatibility
+        const stopUpdateData: any = {};
+        if (creditMemoNumber && creditMemoNumber.trim()) {
+          stopUpdateData.creditMemoNumber = creditMemoNumber.trim();
+        }
+        if (creditMemoData.creditMemoAmount > 0) {
+          stopUpdateData.creditMemoAmount = creditMemoData.creditMemoAmount;
+        }
+
+        if (Object.keys(stopUpdateData).length > 0) {
+          await prisma.stop.update({
+            where: { id: stopId },
+            data: stopUpdateData,
+          });
+          console.log(`Updated stop ${stopId} fields for backward compatibility:`, stopUpdateData);
         }
       }
     }

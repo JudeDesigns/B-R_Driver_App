@@ -162,7 +162,6 @@ export default function EndOfDayCheckPage() {
           eligibleRoutes = (data.routes || []).filter((route: any) => {
             const hasStartOfDayCheck = completedRouteIds.has(route.id);
             const hasEndOfDayCheck = completedEndOfDayRouteIds.has(route.id);
-            const isCompleted = route.status === "COMPLETED";
 
             console.log(
               `Route ${route.id} (${route.routeNumber || "unnamed"
@@ -170,7 +169,9 @@ export default function EndOfDayCheckPage() {
               }, Has start-of-day: ${hasStartOfDayCheck}, Has end-of-day: ${hasEndOfDayCheck}`
             );
 
-            return hasStartOfDayCheck && !hasEndOfDayCheck && !isCompleted;
+            // Show routes that have start-of-day check but no end-of-day check
+            // Allow both IN_PROGRESS and COMPLETED routes (driver may have completed all stops)
+            return hasStartOfDayCheck && !hasEndOfDayCheck;
           });
         }
 

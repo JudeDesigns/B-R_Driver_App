@@ -86,6 +86,20 @@ export async function GET(
                 },
               },
             },
+            creditMemos: {
+              where: {
+                isDeleted: false,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+              select: {
+                id: true,
+                creditMemoNumber: true,
+                creditMemoAmount: true,
+                createdAt: true,
+              },
+            },
             _count: {
               select: {
                 returns: {

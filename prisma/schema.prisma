@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,41 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String
-  role      Role     @default(DRIVER)
-  fullName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
-
-  // Milestone 3: Attendance Integration fields
-  attendanceAppUserId    String? // ID of this user in the external attendance app
-  lastClockInStatusCheck DateTime? // Last time we checked clock-in status
-  cachedClockInStatus    Boolean   @default(false) // Cached clock-in status
-  cachedClockInStatusAt  DateTime? // When the cached status was set
-
-  // Milestone 4: Location Tracking fields (optimized - last known location only)
-  lastKnownLatitude  Float? // Last known latitude
-  lastKnownLongitude Float? // Last known longitude
-  lastLocationUpdate DateTime? // When location was last updated
-  locationAccuracy   Float? // GPS accuracy in meters
-
-  // Relations
-  routes                    Route[]                    @relation("DriverRoutes")
-  adminNotes                AdminNote[]                @relation("AdminNotes")
-  safetyChecks              SafetyCheck[]              @relation("DriverSafetyChecks")
-  safetyDeclarations        SafetyDeclaration[]        @relation("DriverSafetyDeclarations")
-  documents                 Document[]                 @relation("DocumentUploads")
-  files                     File[]                     @relation("FileUploads")
-  vehicleAssignments        VehicleAssignment[]        @relation("DriverVehicleAssignments")
-  driverLocations           DriverLocation[]           @relation("DriverLocationUpdates")
-  systemDocumentUploads     SystemDocument[]           @relation("SystemDocumentUploads")
-  documentAcknowledgments   DocumentAcknowledgment[]   @relation("DriverDocumentAcknowledgments")
-  dailyKPIs                 DailyKPI[]                 @relation("DriverKPIs")
+  id                      String                   @id @default(uuid())
+  username                String                   @unique
+  password                String
+  role                    Role                     @default(DRIVER)
+  fullName                String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isDeleted               Boolean                  @default(false)
+  attendanceAppUserId     String?
+  cachedClockInStatus     Boolean                  @default(false)
+  cachedClockInStatusAt   DateTime?
+  lastClockInStatusCheck  DateTime?
+  lastKnownLatitude       Float?
+  lastKnownLongitude      Float?
+  lastLocationUpdate      DateTime?
+  locationAccuracy        Float?
+  adminNotes              AdminNote[]              @relation("AdminNotes")
+  dailyKPIs               DailyKPI[]               @relation("DriverKPIs")
+  documentAcknowledgments DocumentAcknowledgment[] @relation("DriverDocumentAcknowledgments")
+  documents               Document[]               @relation("DocumentUploads")
+  driverLocations         DriverLocation[]         @relation("DriverLocationUpdates")
+  files                   File[]                   @relation("FileUploads")
+  routes                  Route[]                  @relation("DriverRoutes")
+  safetyChecks            SafetyCheck[]            @relation("DriverSafetyChecks")
+  safetyDeclarations      SafetyDeclaration[]      @relation("DriverSafetyDeclarations")
+  systemDocumentUploads   SystemDocument[]         @relation("SystemDocumentUploads")
+  vehicleAssignments      VehicleAssignment[]      @relation("DriverVehicleAssignments")
 
   @@index([role])
   @@index([isDeleted])
@@ -52,26 +42,21 @@ model User {
   @@map("users")
 }
 
-// Customer model
 model Customer {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  contactInfo String?
-  email       String?  
-  preferences String?
-  groupCode   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-
-  // Milestone 1: Payment Terms and Delivery Instructions
-  paymentTerms         String? @default("COD") // Payment terms (COD, NET30, etc.)
-  deliveryInstructions String? // Special delivery instructions
-
-  // Relations
-  stops     Stop[]
-  documents Document[] // Customer-level documents
+  id                   String     @id @default(uuid())
+  name                 String
+  address              String
+  contactInfo          String?
+  preferences          String?
+  groupCode            String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  isDeleted            Boolean    @default(false)
+  email                String?
+  deliveryInstructions String?
+  paymentTerms         String?    @default("COD")
+  documents            Document[]
+  stops                Stop[]
 
   @@index([name])
   @@index([email])
@@ -81,29 +66,26 @@ model Customer {
   @@map("customers")
 }
 
-// Route model
 model Route {
-  id          String      @id @default(uuid())
-  routeNumber String?
-  date        DateTime    @default(now())
-  status      RouteStatus @default(PENDING)
-  driverId    String? // Made optional since routes can have multiple drivers
-  driver      User?       @relation("DriverRoutes", fields: [driverId], references: [id])
-  uploadedBy  String? // ID of the admin who uploaded the route
-  uploadedAt  DateTime    @default(now())
-  sourceFile  String? // Name of the uploaded file
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  isDeleted   Boolean     @default(false)
-
-  // Relations
-  stops              Stop[]
-  safetyChecks       SafetyCheck[]
-  safetyDeclarations SafetyDeclaration[] @relation("RouteSafetyDeclarations")
-  vehicleAssignments VehicleAssignment[]
-  driverLocations    DriverLocation[]
-  dailyKPIs          DailyKPI[]          @relation("RouteKPIs")
+  id                      String                   @id @default(uuid())
+  routeNumber             String?
+  date                    DateTime                 @default(now())
+  status                  RouteStatus              @default(PENDING)
+  driverId                String?
+  uploadedBy              String?
+  uploadedAt              DateTime                 @default(now())
+  sourceFile              String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isDeleted               Boolean                  @default(false)
+  dailyKPIs               DailyKPI[]               @relation("RouteKPIs")
   documentAcknowledgments DocumentAcknowledgment[]
+  driverLocations         DriverLocation[]
+  driver                  User?                    @relation("DriverRoutes", fields: [driverId], references: [id])
+  safetyChecks            SafetyCheck[]
+  safetyDeclarations      SafetyDeclaration[]      @relation("RouteSafetyDeclarations")
+  stops                   Stop[]
+  vehicleAssignments      VehicleAssignment[]
 
   @@index([routeNumber])
   @@index([date])
@@ -113,29 +95,24 @@ model Route {
   @@map("routes")
 }
 
-// Milestone 1: Vehicle Management
 model Vehicle {
-  id            String        @id @default(uuid())
-  vehicleNumber String        @unique // Truck number or identifier
-  make          String? // Vehicle make (e.g., Ford, Chevrolet)
-  model         String? // Vehicle model
-  year          Int? // Year of manufacture
-  licensePlate  String? // License plate number
-  vin           String? // Vehicle Identification Number
-  fuelType      String        @default("DIESEL") // DIESEL, GASOLINE, ELECTRIC, HYBRID
-  status        VehicleStatus @default(ACTIVE) // ACTIVE, MAINTENANCE, RETIRED
-  notes         String? // Additional notes about the vehicle
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  isDeleted     Boolean       @default(false)
-
-  // Relations
-  assignments VehicleAssignment[]
-
-  // Milestone 1: Fuel Instructions
-  fuelInstructions String? // Specific fueling instructions
-  fuelCardNumber   String? // Fuel card number
-  fuelCapKeyNumber String? // Key number for fuel cap
+  id               String              @id @default(uuid())
+  vehicleNumber    String              @unique
+  make             String?
+  model            String?
+  year             Int?
+  licensePlate     String?
+  vin              String?
+  fuelType         String              @default("DIESEL")
+  status           VehicleStatus       @default(ACTIVE)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  isDeleted        Boolean             @default(false)
+  fuelCapKeyNumber String?
+  fuelCardNumber   String?
+  fuelInstructions String?
+  assignments      VehicleAssignment[]
 
   @@index([vehicleNumber])
   @@index([status])
@@ -144,25 +121,23 @@ model Vehicle {
 }
 
 model SystemDocument {
-  id           String                   @id @default(uuid())
-  title        String                   // "New Safety Policy", "Fueling Procedures"
-  description  String?                  // Brief description
-  documentType SystemDocumentType
-  category     DocumentCategory         // SAFETY, COMPLIANCE, PROCEDURE, POLICY
-  filePath     String
-  fileName     String
-  fileSize     Int
-  mimeType     String
-  isRequired   Boolean                  @default(false) // Must be acknowledged?
-  isActive     Boolean                  @default(true)
-  uploadedBy   String                   // Admin who uploaded
-  uploader     User                     @relation("SystemDocumentUploads", fields: [uploadedBy], references: [id])
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  isDeleted    Boolean                  @default(false)
-
-  // Relations
+  id              String                   @id @default(uuid())
+  documentType    SystemDocumentType
+  filePath        String
+  fileName        String
+  isActive        Boolean                  @default(true)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  isDeleted       Boolean                  @default(false)
+  category        DocumentCategory
+  description     String?
+  fileSize        Int
+  isRequired      Boolean                  @default(false)
+  mimeType        String
+  title           String
+  uploadedBy      String
   acknowledgments DocumentAcknowledgment[]
+  uploader        User                     @relation("SystemDocumentUploads", fields: [uploadedBy], references: [id])
 
   @@index([isRequired])
   @@index([isActive])
@@ -172,27 +147,492 @@ model SystemDocument {
   @@map("system_documents")
 }
 
-// Track which drivers have acknowledged which documents
 model DocumentAcknowledgment {
   id             String         @id @default(uuid())
   documentId     String
-  document       SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   driverId       String
-  driver         User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
-  routeId        String?        // Specific route for which this was acknowledged
-  route          Route?         @relation(fields: [routeId], references: [id])
   acknowledgedAt DateTime       @default(now())
-  ipAddress      String?        // Audit trail
-  userAgent      String?        // Audit trail
+  ipAddress      String?
+  userAgent      String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+  routeId        String?
+  document       SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  driver         User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
+  route          Route?         @relation(fields: [routeId], references: [id])
 
-  @@unique([documentId, driverId, routeId]) // One acknowledgment per driver per document per route
+  @@unique([documentId, driverId, routeId])
   @@index([driverId])
   @@index([documentId])
   @@index([routeId])
   @@index([acknowledgedAt])
   @@map("document_acknowledgments")
+}
+
+model VehicleAssignment {
+  id         String   @id @default(uuid())
+  vehicleId  String
+  driverId   String
+  routeId    String?
+  assignedAt DateTime @default(now())
+  assignedBy String
+  isActive   Boolean  @default(true)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isDeleted  Boolean  @default(false)
+  driver     User     @relation("DriverVehicleAssignments", fields: [driverId], references: [id])
+  route      Route?   @relation(fields: [routeId], references: [id])
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+  @@index([driverId])
+  @@index([routeId])
+  @@index([isActive])
+  @@index([isDeleted])
+  @@map("vehicle_assignments")
+}
+
+model Stop {
+  id                     String           @id @default(uuid())
+  routeId                String
+  customerId             String
+  sequence               Int
+  address                String
+  customerNameFromUpload String?
+  orderNumberWeb         String?
+  quickbooksInvoiceNum   String?
+  initialDriverNotes     String?
+  status                 StopStatus       @default(PENDING)
+  arrivalTime            DateTime?
+  completionTime         DateTime?
+  signedInvoicePdfUrl    String?
+  driverNotes            String?
+  isCOD                  Boolean          @default(false)
+  paymentFlagCash        Boolean          @default(false)
+  paymentFlagCheck       Boolean          @default(false)
+  paymentFlagCC          Boolean          @default(false)
+  paymentFlagNotPaid     Boolean          @default(false)
+  returnFlagInitial      Boolean          @default(false)
+  driverRemarkInitial    String?
+  amount                 Float?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  isDeleted              Boolean          @default(false)
+  driverNameFromUpload   String?
+  onTheWayTime           DateTime?
+  invoiceImageUrls       String[]         @default([])
+  driverPaymentAmount    Float?
+  driverPaymentMethods   String[]         @default([])
+  paymentAmountCC        Float?           @default(0)
+  paymentAmountCash      Float?           @default(0)
+  paymentAmountCheck     Float?           @default(0)
+  totalPaymentAmount     Float?           @default(0)
+  paymentTerms           String?
+  paymentTermsOther      String?
+  creditMemoAmount       Float?
+  creditMemoNumber       String?
+  adminNotes             AdminNote[]
+  creditMemos            CreditMemo[]
+  driverLocations        DriverLocation[]
+  payments               Payment[]
+  returns                Return[]
+  stopDocuments          StopDocument[]
+  customer               Customer         @relation(fields: [customerId], references: [id])
+  route                  Route            @relation(fields: [routeId], references: [id])
+
+  @@index([routeId])
+  @@index([customerId])
+  @@index([status])
+  @@index([driverNameFromUpload])
+  @@index([isDeleted])
+  @@index([sequence])
+  @@map("stops")
+}
+
+model Return {
+  id                  String   @id @default(uuid())
+  stopId              String
+  orderItemIdentifier String
+  productDescription  String?
+  quantity            Int
+  reasonCode          String
+  warehouseLocation   String?
+  vendorCreditNum     String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+  productId           String?
+  product             Product? @relation(fields: [productId], references: [id])
+  stop                Stop     @relation(fields: [stopId], references: [id])
+
+  @@map("returns")
+}
+
+model CreditMemo {
+  id               String    @id @default(uuid())
+  stopId           String
+  creditMemoNumber String
+  creditMemoAmount Float
+  documentId       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  isDeleted        Boolean   @default(false)
+  document         Document? @relation(fields: [documentId], references: [id])
+  stop             Stop      @relation(fields: [stopId], references: [id])
+
+  @@index([stopId])
+  @@index([documentId])
+  @@index([isDeleted])
+  @@map("credit_memos")
+}
+
+model AdminNote {
+  id             String    @id @default(uuid())
+  stopId         String
+  adminId        String
+  note           String
+  readByDriver   Boolean   @default(false)
+  readByDriverAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isDeleted      Boolean   @default(false)
+  admin          User      @relation("AdminNotes", fields: [adminId], references: [id])
+  stop           Stop      @relation(fields: [stopId], references: [id])
+
+  @@index([stopId])
+  @@index([adminId])
+  @@index([readByDriver])
+  @@index([isDeleted])
+  @@map("admin_notes")
+}
+
+model SafetyCheck {
+  id                    String        @id @default(uuid())
+  routeId               String
+  type                  ChecklistType
+  responses             Json
+  timestamp             DateTime      @default(now())
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  isDeleted             Boolean       @default(false)
+  driverId              String
+  calledWarehouse       Boolean?
+  cashBackAmount        Float?
+  creditCardCashAmount  Float?
+  creditCardNumber      String?
+  date                  DateTime?
+  dieselAmount          Float?
+  dieselLevel           String?
+  dieselReceipt         Boolean?
+  dollNumber            String?
+  dpfLevel              String?
+  electricityBoxPhoto   Boolean?
+  frontLightsPhoto      Boolean?
+  fuelCapKeyNumber      String?
+  mileage1              String?
+  mileage2              String?
+  notes                 String?
+  palletJackNumber      String?
+  palletsIn             Int?
+  palletsOut            Int?
+  palletsPhoto          Boolean?
+  strapLevel            String?
+  truckJackNumber       String?
+  truckNumber           String?
+  vehicleConditionVideo Boolean?
+  braksWorking          Boolean?
+  dolliesSecured        Boolean?
+  lightsWorking         Boolean?
+  palletJackWorking     Boolean?
+  routeReviewed         Boolean?
+  strapsAvailable       Boolean?
+  tiresCondition        Boolean?
+  vehicleClean          Boolean?
+  driver                User          @relation("DriverSafetyChecks", fields: [driverId], references: [id])
+  route                 Route         @relation(fields: [routeId], references: [id])
+
+  @@index([routeId])
+  @@index([driverId])
+  @@index([type])
+  @@index([isDeleted])
+  @@map("safety_checks")
+}
+
+model SafetyDeclaration {
+  id                  String   @id @default(uuid())
+  driverId            String
+  routeId             String?
+  declarationType     String   @default("DAILY")
+  vehicleInspected    Boolean  @default(false)
+  safetyEquipment     Boolean  @default(false)
+  routeUnderstood     Boolean  @default(false)
+  emergencyProcedures Boolean  @default(false)
+  companyPolicies     Boolean  @default(false)
+  signature           String?
+  ipAddress           String?
+  userAgent           String?
+  acknowledgedAt      DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  isDeleted           Boolean  @default(false)
+  driver              User     @relation("DriverSafetyDeclarations", fields: [driverId], references: [id])
+  route               Route?   @relation("RouteSafetyDeclarations", fields: [routeId], references: [id])
+
+  @@index([driverId])
+  @@index([routeId])
+  @@index([declarationType])
+  @@index([acknowledgedAt])
+  @@index([isDeleted])
+  @@map("safety_declarations")
+}
+
+model RouteUpload {
+  id               String       @id @default(uuid())
+  fileName         String
+  originalFileName String
+  uploadedBy       String
+  uploadedAt       DateTime     @default(now())
+  processedAt      DateTime?
+  status           UploadStatus @default(PENDING)
+  errorMessage     String?
+  rowsProcessed    Int          @default(0)
+  rowsSucceeded    Int          @default(0)
+  rowsFailed       Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  isDeleted        Boolean      @default(false)
+
+  @@index([uploadedBy])
+  @@index([status])
+  @@index([uploadedAt])
+  @@index([isDeleted])
+  @@map("route_uploads")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  sku         String   @unique
+  description String?
+  unit        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  Return      Return[]
+
+  @@index([sku])
+  @@index([name])
+  @@index([isDeleted])
+  @@map("products")
+}
+
+model CustomerEmail {
+  id                 String      @id @default(uuid())
+  stopId             String
+  customerEmail      String
+  subject            String
+  body               String
+  signedInvoiceUrl   String?
+  originalInvoiceUrl String?
+  status             EmailStatus @default(PENDING)
+  sentAt             DateTime?
+  error              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  isDeleted          Boolean     @default(false)
+
+  @@index([stopId])
+  @@index([status])
+  @@index([sentAt])
+  @@index([isDeleted])
+  @@map("customer_emails")
+}
+
+model Document {
+  id            String         @id @default(uuid())
+  title         String
+  description   String?
+  type          DocumentType
+  fileName      String
+  filePath      String
+  fileSize      Int
+  mimeType      String
+  uploadedBy    String
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isDeleted     Boolean        @default(false)
+  customerId    String?
+  creditMemos   CreditMemo[]
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  uploader      User           @relation("DocumentUploads", fields: [uploadedBy], references: [id])
+  stopDocuments StopDocument[]
+
+  @@index([type])
+  @@index([uploadedBy])
+  @@index([isActive])
+  @@index([isDeleted])
+  @@index([customerId])
+  @@map("documents")
+}
+
+model StopDocument {
+  id         String    @id @default(uuid())
+  stopId     String
+  documentId String
+  isPrinted  Boolean   @default(false)
+  printedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  isDeleted  Boolean   @default(false)
+  document   Document  @relation(fields: [documentId], references: [id])
+  stop       Stop      @relation(fields: [stopId], references: [id])
+
+  @@unique([stopId, documentId])
+  @@index([stopId])
+  @@index([documentId])
+  @@index([isPrinted])
+  @@index([isDeleted])
+  @@map("stop_documents")
+}
+
+model FileCategory {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?
+  pathPrefix    String
+  maxFileSize   Int      @default(10485760)
+  allowedTypes  String[] @default([])
+  retentionDays Int      @default(365)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  files         File[]
+
+  @@map("file_categories")
+}
+
+model File {
+  id           String          @id @default(uuid())
+  originalName String
+  storedName   String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  categoryId   String?
+  uploadedBy   String
+  checksum     String
+  metadata     Json?
+  isArchived   Boolean         @default(false)
+  archivedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  isDeleted    Boolean         @default(false)
+  thumbnails   FileThumbnail[]
+  versions     FileVersion[]
+  category     FileCategory?   @relation(fields: [categoryId], references: [id])
+  uploader     User            @relation("FileUploads", fields: [uploadedBy], references: [id])
+
+  @@index([categoryId])
+  @@index([uploadedBy])
+  @@index([checksum])
+  @@index([isArchived])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@map("files")
+}
+
+model FileVersion {
+  id            String   @id @default(uuid())
+  fileId        String
+  versionNumber Int
+  filePath      String
+  fileSize      Int
+  createdAt     DateTime @default(now())
+  file          File     @relation(fields: [fileId], references: [id])
+
+  @@index([fileId])
+  @@map("file_versions")
+}
+
+model FileThumbnail {
+  id        String        @id @default(uuid())
+  fileId    String
+  size      ThumbnailSize
+  filePath  String
+  width     Int
+  height    Int
+  createdAt DateTime      @default(now())
+  file      File          @relation(fields: [fileId], references: [id])
+
+  @@index([fileId])
+  @@index([size])
+  @@map("file_thumbnails")
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  stopId    String
+  amount    Float
+  method    String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stop      Stop     @relation(fields: [stopId], references: [id], onDelete: Cascade)
+
+  @@index([stopId])
+  @@index([method])
+  @@map("payments")
+}
+
+model DriverLocation {
+  id        String   @id @default(uuid())
+  driverId  String
+  routeId   String?
+  stopId    String?
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  driver    User     @relation("DriverLocationUpdates", fields: [driverId], references: [id])
+  route     Route?   @relation(fields: [routeId], references: [id])
+  stop      Stop?    @relation(fields: [stopId], references: [id])
+
+  @@index([driverId])
+  @@index([routeId])
+  @@index([stopId])
+  @@index([timestamp])
+  @@index([createdAt])
+  @@map("driver_locations")
+}
+
+model DailyKPI {
+  id             String    @id @default(uuid())
+  driverId       String
+  routeId        String?
+  date           DateTime
+  milesStart     Float?
+  milesEnd       Float?
+  milesDriven    Float?
+  totalDelivered Float     @default(0)
+  stopsCompleted Int       @default(0)
+  stopsTotal     Int       @default(0)
+  timeStart      DateTime?
+  timeEnd        DateTime?
+  totalTime      Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isDeleted      Boolean   @default(false)
+  driver         User      @relation("DriverKPIs", fields: [driverId], references: [id])
+  route          Route?    @relation("RouteKPIs", fields: [routeId], references: [id])
+
+  @@unique([driverId, date])
+  @@index([driverId])
+  @@index([routeId])
+  @@index([date])
+  @@index([createdAt])
+  @@map("daily_kpis")
 }
 
 enum DocumentCategory {
@@ -217,346 +657,6 @@ enum SystemDocumentType {
   OTHER
 }
 
-model VehicleAssignment {
-  id         String   @id @default(uuid())
-  vehicleId  String
-  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id])
-  driverId   String
-  driver     User     @relation("DriverVehicleAssignments", fields: [driverId], references: [id])
-  routeId    String? // Optional: specific route assignment
-  route      Route?   @relation(fields: [routeId], references: [id])
-  assignedAt DateTime @default(now())
-  assignedBy String // Admin who made the assignment
-  isActive   Boolean  @default(true) // Whether this assignment is currently active
-  notes      String? // Assignment notes
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  isDeleted  Boolean  @default(false)
-
-  @@index([vehicleId])
-  @@index([driverId])
-  @@index([routeId])
-  @@index([isActive])
-  @@index([isDeleted])
-  @@map("vehicle_assignments")
-}
-
-// Stop model
-model Stop {
-  id                     String     @id @default(uuid())
-  routeId                String
-  route                  Route      @relation(fields: [routeId], references: [id])
-  customerId             String
-  customer               Customer   @relation(fields: [customerId], references: [id])
-  sequence               Int
-  address                String
-  customerNameFromUpload String? // Original customer name from the upload
-  driverNameFromUpload   String? // Original driver name from the upload
-  orderNumberWeb         String? // Order # (Web) from the upload
-  quickbooksInvoiceNum   String? // Invoice # from the upload
-  initialDriverNotes     String? // Notes to be updated at top of the INVOICE
-  status                 StopStatus @default(PENDING)
-  onTheWayTime           DateTime? // Time when driver started the delivery (status changed to ON_THE_WAY)
-  arrivalTime            DateTime? // Time when driver arrived at the stop (status changed to ARRIVED)
-  completionTime         DateTime? // Time when delivery was completed (status changed to COMPLETED)
-  signedInvoicePdfUrl    String?
-  invoiceImageUrls       String[]   @default([]) // URLs of uploaded invoice images for admin preview
-  driverNotes            String? // Notes added by driver during delivery
-  isCOD                  Boolean    @default(false) // COD Account flag
-  paymentFlagCash        Boolean    @default(false) // Cash payment flag
-  paymentFlagCheck       Boolean    @default(false) // Check payment flag
-  paymentFlagCC          Boolean    @default(false) // Credit Card payment flag
-  paymentFlagNotPaid     Boolean    @default(false) // Not paid flag
-  returnFlagInitial      Boolean    @default(false) // Return flag from upload
-  driverRemarkInitial    String? // Other Remarks from upload
-  amount                 Float? // Amount from the upload
-  // Payment amounts from Excel columns AK, AL, AM
-  paymentAmountCash      Float?     @default(0) // Cash payment amount from column AK
-  paymentAmountCheck     Float?     @default(0) // Check payment amount from column AL
-  paymentAmountCC        Float?     @default(0) // Credit Card payment amount from column AM
-  totalPaymentAmount     Float?     @default(0) // Sum of all payment amounts
-  // Driver-recorded payment information (for future use)
-  driverPaymentAmount    Float? // Payment amount recorded by driver during delivery
-  driverPaymentMethods   String[]   @default([]) // Payment methods selected by driver (Cash, Check, CC)
-  // Stop-specific payment terms (overrides customer default if set)
-  paymentTerms           String? // Payment terms for this specific stop (COD, Prepaid, Post Paid, etc.)
-  paymentTermsOther      String? // Custom payment terms when "Other" is selected
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
-  isDeleted              Boolean    @default(false)
-
-  // Relations
-  returns         Return[]
-  adminNotes      AdminNote[]
-  stopDocuments   StopDocument[]
-  payments        Payment[] // Individual payment entries
-  driverLocations DriverLocation[]
-
-  @@index([routeId])
-  @@index([customerId])
-  @@index([status])
-  @@index([driverNameFromUpload])
-  @@index([isDeleted])
-  @@index([sequence])
-  @@map("stops")
-}
-
-// Return model
-model Return {
-  id                  String   @id @default(uuid())
-  stopId              String
-  stop                Stop     @relation(fields: [stopId], references: [id])
-  orderItemIdentifier String // Product ID or identifier
-  productDescription  String? // Description of the returned product
-  productId           String? // Add this field
-  product             Product? @relation(fields: [productId], references: [id]) // Add this relation
-  quantity            Int
-  reasonCode          String
-  warehouseLocation   String?
-  vendorCreditNum     String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  isDeleted           Boolean  @default(false)
-
-  @@map("returns")
-}
-
-// AdminNote model
-model AdminNote {
-  id             String    @id @default(uuid())
-  stopId         String
-  stop           Stop      @relation(fields: [stopId], references: [id])
-  adminId        String
-  admin          User      @relation("AdminNotes", fields: [adminId], references: [id])
-  note           String
-  readByDriver   Boolean   @default(false)
-  readByDriverAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  isDeleted      Boolean   @default(false)
-
-  @@index([stopId])
-  @@index([adminId])
-  @@index([readByDriver])
-  @@index([isDeleted])
-  @@map("admin_notes")
-}
-
-// SafetyCheck model
-model SafetyCheck {
-  id               String        @id @default(uuid())
-  routeId          String
-  route            Route         @relation(fields: [routeId], references: [id])
-  driverId         String // ID of the driver who submitted the safety check
-  driver           User          @relation("DriverSafetyChecks", fields: [driverId], references: [id])
-  type             ChecklistType
-  // Enhanced responses structure to match PRD requirements
-  // Vehicle & Fuel Check fields
-  date             DateTime? // Date field
-  mileage1         String? // MIL #1
-  mileage2         String? // MIL #2
-  dieselLevel      String? // Diesel Level (Dropdown)
-  palletsIn        Int? // Pallets IN
-  palletsOut       Int? // Pallets OUT
-  dpfLevel         String? // DPF Level
-  dieselReceipt    Boolean? // Diesel Receipt
-  dollNumber       String? // Doll #
-  truckJackNumber  String? // Truck Jack #
-  strapLevel       String? // Strap Level (Stupl Heve in PRD)
-  palletJackNumber String? // Pallet Jack #
-  truckNumber      String? // Truck #
-
-  // Fueling Details
-  dieselAmount         Float? // Diesel Amount
-  creditCardNumber     String? // Credit Card No.
-  fuelCapKeyNumber     String? // Key for Fuel Cap #
-  creditCardCashAmount Float? // Credit Card / Cash Receive Amount
-  cashBackAmount       Float? // Cash Back Amount
-
-  // Photo/Video Upload Checklist
-  frontLightsPhoto      Boolean? // Upload photo of front lights/tail lights
-  electricityBoxPhoto   Boolean? // Upload photo of electricity box (power off)
-  palletsPhoto          Boolean? // Upload photo of pallets/dolly/pallet jack
-  vehicleConditionVideo Boolean? // Upload video of vehicle condition
-  calledWarehouse       Boolean? // Called warehouse before leaving
-
-  // Additional fields
-  notes String? // Additional notes
-
-  // Simplified Safety Check fields (for start-of-day)
-  lightsWorking     Boolean? // All lights working
-  tiresCondition    Boolean? // Tires in good condition
-  braksWorking      Boolean? // Brakes working properly
-  vehicleClean      Boolean? // Vehicle is clean and presentable
-  palletJackWorking Boolean? // Pallet jack working properly
-  dolliesSecured    Boolean? // Dollies secured and in good condition
-  strapsAvailable   Boolean? // Straps available and in good condition
-  routeReviewed     Boolean? // Route reviewed and understood
-
-  responses Json // Keep original responses for backward compatibility
-  timestamp DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
-
-  @@index([routeId])
-  @@index([driverId])
-  @@index([type])
-  @@index([isDeleted])
-  @@map("safety_checks")
-}
-
-// Milestone 2: Safety Declaration model
-// Drivers must acknowledge safety responsibilities before starting routes
-model SafetyDeclaration {
-  id                String   @id @default(uuid())
-  driverId          String
-  driver            User     @relation("DriverSafetyDeclarations", fields: [driverId], references: [id])
-  routeId           String?
-  route             Route?   @relation("RouteSafetyDeclarations", fields: [routeId], references: [id])
-  declarationType   String   @default("DAILY") // DAILY, ROUTE_SPECIFIC
-  // Declaration statements
-  vehicleInspected  Boolean  @default(false) // I have inspected the vehicle
-  safetyEquipment   Boolean  @default(false) // I have verified all safety equipment
-  routeUnderstood   Boolean  @default(false) // I understand my route and responsibilities
-  emergencyProcedures Boolean @default(false) // I know emergency procedures
-  companyPolicies   Boolean  @default(false) // I agree to follow company policies
-  // Signature and timestamp
-  signature         String? // Driver's digital signature (name or signature data)
-  ipAddress         String? // IP address for audit trail
-  userAgent         String? // Browser/device info for audit trail
-  acknowledgedAt    DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  isDeleted         Boolean  @default(false)
-
-  @@index([driverId])
-  @@index([routeId])
-  @@index([declarationType])
-  @@index([acknowledgedAt])
-  @@index([isDeleted])
-  @@map("safety_declarations")
-}
-
-// RouteUpload model to track uploaded files
-model RouteUpload {
-  id               String       @id @default(uuid())
-  fileName         String
-  originalFileName String
-  uploadedBy       String // ID of the admin who uploaded the file
-  uploadedAt       DateTime     @default(now())
-  processedAt      DateTime?
-  status           UploadStatus @default(PENDING)
-  errorMessage     String?
-  rowsProcessed    Int          @default(0)
-  rowsSucceeded    Int          @default(0)
-  rowsFailed       Int          @default(0)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  isDeleted        Boolean      @default(false)
-
-  @@index([uploadedBy])
-  @@index([status])
-  @@index([uploadedAt])
-  @@index([isDeleted])
-  @@map("route_uploads")
-}
-
-// Product model
-model Product {
-  id          String   @id @default(uuid())
-  name        String
-  sku         String   @unique
-  description String?
-  unit        String? // e.g., "pound", "each", "case"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  Return      Return[]
-
-  @@index([sku])
-  @@index([name])
-  @@index([isDeleted])
-  @@map("products")
-}
-
-// CustomerEmail model for tracking email notifications
-model CustomerEmail {
-  id                 String      @id @default(uuid())
-  stopId             String // Related stop ID
-  customerEmail      String // Customer email address
-  subject            String // Email subject
-  body               String // Email body (can be HTML)
-  signedInvoiceUrl   String? // URL to the signed invoice PDF
-  originalInvoiceUrl String? // URL to the original QuickBooks invoice PDF
-  status             EmailStatus @default(PENDING)
-  sentAt             DateTime?
-  error              String? // Error message if sending failed
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  isDeleted          Boolean     @default(false)
-
-  @@index([stopId])
-  @@index([status])
-  @@index([sentAt])
-  @@index([isDeleted])
-  @@map("customer_emails")
-}
-
-// Document model for admin-uploaded documents that drivers can print
-model Document {
-  id          String       @id @default(uuid())
-  title       String // Document title/name
-  description String? // Optional description
-  type        DocumentType // Type of document (invoice, credit_memo, other)
-  fileName    String // Original file name
-  filePath    String // Path to the uploaded file
-  fileSize    Int // File size in bytes
-  mimeType    String // MIME type of the file
-  uploadedBy  String // ID of the admin who uploaded the document
-  uploader    User         @relation("DocumentUploads", fields: [uploadedBy], references: [id])
-  isActive    Boolean      @default(true) // Whether the document is active/available
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  isDeleted   Boolean      @default(false)
-
-  // Document scope - either customer-level or stop-specific
-  customerId String? // If set, this is a customer-level document
-  customer   Customer? @relation(fields: [customerId], references: [id])
-
-  // Relations
-  stopDocuments StopDocument[]
-
-  @@index([type])
-  @@index([uploadedBy])
-  @@index([isActive])
-  @@index([isDeleted])
-  @@index([customerId])
-  @@map("documents")
-}
-
-// Junction table for documents assigned to specific stops
-model StopDocument {
-  id         String    @id @default(uuid())
-  stopId     String
-  stop       Stop      @relation(fields: [stopId], references: [id])
-  documentId String
-  document   Document  @relation(fields: [documentId], references: [id])
-  isPrinted  Boolean   @default(false) // Whether the driver has printed this document
-  printedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  isDeleted  Boolean   @default(false)
-
-  @@unique([stopId, documentId]) // Prevent duplicate assignments
-  @@index([stopId])
-  @@index([documentId])
-  @@index([isPrinted])
-  @@index([isDeleted])
-  @@map("stop_documents")
-}
-
-// Enums
 enum Role {
   ADMIN
   DRIVER
@@ -598,98 +698,18 @@ enum EmailStatus {
 }
 
 enum DocumentType {
-  // Keep existing values for backward compatibility
   INVOICE
   CREDIT_MEMO
   DELIVERY_RECEIPT
   RETURN_FORM
   OTHER
-
-  // Milestone 1: New document types (additive only)
   CUSTOMER_INVOICE
   VENDOR_BILL_WORK_ORDER
   GASOLINE_DIESEL_EXPENSE
   DRIVER_WAREHOUSE_HOURS
   SAFETY_DECLARATION
   STATEMENT
-}
-
-// Enhanced File Management System
-model FileCategory {
-  id            String   @id @default(uuid())
-  name          String   @unique
-  description   String?
-  pathPrefix    String // e.g., "documents/invoices"
-  maxFileSize   Int      @default(10485760) // 10MB default
-  allowedTypes  String[] @default([]) // MIME types
-  retentionDays Int      @default(365) // How long to keep files
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  files File[]
-
-  @@map("file_categories")
-}
-
-model File {
-  id           String        @id @default(uuid())
-  originalName String // Original filename from upload
-  storedName   String // Generated filename for storage
-  filePath     String // Relative path from uploads root
-  fileSize     Int // File size in bytes
-  mimeType     String // MIME type
-  categoryId   String? // Optional category
-  category     FileCategory? @relation(fields: [categoryId], references: [id])
-  uploadedBy   String // User who uploaded the file
-  uploader     User          @relation("FileUploads", fields: [uploadedBy], references: [id])
-  checksum     String // SHA256 hash for duplicate detection
-  metadata     Json? // Additional metadata
-  isArchived   Boolean       @default(false)
-  archivedAt   DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  isDeleted    Boolean       @default(false)
-
-  // Relations
-  versions   FileVersion[]
-  thumbnails FileThumbnail[]
-
-  @@index([categoryId])
-  @@index([uploadedBy])
-  @@index([checksum])
-  @@index([isArchived])
-  @@index([isDeleted])
-  @@index([createdAt])
-  @@map("files")
-}
-
-model FileVersion {
-  id            String   @id @default(uuid())
-  fileId        String
-  file          File     @relation(fields: [fileId], references: [id])
-  versionNumber Int // 1, 2, 3, etc.
-  filePath      String // Path to this version
-  fileSize      Int // Size of this version
-  createdAt     DateTime @default(now())
-
-  @@index([fileId])
-  @@map("file_versions")
-}
-
-model FileThumbnail {
-  id        String        @id @default(uuid())
-  fileId    String
-  file      File          @relation(fields: [fileId], references: [id])
-  size      ThumbnailSize // small, medium, large
-  filePath  String // Path to thumbnail
-  width     Int
-  height    Int
-  createdAt DateTime      @default(now())
-
-  @@index([fileId])
-  @@index([size])
-  @@map("file_thumbnails")
+  PURCHASE_ORDER
 }
 
 enum ThumbnailSize {
@@ -702,89 +722,4 @@ enum VehicleStatus {
   ACTIVE
   MAINTENANCE
   RETIRED
-}
-
-// Payment model for individual payment entries
-model Payment {
-  id        String   @id @default(uuid())
-  stopId    String
-  amount    Float // Payment amount
-  method    String // Payment method: "Cash", "Check", "Credit Card"
-  notes     String? // Optional notes about the payment
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  stop Stop @relation(fields: [stopId], references: [id], onDelete: Cascade)
-
-  @@index([stopId])
-  @@index([method])
-  @@map("payments")
-}
-
-// Milestone 4: Location Tracking (Optimized for Cost & Performance)
-// Stores location history with 7-day auto-cleanup policy
-// For real-time tracking, use User.lastKnownLatitude/Longitude instead
-model DriverLocation {
-  id        String   @id @default(uuid())
-  driverId  String
-  driver    User     @relation("DriverLocationUpdates", fields: [driverId], references: [id])
-  routeId   String?
-  route     Route?   @relation(fields: [routeId], references: [id])
-  stopId    String?
-  stop      Stop?    @relation(fields: [stopId], references: [id])
-
-  // Location data
-  latitude  Float // GPS latitude
-  longitude Float // GPS longitude
-  accuracy  Float? // GPS accuracy in meters
-
-  // Timestamps
-  timestamp DateTime @default(now()) // When location was captured
-  createdAt DateTime @default(now()) // When record was created
-
-  @@index([driverId])
-  @@index([routeId])
-  @@index([stopId])
-  @@index([timestamp]) // For efficient cleanup queries
-  @@index([createdAt]) // For 7-day cleanup
-  @@map("driver_locations")
-}
-
-// Milestone 5: Driver Performance Tracking (KPI System)
-// Captures daily key performance indicators for each driver
-model DailyKPI {
-  id        String   @id @default(uuid())
-  driverId  String
-  driver    User     @relation("DriverKPIs", fields: [driverId], references: [id])
-  routeId   String?
-  route     Route?   @relation("RouteKPIs", fields: [routeId], references: [id])
-  date      DateTime // Date of the route/shift
-
-  // Mileage tracking
-  milesStart  Float? // Starting odometer reading
-  milesEnd    Float? // Ending odometer reading
-  milesDriven Float? // Calculated: milesEnd - milesStart
-
-  // Delivery metrics
-  totalDelivered Float   @default(0) // Total dollar amount delivered
-  stopsCompleted Int     @default(0) // Number of stops completed
-  stopsTotal     Int     @default(0) // Total stops assigned
-
-  // Time tracking
-  timeStart DateTime? // When driver started their route (safety check completed)
-  timeEnd   DateTime? // When driver completed their route (end-of-day submitted)
-  totalTime Int? // Total time in minutes (calculated)
-
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
-
-  @@unique([driverId, date]) // One KPI record per driver per day
-  @@index([driverId])
-  @@index([routeId])
-  @@index([date])
-  @@index([createdAt])
-  @@map("daily_kpis")
 }

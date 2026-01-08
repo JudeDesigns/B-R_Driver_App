@@ -57,6 +57,14 @@ interface Stop {
   driverNameFromUpload: string | null; // Added driver name from upload
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
+  creditMemoNumber: string | null;
+  creditMemoAmount: number | null;
+  creditMemos?: Array<{
+    id: string;
+    creditMemoNumber: string;
+    creditMemoAmount: number;
+    createdAt: string;
+  }>;
   initialDriverNotes: string | null;
   status: string;
   arrivalTime: string | null;
@@ -908,6 +916,37 @@ export default function RouteDetailPage({
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           {stop.quickbooksInvoiceNum || "N/A"}
         </td>
+        <td className="px-6 py-4 text-sm font-medium text-purple-900">
+          {stop.creditMemos && stop.creditMemos.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {stop.creditMemos.map((cm) => (
+                <div key={cm.id} className="text-xs">
+                  {cm.creditMemoNumber}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </td>
+        <td className="px-6 py-4 text-sm font-semibold text-purple-900">
+          {stop.creditMemos && stop.creditMemos.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {stop.creditMemos.map((cm) => (
+                <div key={cm.id} className="text-xs">
+                  ${cm.creditMemoAmount.toFixed(2)}
+                </div>
+              ))}
+              {stop.creditMemos.length > 1 && (
+                <div className="text-xs font-bold border-t border-purple-300 pt-1 mt-1">
+                  Total: ${stop.creditMemos.reduce((sum, cm) => sum + cm.creditMemoAmount, 0).toFixed(2)}
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </td>
         <td className="px-6 py-4 whitespace-nowrap">
           <span
             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(
@@ -1060,6 +1099,12 @@ export default function RouteDetailPage({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Invoice #
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-purple-600 uppercase tracking-wider">
+                  Credit Memo #
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-purple-600 uppercase tracking-wider">
+                  Credit Amt
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
@@ -1097,7 +1142,7 @@ export default function RouteDetailPage({
               </SortableContext>
               {/* Driver Total Row */}
               <tr className="bg-blue-50 border-t-2 border-blue-300">
-                <td colSpan={7} className="px-6 py-3 text-right text-sm font-bold text-gray-900">
+                <td colSpan={9} className="px-6 py-3 text-right text-sm font-bold text-gray-900">
                   Driver Payment Total:
                 </td>
                 <td className="px-6 py-3 whitespace-nowrap">
@@ -1650,6 +1695,34 @@ export default function RouteDetailPage({
                         </th>
                         <th
                           scope="col"
+                          className="px-6 py-3 text-left text-xs font-semibold text-purple-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('creditMemoNumber')}
+                        >
+                          <div className="flex items-center">
+                            Credit Memo #
+                            {sortField === 'creditMemoNumber' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-semibold text-purple-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
+                          onClick={() => handleSort('creditMemoAmount')}
+                        >
+                          <div className="flex items-center">
+                            Credit Amt
+                            {sortField === 'creditMemoAmount' && (
+                              <svg className={`ml-1 h-4 w-4 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          scope="col"
                           className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200"
                           onClick={() => handleSort('status')}
                         >
@@ -1712,7 +1785,16 @@ export default function RouteDetailPage({
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {getSortedStops(route.stops)
-                        .map((stop, index) => (
+                        .map((stop, index) => {
+                          // Debug: Log credit memo data for first stop
+                          if (index === 0) {
+                            console.log('First stop credit memo data:', {
+                              creditMemoNumber: stop.creditMemoNumber,
+                              creditMemoAmount: stop.creditMemoAmount,
+                              stopId: stop.id
+                            });
+                          }
+                          return (
                           <tr
                             key={stop.id}
                             className={`hover:bg-gray-50 transition-colors duration-150 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"
@@ -1750,6 +1832,37 @@ export default function RouteDetailPage({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {stop.quickbooksInvoiceNum || "N/A"}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-purple-900">
+                              {stop.creditMemos && stop.creditMemos.length > 0 ? (
+                                <div className="flex flex-col gap-1">
+                                  {stop.creditMemos.map((cm) => (
+                                    <div key={cm.id} className="text-xs">
+                                      {cm.creditMemoNumber}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-semibold text-purple-900">
+                              {stop.creditMemos && stop.creditMemos.length > 0 ? (
+                                <div className="flex flex-col gap-1">
+                                  {stop.creditMemos.map((cm) => (
+                                    <div key={cm.id} className="text-xs">
+                                      ${cm.creditMemoAmount.toFixed(2)}
+                                    </div>
+                                  ))}
+                                  {stop.creditMemos.length > 1 && (
+                                    <div className="text-xs font-bold border-t border-purple-300 pt-1 mt-1">
+                                      Total: ${stop.creditMemos.reduce((sum, cm) => sum + cm.creditMemoAmount, 0).toFixed(2)}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
@@ -1833,10 +1946,11 @@ export default function RouteDetailPage({
                               </Link>
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
                       {/* Total Amount Row */}
                       <tr className="bg-gray-50 border-t-2 border-gray-300">
-                        <td colSpan={6} className="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                        <td colSpan={8} className="px-6 py-4 text-right text-sm font-bold text-gray-900">
                           Total Payment Amount:
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

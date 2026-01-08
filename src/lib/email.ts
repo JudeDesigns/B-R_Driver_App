@@ -52,7 +52,9 @@ const createDeliveryConfirmationEmail = (
   invoiceNumber: string,
   deliveryTime: string,
   totalAmount: number = 0,
-  driverNotes?: string | null // Add driverNotes parameter
+  driverNotes?: string | null, // Add driverNotes parameter
+  creditMemoNumber?: string | null, // Add credit memo number parameter
+  creditMemoAmount?: number | null // Add credit memo amount parameter
 ) => {
   return `
     <!DOCTYPE html>
@@ -165,6 +167,16 @@ const createDeliveryConfirmationEmail = (
             <span class="detail-label">Total amount:</span>
             <span class="detail-value">$${totalAmount.toFixed(2)}</span>
           </div>
+          ${creditMemoNumber && creditMemoAmount ? `
+          <div class="detail-row" style="background-color: #f3e8ff; padding: 10px; border-left: 3px solid #9333ea; margin-top: 10px;">
+            <span class="detail-label" style="color: #7e22ce;">Credit Memo #:</span>
+            <span class="detail-value" style="color: #7e22ce; font-weight: bold;">${creditMemoNumber}</span>
+          </div>
+          <div class="detail-row" style="background-color: #f3e8ff; padding: 10px; border-left: 3px solid #9333ea;">
+            <span class="detail-label" style="color: #7e22ce;">Credit Amount:</span>
+            <span class="detail-value" style="color: #7e22ce; font-weight: bold;">$${creditMemoAmount.toFixed(2)}</span>
+          </div>
+          ` : ''}
           <div class="detail-row">
             <span class="detail-label">Delivered to:</span>
             <span class="detail-value">${customerName}</span>
@@ -238,13 +250,18 @@ export const sendDeliveryConfirmationEmail = async (
     // Create the email HTML content
     const invoiceNumber = stopData.quickbooksInvoiceNum || 'N/A'; // Use only QuickBooks invoice, not web order
     const totalAmount = stopData.amount || 0;
+    const creditMemoNumber = stopData.creditMemoNumber || null;
+    const creditMemoAmount = stopData.creditMemoAmount || null;
+
     const emailHtml = createDeliveryConfirmationEmail(
       customerName,
       orderNumber,
       invoiceNumber,
       deliveryTime,
       totalAmount, // Add total amount parameter
-      stopData.driverNotes // Pass driverNotes
+      stopData.driverNotes, // Pass driverNotes
+      creditMemoNumber, // Pass credit memo number
+      creditMemoAmount // Pass credit memo amount
     );
 
     // Determine email recipients based on configuration
@@ -264,8 +281,11 @@ export const sendDeliveryConfirmationEmail = async (
 
     const actualRecipient = recipients.join(', ');
 
-    // Format subject line - always use office format for consistency
-    const emailSubject = `Delivery Completed - ${customerName} - Order #${invoiceNumber} $${totalAmount.toFixed(2)}`;
+    // Format subject line - include credit memo if present
+    let emailSubject = `Delivery Completed - ${customerName} - Order #${invoiceNumber} $${totalAmount.toFixed(2)}`;
+    if (creditMemoNumber && creditMemoAmount) {
+      emailSubject += ` | Credit Memo #${creditMemoNumber} $${creditMemoAmount.toFixed(2)}`;
+    }
 
     // Create the email record in the database
     const emailRecord = await prisma.customerEmail.create({

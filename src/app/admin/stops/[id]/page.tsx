@@ -44,6 +44,8 @@ interface Stop {
   driverNameFromUpload: string | null;
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
+  creditMemoNumber: string | null;
+  creditMemoAmount: number | null;
   initialDriverNotes: string | null;
   arrivalTime: string | null;
   completionTime: string | null;
@@ -1294,6 +1296,32 @@ export default function StopDetailPage({
                           </div>
                         )}
                       </div>
+
+                      {/* Credit Memo Information */}
+                      {(stop.creditMemoNumber || stop.creditMemoAmount) && (
+                        <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                          <h4 className="text-sm font-semibold text-purple-800 mb-2 flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                            </svg>
+                            Credit Memo
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            {stop.creditMemoNumber && (
+                              <div>
+                                <span className="font-medium text-purple-700">Number:</span>
+                                <span className="ml-2 text-purple-900">{stop.creditMemoNumber}</span>
+                              </div>
+                            )}
+                            {stop.creditMemoAmount && (
+                              <div>
+                                <span className="font-medium text-purple-700">Amount:</span>
+                                <span className="ml-2 text-purple-900 font-semibold">${stop.creditMemoAmount.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

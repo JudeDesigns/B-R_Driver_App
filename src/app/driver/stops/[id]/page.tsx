@@ -64,6 +64,8 @@ interface Stop {
   customerNameFromUpload: string | null;
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
+  creditMemoNumber?: string | null;
+  creditMemoAmount?: number | null;
   initialDriverNotes: string | null;
   status: string;
   onTheWayTime: string | null; // Added for tracking when driver started the delivery

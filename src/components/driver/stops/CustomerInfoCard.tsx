@@ -19,6 +19,8 @@ interface Stop {
   amount: number | null;
   orderNumberWeb: string | null;
   quickbooksInvoiceNum: string | null;
+  creditMemoNumber?: string | null;
+  creditMemoAmount?: number | null;
   initialDriverNotes: string | null;
   paymentTerms?: string | null;
   paymentTermsOther?: string | null;
@@ -174,6 +176,32 @@ export default function CustomerInfoCard({ stop, formatDate }: CustomerInfoCardP
               </span>
             </div>
           </div>
+
+          {/* Credit Memo Information - Only show if present */}
+          {(stop.creditMemoNumber || stop.creditMemoAmount) && (
+            <>
+              <div className="col-span-2 sm:col-span-1">
+                <div className="flex flex-col">
+                  <span className="text-xs uppercase tracking-wider text-purple-600 font-medium">
+                    Credit Memo #
+                  </span>
+                  <span className="font-medium text-purple-900 text-sm sm:text-base">
+                    {stop.creditMemoNumber || "N/A"}
+                  </span>
+                </div>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <div className="flex flex-col">
+                  <span className="text-xs uppercase tracking-wider text-purple-600 font-medium">
+                    Credit Amount
+                  </span>
+                  <span className="font-semibold text-purple-900 text-sm sm:text-base">
+                    {stop.creditMemoAmount ? `$${stop.creditMemoAmount.toFixed(2)}` : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* All Instructions - Mobile Optimized */}
