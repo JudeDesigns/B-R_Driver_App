@@ -153,9 +153,9 @@ export default function EndOfDayCheckPage() {
         ) {
           console.log("Using routes from API that need end-of-day checks");
           // Use the routes directly from the API that need end-of-day checks
-          eligibleRoutes = safetyCheckData.routesNeedingEndOfDayChecks.filter(
-            (route: any) => route.status !== "COMPLETED"
-          );
+          // Allow routes regardless of status (IN_PROGRESS or COMPLETED)
+          // Each driver should be able to do end-of-day independently
+          eligibleRoutes = safetyCheckData.routesNeedingEndOfDayChecks;
         } else {
           console.log("Manually filtering routes that need end-of-day checks");
           // Fall back to manual filtering
