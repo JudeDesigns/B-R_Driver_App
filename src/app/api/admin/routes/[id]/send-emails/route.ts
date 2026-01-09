@@ -60,6 +60,8 @@ export async function POST(
             orderNumberWeb: true,
             quickbooksInvoiceNum: true,
             amount: true,
+            creditMemoNumber: true, // Include credit memo number
+            creditMemoAmount: true, // Include credit memo amount
             arrivalTime: true,
             completionTime: true,
             driverNotes: true,
@@ -135,6 +137,8 @@ export async function POST(
           orderNumberWeb: stop.orderNumberWeb,
           quickbooksInvoiceNum: stop.quickbooksInvoiceNum,
           amount: stop.amount || 0, // Add total amount
+          creditMemoNumber: stop.creditMemoNumber || null, // Add credit memo number
+          creditMemoAmount: stop.creditMemoAmount || null, // Add credit memo amount
         };
 
         // Prepare image URLs for PDF (from invoice images)
