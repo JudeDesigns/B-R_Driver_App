@@ -1106,6 +1106,7 @@ export default function StopDetailPage({
                         </div>
                         <EnhancedInvoiceUpload
                           stopId={stop.id}
+                          existingPdfUrl={stop.signedInvoicePdfUrl}
                           onUploadSuccess={handleUploadSuccess}
                           onUploadComplete={() => {
                             // PDF generated successfully - automatically mark step as completed

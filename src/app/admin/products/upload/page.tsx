@@ -20,6 +20,7 @@ export default function ProductUploadPage() {
   const [success, setSuccess] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -37,6 +38,49 @@ export default function ProductUploadPage() {
     if (selectedFile) {
       setFile(selectedFile);
       setError("");
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    if (!token) {
+      setError("You must be logged in to download the template");
+      return;
+    }
+
+    setDownloadingTemplate(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/products/template", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Failed to download template");
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `product_upload_template_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to download template";
+      setError(errorMessage);
+    } finally {
+      setDownloadingTemplate(false);
     }
   };
 
@@ -208,9 +252,33 @@ export default function ProductUploadPage() {
               )}
 
               <div className="mb-6">
-                <label className="block text-mono-800 text-sm font-medium mb-2">
-                  Upload CSV or Excel File
-                </label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-mono-800 text-sm font-medium">
+                    Upload CSV or Excel File
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    disabled={downloadingTemplate}
+                    className="text-primary-blue hover:text-blue-700 text-sm font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {downloadingTemplate ? "Downloading..." : "Download Template"}
+                  </button>
+                </div>
                 <div className="border-2 border-dashed border-mono-300 hover:border-primary-blue rounded-lg p-8 text-center transition-colors duration-200">
                   <input
                     type="file"

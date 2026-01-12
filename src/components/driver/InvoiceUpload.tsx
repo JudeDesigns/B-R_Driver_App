@@ -29,11 +29,38 @@ export default function InvoiceUpload({
     currentStopStatus || null
   );
   const [pdfUrl, setPdfUrl] = useState<string | null>(existingPdfUrl);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    uploadFile(file);
+
+    // Only show confirmation dialog if there are existing images
+    if (existingPdfUrl || pdfUrl) {
+      setPendingFile(file);
+      setShowConfirmDialog(true);
+    } else {
+      // No existing images, upload directly
+      uploadFile(file);
+    }
+  };
+
+  const handleConfirmUpload = () => {
+    setShowConfirmDialog(false);
+    if (pendingFile) {
+      uploadFile(pendingFile);
+      setPendingFile(null);
+    }
+  };
+
+  const handleCancelUpload = () => {
+    setShowConfirmDialog(false);
+    setPendingFile(null);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -52,7 +79,15 @@ export default function InvoiceUpload({
 
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-    uploadFile(file);
+
+    // Only show confirmation dialog if there are existing images
+    if (existingPdfUrl || pdfUrl) {
+      setPendingFile(file);
+      setShowConfirmDialog(true);
+    } else {
+      // No existing images, upload directly
+      uploadFile(file);
+    }
   };
 
   // Function to mark delivery as completed
@@ -574,6 +609,63 @@ export default function InvoiceUpload({
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-6 w-6 text-yellow-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Warning: Images Will Be Replaced
+                </h3>
+                <div className="text-sm text-gray-600 space-y-2">
+                  <p className="font-semibold text-yellow-700">
+                    Uploading new images will replace ALL previously uploaded images for this delivery.
+                  </p>
+                  <p>
+                    Please ensure you are uploading <strong>ALL required images at once</strong>, including any previously uploaded images you want to keep.
+                  </p>
+                  <p>
+                    If you only upload a single missing image, all other images will be lost.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleCancelUpload}
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200"
+              >
+                Continue Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

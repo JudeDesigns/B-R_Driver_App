@@ -433,6 +433,8 @@ export async function PATCH(
                 orderNumberWeb: updatedStop.orderNumberWeb,
                 quickbooksInvoiceNum: updatedStop.quickbooksInvoiceNum,
                 amount: updatedStop.amount || 0, // Add total amount
+                creditMemoNumber: updatedStop.creditMemoNumber, // Add credit memo number
+                creditMemoAmount: updatedStop.creditMemoAmount, // Add credit memo amount
               };
 
               // Prepare image URLs for PDF (from invoice images)
