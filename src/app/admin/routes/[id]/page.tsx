@@ -1786,11 +1786,15 @@ export default function RouteDetailPage({
                     <tbody className="bg-white divide-y divide-gray-200">
                       {getSortedStops(route.stops)
                         .map((stop, index) => {
-                          // Debug: Log credit memo data for first stop
-                          if (index === 0) {
-                            console.log('First stop credit memo data:', {
-                              creditMemoNumber: stop.creditMemoNumber,
-                              creditMemoAmount: stop.creditMemoAmount,
+                          // Debug: Log credit memo data for stops with credit memos
+                          if (stop.creditMemos && stop.creditMemos.length > 0) {
+                            console.log(`Stop ${stop.sequence} (${stop.customer.name}) credit memos:`, {
+                              count: stop.creditMemos.length,
+                              creditMemos: stop.creditMemos.map(cm => ({
+                                id: cm.id,
+                                number: cm.creditMemoNumber,
+                                amount: cm.creditMemoAmount
+                              })),
                               stopId: stop.id
                             });
                           }

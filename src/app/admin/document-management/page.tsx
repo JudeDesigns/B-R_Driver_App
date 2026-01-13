@@ -113,6 +113,7 @@ export default function DocumentManagementPage() {
   const [validationResult, setValidationResult] = useState<InvoiceValidationResult | null>(null);
   const [showValidationAlert, setShowValidationAlert] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Notification state
   const [notification, setNotification] = useState<{
@@ -353,6 +354,12 @@ export default function DocumentManagementPage() {
   const handleUploadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Prevent multiple simultaneous uploads
+    if (isUploading) {
+      console.log('Upload already in progress, ignoring duplicate submission');
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
     const file = formData.get('file') as File;
     const title = formData.get('title') as string;
@@ -394,7 +401,7 @@ export default function DocumentManagementPage() {
       if (needsUserConfirmation(validation) && !pendingUpload) {
         setValidationResult(validation);
         setShowValidationAlert(true);
-        setPendingUpload(true);
+        // Don't set pendingUpload here - it will be set when user confirms
         return;
       }
     }
@@ -419,12 +426,15 @@ export default function DocumentManagementPage() {
       if (needsUserConfirmation(validation) && !pendingUpload) {
         setValidationResult(validation);
         setShowValidationAlert(true);
-        setPendingUpload(true);
+        // Don't set pendingUpload here - it will be set when user confirms
         return;
       }
     }
 
     try {
+      // Set uploading state to prevent duplicate submissions
+      setIsUploading(true);
+
       // Get token
       let token;
       if (typeof window !== 'undefined') {
@@ -433,6 +443,7 @@ export default function DocumentManagementPage() {
 
       if (!token) {
         showNotification('error', 'Authentication Error', 'Please log in again');
+        setIsUploading(false);
         return;
       }
 
@@ -445,6 +456,12 @@ export default function DocumentManagementPage() {
 
       if (uploadType === 'customer') {
         uploadFormData.append('customerId', selectedCustomerForUpload);
+
+        // Add credit memo-specific data for customer documents
+        if (type === 'CREDIT_MEMO') {
+          uploadFormData.append('creditMemoNumber', creditMemoNumber);
+          uploadFormData.append('creditMemoAmount', creditMemoAmount);
+        }
       } else if (uploadType === 'stop') {
         uploadFormData.append('stopId', selectedStopForUpload);
 
@@ -504,7 +521,8 @@ export default function DocumentManagementPage() {
       console.error('Upload error:', error);
       showNotification('error', 'Upload Failed', error instanceof Error ? error.message : 'Failed to upload document');
     } finally {
-      // Reset validation states
+      // Reset validation states and uploading flag
+      setIsUploading(false);
       setPendingUpload(false);
       setShowValidationAlert(false);
       setValidationResult(null);
@@ -1028,8 +1046,8 @@ export default function DocumentManagementPage() {
                   </div>
                 )}
 
-                {/* Credit Memo-specific fields for stop documents */}
-                {uploadType === 'stop' && selectedDocumentType === 'CREDIT_MEMO' && (
+                {/* Credit Memo-specific fields for both customer and stop documents */}
+                {selectedDocumentType === 'CREDIT_MEMO' && (
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
                     <div className="flex items-center mb-2">
                       <svg className="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -1125,15 +1143,27 @@ export default function DocumentManagementPage() {
                   <button
                     type="button"
                     onClick={() => setShowUploadModal(false)}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                    disabled={isUploading}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                    disabled={isUploading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                   >
-                    Upload Document
+                    {isUploading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Uploading...
+                      </>
+                    ) : (
+                      'Upload Document'
+                    )}
                   </button>
                 </div>
               </form>

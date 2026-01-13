@@ -250,12 +250,63 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create CreditMemo record
-        const creditMemo = await prisma.creditMemo.create({
-          data: creditMemoData,
+        // Check if a credit memo with the same stop + credit memo number already exists
+        // This prevents duplicates even if multiple documents are uploaded
+        const existingCreditMemo = await prisma.creditMemo.findFirst({
+          where: {
+            stopId: stopId,
+            creditMemoNumber: creditMemoData.creditMemoNumber,
+            isDeleted: false,
+          },
         });
 
-        console.log(`Created CreditMemo record for stop ${stopId}:`, creditMemo);
+        let creditMemo;
+        if (existingCreditMemo) {
+          // Update existing credit memo instead of creating a duplicate
+          // This handles the case where the same credit memo is uploaded multiple times
+          creditMemo = await prisma.creditMemo.update({
+            where: { id: existingCreditMemo.id },
+            data: {
+              creditMemoAmount: creditMemoData.creditMemoAmount,
+              documentId: document.id, // Update to point to the latest document
+              updatedAt: new Date(),
+            },
+          });
+          console.log(`Updated existing CreditMemo record for stop ${stopId}, credit memo ${creditMemoData.creditMemoNumber}:`, creditMemo);
+        } else {
+          // Create new CreditMemo record
+          try {
+            creditMemo = await prisma.creditMemo.create({
+              data: creditMemoData,
+            });
+            console.log(`Created CreditMemo record for stop ${stopId}:`, creditMemo);
+          } catch (error: any) {
+            // Handle unique constraint violation (in case of race condition)
+            if (error.code === 'P2002') {
+              console.log(`Duplicate credit memo detected for stop ${stopId}, credit memo ${creditMemoData.creditMemoNumber}. Updating existing record.`);
+              // Find and update the existing record
+              const existing = await prisma.creditMemo.findFirst({
+                where: {
+                  stopId: stopId,
+                  creditMemoNumber: creditMemoData.creditMemoNumber,
+                  isDeleted: false,
+                },
+              });
+              if (existing) {
+                creditMemo = await prisma.creditMemo.update({
+                  where: { id: existing.id },
+                  data: {
+                    creditMemoAmount: creditMemoData.creditMemoAmount,
+                    documentId: document.id,
+                    updatedAt: new Date(),
+                  },
+                });
+              }
+            } else {
+              throw error;
+            }
+          }
+        }
 
         // Also update the Stop fields for backward compatibility
         const stopUpdateData: any = {};

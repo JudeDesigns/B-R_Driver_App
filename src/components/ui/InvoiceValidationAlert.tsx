@@ -93,12 +93,14 @@ export default function InvoiceValidationAlert({
           {showActions && validationResult.warnings.length > 0 && (
             <div className="mt-4 flex space-x-3">
               <button
+                type="button"
                 onClick={onConfirm}
                 className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 Upload Anyway
               </button>
               <button
+                type="button"
                 onClick={onCancel}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors"
               >
