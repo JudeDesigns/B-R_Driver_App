@@ -907,8 +907,20 @@ export default function RouteDetailPage({
             )}
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-          {stop.customerNameFromUpload}
+        <td className="px-6 py-4">
+          <div className="flex flex-col">
+            <div className="text-sm font-medium text-gray-900">
+              {stop.customer.name}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {stop.customer.address}
+              {stop.customer.groupCode && (
+                <span className="ml-2 text-xs text-gray-400">
+                  ({stop.customer.groupCode})
+                </span>
+              )}
+            </div>
+          </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
           {stop.orderNumberWeb || "N/A"}

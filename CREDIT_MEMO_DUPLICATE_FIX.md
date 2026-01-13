@@ -68,28 +68,60 @@ From the database query results:
 
 ## SQL to Clean Up Existing Duplicates
 
+### Step 1: Clean up duplicate credit memos (ALREADY DONE)
 Run this in your psql terminal connected to `br_food_services`:
 
 ```sql
--- Clean up duplicate credit memos (keep only the oldest one for each documentId)
+BEGIN;
+
+-- Mark duplicate credit memos as deleted (keep oldest per stop + credit memo number)
 WITH ranked_memos AS (
-  SELECT 
+  SELECT
     id,
     "documentId",
-    ROW_NUMBER() OVER (PARTITION BY "documentId" ORDER BY "createdAt" ASC) as rn
+    "stopId",
+    "creditMemoNumber",
+    ROW_NUMBER() OVER (
+      PARTITION BY "stopId", "creditMemoNumber"
+      ORDER BY "createdAt" ASC
+    ) as rn
   FROM credit_memos
-  WHERE "isDeleted" = false AND "documentId" IS NOT NULL
+  WHERE "isDeleted" = false
 )
-UPDATE credit_memos
+UPDATE credit_memos cm
 SET "isDeleted" = true, "updatedAt" = NOW()
-WHERE id IN (
-  SELECT id FROM ranked_memos WHERE rn > 1
-);
+FROM ranked_memos rm
+WHERE cm.id = rm.id AND rm.rn > 1;
 
+-- Also mark the associated duplicate documents as deleted
+WITH duplicate_credit_memos AS (
+  SELECT
+    id,
+    "documentId",
+    "stopId",
+    "creditMemoNumber",
+    ROW_NUMBER() OVER (
+      PARTITION BY "stopId", "creditMemoNumber"
+      ORDER BY "createdAt" ASC
+    ) as rn
+  FROM credit_memos
+  WHERE "updatedAt" > NOW() - INTERVAL '1 minute'
+    AND "isDeleted" = true
+)
+UPDATE documents d
+SET "isDeleted" = true, "updatedAt" = NOW()
+FROM duplicate_credit_memos dcm
+WHERE d.id = dcm."documentId" AND dcm."documentId" IS NOT NULL;
+
+COMMIT;
+```
+
+### Step 2: Add unique constraint (MUST RUN THIS)
+```sql
 -- Add unique constraint to prevent future duplicates
-CREATE UNIQUE INDEX IF NOT EXISTS "credit_memos_documentId_unique_active" 
-ON "credit_memos"("documentId") 
-WHERE "isDeleted" = false AND "documentId" IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "credit_memos_stop_number_unique_active"
+ON "credit_memos"("stopId", "creditMemoNumber")
+WHERE "isDeleted" = false;
 ```
 
 ## Verification
