@@ -64,7 +64,8 @@ export function generateDirectionsToAddress(address: string): string {
 
 /**
  * Generates a Google Maps route link for multiple stops
- * Creates an optimized route through all delivery addresses
+ * Uses the Directions API format to preserve the exact sequence of stops
+ * This prevents Google Maps from auto-optimizing the route order
  */
 export function generateFullRouteMapLink(routeData: RouteMapData): string {
   if (!routeData.stops || routeData.stops.length === 0) {
@@ -73,31 +74,52 @@ export function generateFullRouteMapLink(routeData: RouteMapData): string {
 
   // Sort stops by sequence to maintain delivery order
   const sortedStops = [...routeData.stops].sort((a, b) => a.sequence - b.sequence);
-  
-  // Build the route URL
-  let routeUrl = 'https://www.google.com/maps/dir/';
-  
-  // Add starting location if provided
+
+  if (sortedStops.length === 1) {
+    // For single stop, just use directions to that address
+    const formattedAddress = formatAddressForMaps(sortedStops[0].address);
+    return `https://www.google.com/maps/dir/?api=1&destination=${formattedAddress}&travelmode=driving`;
+  }
+
+  // For multiple stops, use origin + destination + waypoints format
+  // This preserves the exact order and prevents Google Maps from reordering
+  const origin = routeData.startLocation || sortedStops[0].address;
+  const destination = routeData.endLocation || sortedStops[sortedStops.length - 1].address;
+
+  // Middle stops become waypoints (if we have more than 2 stops)
+  const waypoints: string[] = [];
+
   if (routeData.startLocation) {
-    routeUrl += formatAddressForMaps(routeData.startLocation) + '/';
-  }
-  
-  // Add all stops
-  sortedStops.forEach(stop => {
-    const formattedAddress = formatAddressForMaps(stop.address);
-    if (formattedAddress) {
-      routeUrl += formattedAddress + '/';
+    // If we have a custom start location, all sorted stops become waypoints except the last
+    for (let i = 0; i < sortedStops.length - 1; i++) {
+      waypoints.push(sortedStops[i].address);
     }
-  });
-  
-  // Add ending location if provided
-  if (routeData.endLocation) {
-    routeUrl += formatAddressForMaps(routeData.endLocation) + '/';
+  } else {
+    // First stop is origin, last is destination, middle ones are waypoints
+    for (let i = 1; i < sortedStops.length - 1; i++) {
+      waypoints.push(sortedStops[i].address);
+    }
   }
-  
-  // Add route parameters for driving directions
-  routeUrl += '?travelmode=driving';
-  
+
+  // Build the URL using Directions API format
+  let routeUrl = 'https://www.google.com/maps/dir/?api=1';
+  routeUrl += `&origin=${formatAddressForMaps(origin)}`;
+  routeUrl += `&destination=${formatAddressForMaps(destination)}`;
+
+  // Add waypoints if any (separated by |)
+  if (waypoints.length > 0) {
+    const formattedWaypoints = waypoints
+      .map(wp => formatAddressForMaps(wp))
+      .filter(wp => wp !== '')
+      .join('|');
+    if (formattedWaypoints) {
+      routeUrl += `&waypoints=${formattedWaypoints}`;
+    }
+  }
+
+  // Add travel mode
+  routeUrl += '&travelmode=driving';
+
   return routeUrl;
 }
 
@@ -149,13 +171,20 @@ export function isValidAddressForMaps(address: string): boolean {
  */
 export function extractRouteDataFromStops(stops: Array<{
   sequence: number;
-  address: string;
-  customer: { name: string };
+  address?: string; // Direct address field (optional)
+  customer: {
+    name: string;
+    address?: string; // Customer address field (optional)
+  };
 }>): RouteMapData {
   const validStops = stops
-    .filter(stop => isValidAddressForMaps(stop.address))
+    .filter(stop => {
+      // Check both stop.address and stop.customer.address
+      const address = stop.address || stop.customer.address || '';
+      return isValidAddressForMaps(address);
+    })
     .map(stop => ({
-      address: stop.address,
+      address: stop.address || stop.customer.address || '',
       customerName: stop.customer.name,
       sequence: stop.sequence
     }));

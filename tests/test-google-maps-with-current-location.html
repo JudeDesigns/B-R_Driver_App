@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Route Test - Your Current Location</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #357ae8;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e8f0fe;
+            color: #1967d2;
+        }
+        .error {
+            background: #fce8e6;
+            color: #d93025;
+        }
+        .success {
+            background: #e6f4ea;
+            color: #1e8e3e;
+        }
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #4285f4;
+            font-size: 14px;
+        }
+        .url-display {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Google Maps Route Test</h1>
+        <p class="subtitle">Test the route order fix using your current location</p>
+        
+        <button id="getLocationBtn" onclick="testRoute()">
+            📍 Get My Location & Generate Route
+        </button>
+        
+        <div id="status"></div>
+        
+        <div class="info">
+            <strong>What this test does:</strong>
+            <ul>
+                <li>Gets your current GPS location</li>
+                <li>Uses your location as the <strong>origin</strong> (driver's starting point)</li>
+                <li>Creates 4 sample delivery stops in Los Angeles area</li>
+                <li>Generates a Google Maps route in exact sequence (1 → 2 → 3 → 4)</li>
+                <li>Opens the route in Google Maps for you to verify</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function formatAddressForMaps(address) {
+            if (!address) return '';
+            return encodeURIComponent(address.trim());
+        }
+
+        function generateFullRouteMapLink(routeData) {
+            if (!routeData.stops || routeData.stops.length === 0) {
+                return '';
+            }
+
+            const sortedStops = [...routeData.stops].sort((a, b) => a.sequence - b.sequence);
+
+            if (sortedStops.length === 1) {
+                const formattedAddress = formatAddressForMaps(sortedStops[0].address);
+                return `https://www.google.com/maps/dir/?api=1&destination=${formattedAddress}&travelmode=driving`;
+            }
+
+            const origin = routeData.startLocation || sortedStops[0].address;
+            const destination = routeData.endLocation || sortedStops[sortedStops.length - 1].address;
+
+            const waypoints = [];
+
+            if (routeData.startLocation) {
+                for (let i = 0; i < sortedStops.length - 1; i++) {
+                    waypoints.push(sortedStops[i].address);
+                }
+            } else {
+                for (let i = 1; i < sortedStops.length - 1; i++) {
+                    waypoints.push(sortedStops[i].address);
+                }
+            }
+
+            let routeUrl = 'https://www.google.com/maps/dir/?api=1';
+            routeUrl += `&origin=${formatAddressForMaps(origin)}`;
+            routeUrl += `&destination=${formatAddressForMaps(destination)}`;
+
+            if (waypoints.length > 0) {
+                const formattedWaypoints = waypoints
+                    .map(wp => formatAddressForMaps(wp))
+                    .filter(wp => wp !== '')
+                    .join('|');
+                if (formattedWaypoints) {
+                    routeUrl += `&waypoints=${formattedWaypoints}`;
+                }
+            }
+
+            routeUrl += '&travelmode=driving';
+
+            return routeUrl;
+        }
+
+        async function testRoute() {
+            const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('getLocationBtn');
+            
+            btn.disabled = true;
+            statusDiv.className = 'status';
+            statusDiv.innerHTML = '📍 Getting your current location...';
+
+            if (!navigator.geolocation) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '❌ Geolocation is not supported by your browser';
+                btn.disabled = false;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `✅ Got your location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+
+                    // Create route data with user's location as origin
+                    const routeData = {
+                        startLocation: `${lat},${lon}`, // Your current location
+                        stops: [
+                            { address: '1234 Wilshire Blvd, Los Angeles, CA 90017', customerName: 'Customer 1', sequence: 1 },
+                            { address: '5678 Hollywood Blvd, Los Angeles, CA 90028', customerName: 'Customer 2', sequence: 2 },
+                            { address: '9012 Sunset Blvd, Los Angeles, CA 90069', customerName: 'Customer 3', sequence: 3 },
+                            { address: '3456 Beverly Blvd, Los Angeles, CA 90004', customerName: 'Customer 4', sequence: 4 },
+                        ],
+                    };
+
+                    const url = generateFullRouteMapLink(routeData);
+                    
+                    statusDiv.innerHTML += `
+                        <div style="margin-top: 15px;">
+                            <strong>🎯 Route Generated!</strong><br>
+                            <strong>Origin:</strong> Your Current Location (${lat.toFixed(6)}, ${lon.toFixed(6)})<br>
+                            <strong>Waypoints:</strong> Stop 1 → Stop 2 → Stop 3<br>
+                            <strong>Destination:</strong> Stop 4<br>
+                            <div class="url-display">${url}</div>
+                            <button onclick="window.open('${url}', '_blank')" style="margin-top: 10px;">
+                                🗺️ Open in Google Maps
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Auto-open in 2 seconds
+                    setTimeout(() => {
+                        window.open(url, '_blank');
+                    }, 2000);
+                    
+                    btn.disabled = false;
+                },
+                (error) => {
+                    statusDiv.className = 'status error';
+                    let errorMsg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '❌ Location permission denied. Please allow location access and try again.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = '❌ Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '❌ Location request timed out.';
+                            break;
+                        default:
+                            errorMsg = '❌ An unknown error occurred.';
+                    }
+                    statusDiv.innerHTML = errorMsg;
+                    btn.disabled = false;
+                }
+            );
+        }
+    </script>
+</body>
+</html>
+

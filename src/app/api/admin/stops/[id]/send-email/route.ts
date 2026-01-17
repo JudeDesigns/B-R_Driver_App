@@ -73,10 +73,26 @@ export async function POST(
     // Get return reasons
     const returnReasons = stop.returns.map((returnItem) => returnItem.reasonCode);
 
-    // Format delivery time
+    // Format delivery time in PST timezone
     const deliveryTime = stop.completionTime
-      ? new Date(stop.completionTime).toLocaleString()
-      : new Date().toLocaleString();
+      ? new Date(stop.completionTime).toLocaleString("en-US", {
+          timeZone: "America/Los_Angeles",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+        })
+      : new Date().toLocaleString("en-US", {
+          timeZone: "America/Los_Angeles",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+        });
 
     // Prepare stop data for PDF generation
     const stopDataForPdf = {
