@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { locationTrackingService, LocationData } from '@/services/locationTracking';
 
 interface LocationTrackerProps {
@@ -33,23 +33,8 @@ export default function LocationTracker({
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
-  useEffect(() => {
-    // Only track when active
-    if (isActive && !isTracking) {
-      startTracking();
-    } else if (!isActive && isTracking) {
-      stopTracking();
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (isTracking) {
-        stopTracking();
-      }
-    };
-  }, [isActive, stopId, routeId]);
-
-  const startTracking = async () => {
+  // FIX #3: Use useCallback to prevent infinite re-renders (Safari fix)
+  const startTracking = useCallback(async () => {
     if (!locationTrackingService.isEnabled()) {
       setError('Location tracking is disabled');
       return;
@@ -79,12 +64,30 @@ export default function LocationTracker({
       setPermissionDenied(true);
       setError('Location permission denied');
     }
-  };
+  }, [stopId, routeId, onLocationUpdate, onError]);
 
-  const stopTracking = () => {
+  // FIX #3: Use useCallback to prevent infinite re-renders (Safari fix)
+  const stopTracking = useCallback(() => {
     locationTrackingService.stopTracking();
     setIsTracking(false);
-  };
+  }, []);
+
+  // FIX #3: Include all dependencies to prevent infinite re-renders (Safari fix)
+  useEffect(() => {
+    // Only track when active
+    if (isActive && !isTracking) {
+      startTracking();
+    } else if (!isActive && isTracking) {
+      stopTracking();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (isTracking) {
+        stopTracking();
+      }
+    };
+  }, [isActive, isTracking, startTracking, stopTracking]);
 
   // SILENT MODE: No UI displayed to driver
   // Tracking runs in background without driver knowing

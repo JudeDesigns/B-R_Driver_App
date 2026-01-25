@@ -30,12 +30,16 @@ class LocationTrackingService {
   private currentLocation: LocationData | null = null;
   private options: LocationTrackingOptions | null = null;
 
+  // FIX #2: Cache permission state to avoid repeated requests (Safari fix)
+  private permissionGranted: boolean = false;
+  private permissionChecked: boolean = false;
+
   // Configuration from environment variables
   private readonly UPDATE_INTERVAL = parseInt(
     process.env.NEXT_PUBLIC_LOCATION_UPDATE_INTERVAL || '300000',
     10
   ); // 5 minutes default
-  private readonly TRACKING_ENABLED = 
+  private readonly TRACKING_ENABLED =
     process.env.NEXT_PUBLIC_LOCATION_TRACKING_ENABLED === 'true';
 
   /**
@@ -61,6 +65,7 @@ class LocationTrackingService {
 
   /**
    * Request location permission from user
+   * FIX #1 & #2: Removed getCurrentPosition() call and added permission caching (Safari fix)
    */
   async requestPermission(): Promise<boolean> {
     if (!this.isSupported()) {
@@ -75,59 +80,45 @@ class LocationTrackingService {
       return false;
     }
 
+    // FIX #2: Return cached permission state if already checked
+    if (this.permissionChecked) {
+      return this.permissionGranted;
+    }
+
     // Check if Permissions API is available
     if ('permissions' in navigator) {
       try {
         const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
 
+        // Cache the result
+        this.permissionChecked = true;
+
         if (result.state === 'denied') {
           console.error('Location permission is denied. Please enable location access in your browser settings.');
+          this.permissionGranted = false;
           return false;
         }
 
         if (result.state === 'granted') {
+          this.permissionGranted = true;
           return true;
         }
 
-        // If state is 'prompt', we need to request permission
+        // If state is 'prompt', let watchPosition() handle the permission request
+        // FIX #1: Don't call getCurrentPosition() - Safari will re-prompt when we call watchPosition()
+        this.permissionGranted = true; // Assume granted, watchPosition will prompt if needed
+        return true;
       } catch (error) {
-        console.warn('Permissions API not fully supported, falling back to direct request');
+        console.warn('Permissions API not fully supported, falling back to watchPosition');
       }
     }
 
-    try {
-      // Try to get current position to trigger permission prompt
-      await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (error) => {
-            // Provide more detailed error messages
-            let errorMessage = 'Location permission denied';
-            switch (error.code) {
-              case error.PERMISSION_DENIED:
-                errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMessage = 'Location information is unavailable.';
-                break;
-              case error.TIMEOUT:
-                errorMessage = 'Location request timed out.';
-                break;
-            }
-            reject(new Error(errorMessage));
-          },
-          {
-            enableHighAccuracy: true, // CHANGED: High accuracy required for HTTP contexts
-            timeout: 15000, // Increased timeout for better reliability
-            maximumAge: 10000, // CHANGED: Reduced cache to 10 seconds
-          }
-        );
-      });
-      return true;
-    } catch (error) {
-      console.error('Location permission error:', error instanceof Error ? error.message : 'Unknown error');
-      return false;
-    }
+    // FIX #1: Don't call getCurrentPosition() here
+    // Let watchPosition() handle the permission request naturally
+    // This prevents Safari from showing multiple permission popups
+    this.permissionChecked = true;
+    this.permissionGranted = true; // Assume granted, watchPosition will prompt if needed
+    return true;
   }
 
   /**
@@ -164,6 +155,12 @@ class LocationTrackingService {
           accuracy: position.coords.accuracy,
           timestamp: new Date(position.timestamp),
         };
+
+        // Update permission state on successful position
+        if (!this.permissionGranted) {
+          this.permissionGranted = true;
+          this.permissionChecked = true;
+        }
       },
       (error) => {
         // GeolocationPositionError doesn't always have a message property
@@ -173,12 +170,19 @@ class LocationTrackingService {
           error.code === 3 ? 'Timeout' : 'Unknown error'
         }`;
         console.error('Geolocation error:', errorMessage, error);
+
+        // Update permission state on error
+        if (error.code === 1) { // PERMISSION_DENIED
+          this.permissionGranted = false;
+          this.permissionChecked = true;
+        }
+
         this.options?.onError?.(new Error(errorMessage));
       },
       {
-        enableHighAccuracy: true, // CHANGED: High accuracy required for HTTP contexts
+        enableHighAccuracy: true,
         timeout: 30000,
-        maximumAge: 10000, // CHANGED: Reduced cache to 10 seconds for better reliability
+        maximumAge: 60000, // FIX #4: Increased from 10s to 60s (1 minute) - reduces Safari re-prompts
       }
     );
 
@@ -212,6 +216,9 @@ class LocationTrackingService {
     this.isTracking = false;
     this.currentLocation = null;
     this.options = null;
+
+    // Note: Keep permission cache (permissionGranted/permissionChecked)
+    // so we don't re-prompt on next tracking session
 
     console.log('Location tracking stopped');
   }
