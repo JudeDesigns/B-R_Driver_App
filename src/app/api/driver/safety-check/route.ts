@@ -354,25 +354,22 @@ export async function POST(request: NextRequest) {
     // Update route status based on safety check type - but only for END_OF_DAY checks
     // START_OF_DAY checks should not update route status as multiple drivers may be assigned
     if (type === "END_OF_DAY" && route.status === "IN_PROGRESS") {
-      // If this is an end of day safety check and the route is in progress, update it to completed
-      // First check if all stops are completed - use precise driver matching
-      const stops = await prisma.stop.findMany({
+      // If this is an end of day safety check and the route is in progress, check if it should be completed
+      // IMPORTANT: Check ALL stops in the route, not just the current driver's stops
+      // This prevents marking a route as complete when other drivers still have pending stops
+      const allStopsInRoute = await prisma.stop.findMany({
         where: {
           routeId,
           isDeleted: false,
-          OR: [
-            { driverNameFromUpload: driver.username },
-            ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
-          ],
         },
       });
 
-      const allStopsCompleted = stops.every(
-        (stop) => stop.status === "COMPLETED"
+      const allStopsCompleted = allStopsInRoute.every(
+        (stop) => stop.status === "COMPLETED" || stop.status === "CANCELLED"
       );
 
-      // Only mark the route as completed if all stops are completed
-      if (allStopsCompleted || stops.length === 0) {
+      // Only mark the route as completed if ALL stops (from all drivers) are completed or cancelled
+      if (allStopsCompleted && allStopsInRoute.length > 0) {
         await prisma.route.update({
           where: {
             id: routeId,
