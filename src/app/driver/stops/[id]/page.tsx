@@ -911,8 +911,6 @@ export default function StopDetailPage({
                                     <div className="document-actions">
                                       <a
                                         href={doc.filePath}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation mobile-button-safe"
                                       >
                                         View & Print
@@ -972,8 +970,6 @@ export default function StopDetailPage({
                                     <div className="document-actions">
                                       <a
                                         href={stopDoc.document.filePath}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors touch-manipulation mobile-button-safe"
                                       >
                                         View & Print

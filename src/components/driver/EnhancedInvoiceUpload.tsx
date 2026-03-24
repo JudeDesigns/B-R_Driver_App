@@ -541,8 +541,6 @@ export default function EnhancedInvoiceUpload({
           <div className="mt-4 flex space-x-3">
             <a
               href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg text-center transition duration-200"
             >
               View Full PDF
