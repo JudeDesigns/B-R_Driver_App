@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated Document Intake | Executive Brief</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --bg-dark: #090e17;
+            --bg-card: #151e2e;
+            --bg-card-hover: #1e293b;
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-light: #60a5fa;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --grad-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Typography */
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-weight: 700;
+            line-height: 1.2;
+            color: #fff;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            letter-spacing: -1px;
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        section {
+            padding: 6rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Grid Systems */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+
+            .grid-2,
+            .grid-3,
+            .grid-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Abstract Background Elements */
+        .glow {
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            background: var(--primary);
+            filter: blur(150px);
+            border-radius: 50%;
+            opacity: 0.15;
+            z-index: -1;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Cards & Containers */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(96, 165, 250, 0.4);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-accent-top {
+            border-top: 4px solid var(--primary);
+        }
+
+        .card-accent-success {
+            border-top: 4px solid var(--success);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 8rem 0 6rem;
+            position: relative;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Stats row */
+        .stat-box {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 1rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-blue {
+            color: var(--primary-light);
+        }
+
+        /* Current vs Future */
+        .vs-container {
+            display: flex;
+            align-items: stretch;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .state-box {
+            flex: 1;
+            padding: 3rem;
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .current-state {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .future-state {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .state-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .state-title .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .current-state .icon {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .future-state .icon {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .state-list li {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+            color: #cbd5e1;
+        }
+
+        .state-list li::before {
+            content: "•";
+            color: currentColor;
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1.2rem 1.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            background: rgba(255, 255, 255, 0.03);
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .tag {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .tag-gray {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .tag-blue {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .tag-green {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        /* Code & Formulas */
+        .formula-box {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1.5rem 0;
+        }
+
+        .code-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--primary);
+        }
+
+        .code-syntax {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .code-syntax span.highlight {
+            color: var(--primary-light);
+            font-weight: bold;
+        }
+
+        .code-syntax span.bracket {
+            color: #f472b6;
+        }
+
+        .code-desc {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* Architecture Flow */
+        .arch-container {
+            padding: 4rem;
+            background: var(--bg-card);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .arch-level {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+
+        .arch-level::after {
+            content: '⬇';
+            position: absolute;
+            bottom: -2.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5rem;
+            color: var(--border);
+        }
+
+        .arch-level:last-child::after {
+            display: none;
+        }
+
+        .arch-node {
+            background: #0f172a;
+            border: 1px solid var(--primary);
+            padding: 1.5rem 2rem;
+            border-radius: 16px;
+            min-width: 250px;
+            box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3);
+        }
+
+        .arch-node h4 {
+            margin-top: 0;
+            color: #60a5fa;
+            margin-bottom: 0.5rem;
+        }
+
+        /* UI/UX Showcase */
+        .browser-mockup {
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-top: 2rem;
+        }
+
+        .browser-header {
+            background: #0f172a;
+            padding: 1rem;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .browser-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .browser-body {
+            padding: 2rem;
+        }
+
+        .ui-alert {
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ui-alert.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .ui-alert.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        .ui-alert strong {
+            display: block;
+            color: #fff;
+        }
+
+        .ui-alert span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .ui-btn {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="glow"></div>
+
+    <div class="container">
+        <!-- Executive Summary -->
+        <section class="hero fade-in">
+            <div class="badge">Executive Briefing</div>
+            <h1>B-R Driver App:<br>Automated Document Intake</h1>
+            <p style="max-width: 800px; margin: 0 auto; font-size: 1.25rem;">A high-performance pipeline that guarantees
+                zero manual data entry for document-to-stop assignments, leveraging robust folder-based routing,
+                database indexing, and a fail-safe Admin UX.</p>
+
+            <div class="grid-3" style="margin-top: 4rem;">
+                <div class="stat-box">
+                    <div class="stat-number stat-blue">Zero</div>
+                    <div class="stat-label">Driver App Changes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Automated Routing</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number stat-blue">~8</div>
+                    <div class="stat-label">Days to Implement</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Problem vs Solution -->
+        <section class="fade-in">
+            <h2>The Paradigm Shift</h2>
+            <p>Moving from a labor-intensive manual upload process to an intelligent event-driven architecture.</p>
+
+            <div class="vs-container">
+                <div class="state-box current-state">
+                    <div class="state-title">
+                        <div class="icon">✕</div>
+                        Current State
+                    </div>
+                    <ul class="state-list">
+                        <li><strong>Manual Upload:</strong> Office staff must click through the UI for every single
+                            document.</li>
+                        <li><strong>Context Switching:</strong> Navigating dozens of routes and stops per document to
+                            find the correct assignment target.</li>
+                        <li><strong>Human Error:</strong> High risk of attaching a document to the wrong stop or
+                            customer.</li>
+                        <li><strong>Scalability Bottleneck:</strong> Processing 100 invoices takes hours of repetitive
+                            clicking.</li>
+                    </ul>
+                </div>
+
+                <div class="state-box future-state">
+                    <div class="state-title">
+                        <div class="icon">✓</div>
+                        Future State
+                    </div>
+                    <ul class="state-list">
+                        <li><strong>Bulk Assignment:</strong> Drop 100 PDFs into a folder and process them in a single
+                            batch.</li>
+                        <li><strong>Naming Intelligence:</strong> The filename itself becomes the routing instruction
+                            mapped directly to the database.</li>
+                        <li><strong>Fail-Safe Dry Runs:</strong> The system previews all matches <em>before</em> saving,
+                            flagging any missing stops entirely automatically.</li>
+                        <li><strong>Speed:</strong> Processing 100 invoices takes 10 seconds of computation + 1 click
+                            from the Admin.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Naming Convention deeply explained -->
+        <section class="fade-in">
+            <h2>The Naming Formula</h2>
+            <p>A rigorous, machine-readable yet human-friendly syntax. The system uses a strict 3-part or 4-part
+                splitting algorithm separated by underscores.</p>
+
+            <div class="grid-2">
+                <div>
+                    <div class="card card-accent-top">
+                        <h3>1. Stop Documents <span class="tag tag-gray" style="float: right;">Target: Specific
+                                Visit</span></h3>
+                        <p>Linked securely to the <code class="mono">StopDocument</code> junction table. Drivers only
+                            see this document when they arrive at the exact stop on the specified route.</p>
+
+                        <div class="formula-box">
+                            <div style="margin-bottom: 10px; font-weight: 600; color: #fff;">Primary (By QuickBooks ID)
+                            </div>
+                            <div class="code-line">
+                                <div class="code-syntax">STOP_<span>[QB_Num]</span>_<span>[Type]</span>.pdf</div>
+                            </div>
+                            <div style="padding-left: 1rem; margin-bottom: 15px;" class="code-desc">Example: <strong
+                                    style="color: #fff">STOP_10045_INV.pdf</strong></div>
+
+                            <div style="margin-bottom: 10px; font-weight: 600; color: #fff;">Fallback (By Route &
+                                Sequence)</div>
+                            <div class="code-line">
+                                <div class="code-syntax">
+                                    STOP_R<span>[#]</span>_S<span>[#]</span>_<span>[Type]</span>.pdf</div>
+                            </div>
+                            <div style="padding-left: 1rem;" class="code-desc">Example: <strong
+                                    style="color: #fff">STOP_R12_S04_CM.pdf</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card card-accent-success">
+                        <h3>2. Customer Documents <span class="tag tag-gray" style="float: right;">Target: Global
+                                Profile</span></h3>
+                        <p>Linked securely via the <code class="mono">Document.customerId</code> field. Drivers will
+                            have access to this document every time they visit this customer, on any route.</p>
+
+                        <div class="formula-box">
+                            <div style="margin-bottom: 10px; font-weight: 600; color: #fff;">Syntax (By Group Code)
+                            </div>
+                            <div class="code-line" style="border-left-color: var(--success);">
+                                <div class="code-syntax">CUST_<span>[GroupCode]</span>_<span>[Type]</span>.pdf</div>
+                            </div>
+                            <div style="padding-left: 1rem;" class="code-desc">Example: <strong
+                                    style="color: #fff">CUST_ACME001_STMT.pdf</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 4rem;">Supported Document Types Dictionary</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="15%">Tag</th>
+                        <th width="25%">DB Value</th>
+                        <th width="25%">Allowed Flows</th>
+                        <th width="35%">Automatic DB Side-Effects</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono font-bold text-white">INV</td>
+                        <td>INVOICE</td>
+                        <td><span class="tag tag-gray">STOP Only</span></td>
+                        <td>Updates <code class="mono">stop.quickbooksInvoiceNum</code></td>
+                    </tr>
+                    <tr>
+                        <td class="mono font-bold text-white">CM</td>
+                        <td>CREDIT_MEMO</td>
+                        <td><span class="tag tag-green">Both CUST & STOP</span></td>
+                        <td>Creates <code class="mono">CreditMemo</code> record for specific stop</td>
+                    </tr>
+                    <tr>
+                        <td class="mono font-bold text-white">PO</td>
+                        <td>PURCHASE_ORDER</td>
+                        <td><span class="tag tag-green">Both CUST & STOP</span></td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td class="mono font-bold text-white">STMT</td>
+                        <td>DELIVERY_RECEIPT</td>
+                        <td><span class="tag tag-green">Both CUST & STOP</span></td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td class="mono font-bold text-white">RF</td>
+                        <td>RETURN_FORM</td>
+                        <td><span class="tag tag-green">Both CUST & STOP</span></td>
+                        <td>None</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Technical Architecture & Conflict Resolution -->
+        <section class="fade-in">
+            <h2>Architecture & Conflict Resolution</h2>
+            <p>How the system resolves ambiguity natively at the database level.</p>
+
+            <div class="grid-2">
+                <div>
+                    <h3 style="margin-top: 1rem; color: #60a5fa;">The "Time-Scoping" Engine</h3>
+                    <p>There is a natural concern: <em>"What if QuickBooks invoice 10045 was used 2 years ago, and is
+                            used again today?"</em></p>
+                    <p><strong>Solution: Rolling Date Windows.</strong></p>
+                    <p>The parser query is hardcoded to only search Stops linked to Routes created within the last
+                        <strong>7 days</strong>. It then orders by <code class="mono">route.date DESC</code> to select
+                        the absolute most recent match.
+                    </p>
+
+                    <div
+                        style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--warning); margin-bottom: 2rem;">
+                        <h4 style="color: #fff; margin-bottom: 0.5rem; font-size: 1.1rem;">Safeguard: Missing Data
+                            Fallback</h4>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Some stops don't have
+                            QuickBooks Invoice Numbers attached yet (e.g. COD orders). By defaulting to the <code
+                                class="mono">STOP_R{Route}_S{Sequence}</code> format, office staff have a 100%
+                            guaranteed fallback that can never fail, as sequence/route numbers are established
+                            immediately upon Excel routing upload.</p>
+                    </div>
+                </div>
+
+                <div class="arch-container">
+                    <div class="arch-level">
+                        <div class="arch-node">
+                            <h4>1. Folder Staging</h4>
+                            <p style="font-size: 0.9rem; margin: 0;">Files dropped in <code
+                                    class="mono">uploads/intake/</code></p>
+                        </div>
+                    </div>
+                    <div class="arch-level">
+                        <div class="arch-node">
+                            <h4>2. Parser Node</h4>
+                            <p style="font-size: 0.9rem; margin: 0;">Executes regex on filenames</p>
+                        </div>
+                    </div>
+                    <div class="arch-level">
+                        <div class="arch-node" style="border-color: #34d399;">
+                            <h4 style="color: #34d399;">3. Prisma DB Engine</h4>
+                            <p style="font-size: 0.9rem; margin: 0;">Resolves UUIDs using constraints</p>
+                        </div>
+                    </div>
+                    <div class="arch-level">
+                        <div class="arch-node" style="border-color: #8b5cf6;">
+                            <h4 style="color: #8b5cf6;">4. Finalization</h4>
+                            <p style="font-size: 0.9rem; margin: 0;">Move to <code class="mono">/documents/</code> &
+                                Write Junctions</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin UI Workflow -->
+        <section class="fade-in">
+            <h2>The Admin UX / UI Flow</h2>
+            <p>Designed to provide maximum visibility before committing database transactions.</p>
+
+            <div class="browser-mockup">
+                <div class="browser-header">
+                    <div class="browser-dot" style="background: #ef4444;"></div>
+                    <div class="browser-dot" style="background: #f59e0b;"></div>
+                    <div class="browser-dot" style="background: #10b981;"></div>
+                    <div style="margin-left: 20px; color: #64748b; font-size: 0.8rem; font-family: monospace;">
+                        admin/document-intake</div>
+                </div>
+                <div class="browser-body">
+                    <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.25rem;">Step 2: Preview Assignments (Dry
+                        Run)</h3>
+
+                    <div class="ui-alert success">
+                        <div>
+                            <strong>STOP_10045_INV.pdf</strong>
+                            <span>Matched to: Route 12 • Stop 4 • Acme Corp</span>
+                        </div>
+                        <span class="tag tag-green">Ready</span>
+                    </div>
+
+                    <div class="ui-alert success">
+                        <div>
+                            <strong>CUST_ACME001_STMT.pdf</strong>
+                            <span>Matched to: Customer • Acme Corp Profile</span>
+                        </div>
+                        <span class="tag tag-green">Ready</span>
+                    </div>
+
+                    <div class="ui-alert error">
+                        <div>
+                            <strong>old_invoice_document.pdf</strong>
+                            <span style="color: #ef4444;">Error: Filename violates convention. Must start with STOP_ or
+                                CUST_</span>
+                        </div>
+                        <button class="ui-btn">Assign Manually ▼</button>
+                    </div>
+
+                    <div class="ui-alert error">
+                        <div>
+                            <strong>STOP_99999_INV.pdf</strong>
+                            <span style="color: #ef4444;">Error: Invoice #99999 not found on any routes in the past 7
+                                days</span>
+                        </div>
+                        <button class="ui-btn">Assign Manually ▼</button>
+                    </div>
+
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+                        <span style="color: var(--text-muted);">18 Files • 16 Matched • 2 Require Review</span>
+                        <div>
+                            <button
+                                style="background: transparent; color: #fff; border: none; padding: 10px 20px; font-weight: 600; cursor: pointer;">Cancel</button>
+                            <button
+                                style="background: var(--primary); color: #fff; border: none; padding: 10px 20px; font-weight: 600; border-radius: 8px; cursor: pointer;">Commit
+                                All Verified</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Implementation Cost & Timeline -->
+        <section class="fade-in" style="border-bottom: none; margin-bottom: 4rem;">
+            <h2>Development Roadmap</h2>
+            <p>A phased, low-risk deployment plan utilizing the existing infrastructure.</p>
+
+            <div class="grid-3" style="margin-top: 3rem;">
+                <div class="card">
+                    <h3
+                        style="color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                        Phase 1: Core Engine</h3>
+                    <ul class="state-list" style="color: var(--text-muted); font-size: 0.95rem;">
+                        <li>Intake Parser Logic (RegEx)</li>
+                        <li>Prisma matching service</li>
+                        <li><code class="mono">process-intake</code> API Endpoint</li>
+                        <li>Database Migration Log</li>
+                        <li>Unit testing</li>
+                    </ul>
+                    <div style="margin-top: 2rem; font-weight: 700; color: var(--primary-light);">Timeline: ~4 Days
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3
+                        style="color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                        Phase 2: Admin UI</h3>
+                    <ul class="state-list" style="color: var(--text-muted); font-size: 0.95rem;">
+                        <li>Independent Intake Page</li>
+                        <li>Drag-and-Drop Zone</li>
+                        <li>Dry-Run Preview Table</li>
+                        <li>Manual Assignment Fallback</li>
+                    </ul>
+                    <div style="margin-top: 2rem; font-weight: 700; color: var(--primary-light);">Timeline: ~3 Days
+                    </div>
+                </div>
+
+                <!-- <div class="card card-accent-top">
+                    <h3 style="color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">Investment</h3>
+                    <p style="margin: 0; font-size: 0.95rem;">Total Estimated Hours: <strong>~48 hrs</strong></p>
+                    <br>
+                    <p style="margin: 0; font-size: 0.95rem;">Mid-level ($60/hr): <strong>$2,880</strong></p>
+                    <p style="margin: 0; font-size: 0.95rem;">Senior ($120/hr): <strong>$5,760</strong></p>
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border); font-size: 0.85rem; color: #34d399;">
+                        ROI: Eliminates ~20 hrs/week of manual admin data entry. Payback period: ~2 months.
+                    </div>
+                </div> -->
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        // Smooth scroll animations
+        const observerList = document.querySelectorAll('.fade-in');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        observerList.forEach((el) => observer.observe(el));
+
+        // Trigger first section explicitly
+        setTimeout(() => {
+            document.querySelector('.hero').classList.add('visible');
+        }, 100);
+    </script>
+</body>
+
+</html>
