@@ -7,10 +7,10 @@ WITH ranked_memos AS (
     id,
     "documentId",
     ROW_NUMBER() OVER (PARTITION BY "documentId" ORDER BY "createdAt" ASC) as rn
-  FROM credit_memos
+  FROM "credit_memos"
   WHERE "isDeleted" = false AND "documentId" IS NOT NULL
 )
-UPDATE credit_memos
+UPDATE "credit_memos"
 SET "isDeleted" = true, "updatedAt" = NOW()
 WHERE id IN (
   SELECT id FROM ranked_memos WHERE rn > 1

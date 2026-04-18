@@ -35,6 +35,7 @@ model User {
   safetyDeclarations      SafetyDeclaration[]      @relation("DriverSafetyDeclarations")
   systemDocumentUploads   SystemDocument[]         @relation("SystemDocumentUploads")
   vehicleAssignments      VehicleAssignment[]      @relation("DriverVehicleAssignments")
+  documentIntakeBatches   DocumentIntakeBatch[]    @relation("DocumentIntakeBatches")
 
   @@index([role])
   @@index([isDeleted])
@@ -723,3 +724,57 @@ enum VehicleStatus {
   MAINTENANCE
   RETIRED
 }
+
+model DocumentIntakeBatch {
+  id             String              @id @default(uuid())
+  status         IntakeBatchStatus   @default(PENDING)
+  totalFiles     Int                 @default(0)
+  matchedCount   Int                 @default(0)
+  unmatchedCount Int                 @default(0)
+  createdBy      String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  isDeleted      Boolean             @default(false)
+  logs           DocumentIntakeLog[]
+  user           User                @relation("DocumentIntakeBatches", fields: [createdBy], references: [id])
+
+  @@index([status])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@map("document_intake_batches")
+}
+
+model DocumentIntakeLog {
+  id             String              @id @default(uuid())
+  batchId        String
+  fileName       String
+  fileSize       Int
+  status         IntakeMatchStatus
+  flow           String?             // "stop" or "customer"
+  anchorType     String?             // "invoice", "route_seq", "group_code"
+  anchorValue    String?             // e.g "10045" or "R12_S04"
+  docType        DocumentType?       // DocumentType enum
+  resolvedToId   String?             // The UUID of the matched Stop or Customer
+  errorMessage   String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  isDeleted      Boolean             @default(false)
+  batch          DocumentIntakeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([status])
+  @@map("document_intake_logs")
+}
+
+enum IntakeBatchStatus {
+  PENDING
+  COMMITTED
+  CANCELLED
+}
+
+enum IntakeMatchStatus {
+  MATCHED
+  UNMATCHED
+  MANUAL_RESOLVED
+}
+
