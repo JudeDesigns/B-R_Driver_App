@@ -253,9 +253,9 @@ export default function DocumentManagementPage() {
   };
 
   useEffect(() => {
-    fetchDocuments();
-    fetchCustomers();
-    fetchTodaysStops();
+    // Fetch in parallel — neither depends on the other.
+    // Stops are fetched lazily when the user switches to the stop tab.
+    Promise.all([fetchDocuments(), fetchCustomers()]);
   }, []);
 
   const fetchTodaysStops = async () => {
@@ -567,7 +567,7 @@ export default function DocumentManagementPage() {
         return;
       }
 
-      const response = await fetch('/api/admin/documents', {
+      const response = await fetch('/api/admin/documents?limit=200', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

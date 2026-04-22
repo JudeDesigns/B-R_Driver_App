@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { getTodayStartUTC, getTodayEndUTC } from "@/lib/timezone";
+import { getTodayStartUTC } from "@/lib/timezone";
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,15 +25,20 @@ export async function GET(request: NextRequest) {
 
 
 
-    // Get today's date range in PST timezone
+    // Exact-day window anchored to America/Los_Angeles.
+    // gte = midnight LA time today (in UTC)
+    // lt  = midnight LA time tomorrow (in UTC)
+    // Using lt on start-of-tomorrow is cleaner than 23:59:59.999 and avoids
+    // any millisecond gap issues.
     const startOfDay = getTodayStartUTC();
-    const endOfDay = getTodayEndUTC();
+    const startOfTomorrow = new Date(startOfDay);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
     // Build where clause for routes
     const routeWhere: any = {
       date: {
         gte: startOfDay,
-        lt: endOfDay,
+        lt: startOfTomorrow,
       },
       isDeleted: false,
     };
@@ -97,106 +102,89 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    console.log("Stop query where clause:", JSON.stringify(stopWhere, null, 2));
 
-    // Get today's stops with route and customer information
-    const stops = await prisma.stop.findMany({
-      where: stopWhere,
-      select: {
-        id: true,
-        sequence: true,
-        address: true,
-        customerNameFromUpload: true,
-        driverNameFromUpload: true,
-        status: true,
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            groupCode: true,
+
+    // Run all three queries in parallel — no dependency between them.
+    const [stops, drivers, routes] = await Promise.all([
+      // Today's stops with route, customer, and stop-document details
+      prisma.stop.findMany({
+        where: stopWhere,
+        select: {
+          id: true,
+          sequence: true,
+          address: true,
+          customerNameFromUpload: true,
+          driverNameFromUpload: true,
+          status: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              groupCode: true,
+            },
           },
-        },
-        route: {
-          select: {
-            id: true,
-            routeNumber: true,
-            date: true,
-            driver: {
-              select: {
-                id: true,
-                username: true,
-                fullName: true,
+          route: {
+            select: {
+              id: true,
+              routeNumber: true,
+              date: true,
+              driver: {
+                select: {
+                  id: true,
+                  username: true,
+                  fullName: true,
+                },
+              },
+            },
+          },
+          stopDocuments: {
+            where: {
+              isDeleted: false,
+              document: { isDeleted: false },
+            },
+            include: {
+              document: {
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  fileName: true,
+                  filePath: true,
+                  createdAt: true,
+                },
               },
             },
           },
         },
-        stopDocuments: {
-          where: {
-            isDeleted: false,
-            document: {
-              isDeleted: false, // Also filter out deleted documents
-            },
-          },
-          include: {
-            document: {
-              select: {
-                id: true,
-                title: true,
-                type: true,
-                fileName: true,
-                filePath: true, // Include filePath for document viewing
-                createdAt: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [
-        { route: { routeNumber: "asc" } },
-        { sequence: "asc" },
-      ],
-    });
+        orderBy: [
+          { route: { routeNumber: "asc" } },
+          { sequence: "asc" },
+        ],
+      }),
 
-    // Get unique drivers for filtering
-    const drivers = await prisma.user.findMany({
-      where: {
-        role: "DRIVER",
-        isDeleted: false,
-      },
-      select: {
-        id: true,
-        username: true,
-        fullName: true,
-      },
-      orderBy: {
-        fullName: "asc",
-      },
-    });
+      // All active drivers for the filter dropdown
+      prisma.user.findMany({
+        where: { role: "DRIVER", isDeleted: false },
+        select: { id: true, username: true, fullName: true },
+        orderBy: { fullName: "asc" },
+      }),
 
-    // Get today's routes for filtering
-    const routes = await prisma.route.findMany({
-      where: {
-        date: {
-          gte: startOfDay,
-          lt: endOfDay,
+      // Today's routes for the filter dropdown
+      prisma.route.findMany({
+        where: {
+          date: { gte: startOfDay, lt: startOfTomorrow },
+          isDeleted: false,
         },
-        isDeleted: false,
-      },
-      select: {
-        id: true,
-        routeNumber: true,
-        driver: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
+        select: {
+          id: true,
+          routeNumber: true,
+          driver: {
+            select: { id: true, username: true, fullName: true },
           },
         },
-      },
-      orderBy: {
-        routeNumber: "asc",
-      },
-    });
+        orderBy: { routeNumber: "asc" },
+      }),
+    ]);
 
     // Add document count to each stop based on the filtered stopDocuments
     const stopsWithCount = stops.map(stop => ({

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const isActive = searchParams.get("isActive");
     const searchQuery = searchParams.get("search");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "200", 10), 500);
 
     // Build where clause
     const where: any = {
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
     // Get documents
     const documents = await prisma.document.findMany({
       where,
+      take: limit,
       include: {
         uploader: {
           select: {
