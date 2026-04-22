@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Notification from '@/components/ui/Notification';
 import InvoiceValidationAlert from '@/components/ui/InvoiceValidationAlert';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -74,6 +75,7 @@ interface Document {
 }
 
 export default function DocumentManagementPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -338,7 +340,13 @@ export default function DocumentManagementPage() {
 
       if (stopsResponse.ok) {
         const stopsData = await stopsResponse.json();
-        setStops(stopsData);
+        const freshStops: Stop[] = stopsData.stops || [];
+        setStops(freshStops);
+        // Keep the open modal in sync with the freshly-fetched data, otherwise
+        // the deleted document stays visible until the modal is reopened.
+        setSelectedStopForDetails((prev) =>
+          prev ? freshStops.find((s) => s.id === prev.id) || null : prev
+        );
       }
 
       // Close the modal and reset states
@@ -667,12 +675,20 @@ export default function DocumentManagementPage() {
               Manage customer-level and stop-specific documents for driver printing
             </p>
           </div>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            Upload Document
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => router.push('/admin/document-intake')}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Batch Intake
+            </button>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              Upload Document
+            </button>
+          </div>
         </div>
       </div>
 

@@ -1,213 +1,314 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { processIntakeFile } from "@/lib/documentIntakeService";
+import {
+  processIntakeFile,
+  searchStopsForIntake,
+  searchCustomersForIntake,
+} from "@/lib/documentIntakeService";
 import { fileManager } from "@/lib/fileManager";
 import { DocumentType } from "@prisma/client";
 
-export const config = {
-  api: {
-    bodyParser: false, // Disallow Next.js body parsing as we handle multipart form data
-  },
-};
+function authCheck(request: NextRequest): { adminId: string } | NextResponse {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const decoded = verifyToken(authHeader.split(" ")[1]) as any;
+  if (!decoded?.id || !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  return { adminId: decoded.id };
+}
 
-export async function POST(request: NextRequest) {
+// GET /api/admin/documents/intake
+//   ?type=stop     (default) — live stop search for manual assignment
+//   ?type=customer           — live customer search for customer-only attachments
+//   ?type=history            — recent batches + per-file logs (for audit trail)
+export async function GET(request: NextRequest) {
+  const auth = authCheck(request);
+  if (auth instanceof NextResponse) return auth;
+
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("q") || "";
+  const searchType = searchParams.get("type") || "stop";
+  const dateScope = parseInt(searchParams.get("dateScope") || "7", 10);
+  const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
+
   try {
-    // 1. Verify Authorization
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = verifyToken(token) as any;
-
-    if (!decoded || !decoded.id || (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN")) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const adminId = decoded.id;
-
-    // 2. Parse FormData
-    const formData = await request.formData();
-    const dryRunStr = formData.get("dryRun");
-    const isDryRun = dryRunStr === "true";
-    const dateScopeStr = formData.get("dateScope");
-    const dateScope = dateScopeStr ? parseInt(dateScopeStr as string, 10) : 7;
-    
-    // Extract array of files
-    const entries = Array.from(formData.entries());
-    const files = entries
-      .filter(([key, value]) => key === "files" && value instanceof File)
-      .map(([_, value]) => value as File);
-
-    if (files.length === 0) {
-      return NextResponse.json(
-        { message: "No files provided for intake." },
-        { status: 400 }
-      );
-    }
-
-    const results = [];
-    let matchedCount = 0;
-    let unmatchedCount = 0;
-
-    // Create a Batch record if NOT dry run
-    let batchId: string | null = null;
-    if (!isDryRun) {
-      const batch = await prisma.documentIntakeBatch.create({
-        data: {
-          status: "PENDING",
-          totalFiles: files.length,
-          createdBy: adminId,
+    if (searchType === "history") {
+      const batches = await prisma.documentIntakeBatch.findMany({
+        where: { isDeleted: false },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        include: {
+          user: { select: { fullName: true, username: true } },
+          logs: {
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              fileName: true,
+              fileSize: true,
+              status: true,
+              flow: true,
+              docType: true,
+              resolvedToId: true,
+              errorMessage: true,
+              createdAt: true,
+            },
+          },
         },
       });
-      batchId = batch.id;
+      return NextResponse.json({ batches });
     }
 
-    // Process each file
-    for (const file of files) {
-      const fileName = file.name;
-      const fileSize = file.size;
-      const mimeType = file.type || "application/octet-stream";
+    if (searchType === "customer") {
+      const customers = await searchCustomersForIntake(query);
+      return NextResponse.json({ customers });
+    }
 
-      // Parse and Query DB using robust DocumentIntakeService
-      const matchResult = await processIntakeFile(fileName, fileSize, dateScope);
-      const isMatched = matchResult.status === "MATCHED";
+    const stops = await searchStopsForIntake(query, dateScope);
+    return NextResponse.json({ stops });
+  } catch (error: any) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+}
 
-      if (isMatched) {
-        matchedCount++;
-      } else {
-        unmatchedCount++;
+// POST /api/admin/documents/intake
+// dryRun=true  → scan files, return auto-match results (no DB writes)
+// dryRun=false → commit using explicit assignments confirmed by user
+export async function POST(request: NextRequest) {
+  const auth = authCheck(request);
+  if (auth instanceof NextResponse) return auth;
+  const { adminId } = auth;
+
+  try {
+    const formData = await request.formData();
+    const isDryRun = formData.get("dryRun") === "true";
+    const dateScope = parseInt(formData.get("dateScope") as string || "7", 10);
+
+    const files = Array.from(formData.entries())
+      .filter(([key, val]) => key === "files" && val instanceof File)
+      .map(([_, val]) => val as File);
+
+    if (files.length === 0) {
+      return NextResponse.json({ message: "No files provided." }, { status: 400 });
+    }
+
+    // --- DRY RUN: just scan, no DB writes ---
+    if (isDryRun) {
+      const results = await Promise.all(
+        files.map((f) => processIntakeFile(f.name, f.size, dateScope))
+      );
+      const matched = results.filter((r) => r.status === "MATCHED").length;
+      return NextResponse.json({
+        dryRun: true,
+        totalFiles: files.length,
+        matched,
+        needsAssignment: files.length - matched,
+        results,
+      });
+    }
+
+    // --- COMMIT: use explicit user-confirmed assignments ---
+    const assignmentsRaw = formData.get("assignments") as string;
+    if (!assignmentsRaw) {
+      return NextResponse.json({ message: "No assignments provided for commit." }, { status: 400 });
+    }
+
+    interface Assignment {
+      fileName: string;
+      stopId: string | null;      // null = customer-only attachment
+      customerId: string;
+      docType: string;
+      referenceNumber?: string;   // invoice / credit memo / PO number
+    }
+    const assignments: Assignment[] = JSON.parse(assignmentsRaw);
+
+    const fileMap = new Map(files.map((f) => [f.name, f]));
+
+    const batch = await prisma.documentIntakeBatch.create({
+      data: { status: "PENDING", totalFiles: assignments.length, createdBy: adminId },
+    });
+
+    let committed = 0;
+    let skipped = 0;
+    const errors: Array<{ fileName: string; error: string }> = [];
+    const skippedList: Array<{ fileName: string; reason: string }> = [];
+
+    // Category mapping for organized file storage
+    const categoryFor = (docType: string): "documents" => "documents";
+    const subCategoryFor = (docType: string): string | undefined => {
+      switch (docType) {
+        case "INVOICE":
+        case "CUSTOMER_INVOICE":
+          return "invoices";
+        case "CREDIT_MEMO":
+          return "credit-memos";
+        case "STATEMENT":
+          return "statements";
+        default:
+          return undefined;
+      }
+    };
+
+    for (const assignment of assignments) {
+      const file = fileMap.get(assignment.fileName);
+      if (!file) {
+        errors.push({ fileName: assignment.fileName, error: "File not included in upload." });
+        continue;
       }
 
-      let logId: string | null = null;
-      let finalDocId: string | null = null;
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
 
-      // If not dry run, save to standard folders & write to DB
-      if (!isDryRun && isMatched && matchResult.resolvedTo && batchId) {
-        try {
-          // Wrap file upload in standard document upload flow
-          const arrayBuffer = await file.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
+        // uploadFile deduplicates by sha256 checksum — same bytes return the
+        // existing File record instead of creating a new one on disk.
+        const upload = await fileManager.uploadFile(
+          buffer,
+          file.name,
+          file.type || "application/octet-stream",
+          adminId,
+          {
+            category: categoryFor(assignment.docType),
+            subCategory: subCategoryFor(assignment.docType),
+          }
+        );
 
-          // Standard document storage using fileManager (same as manual upload)
-          const uploadResult = await fileManager.saveFile(buffer, fileName);
+        // Scope customerId: only customer-only attachments surface under the
+        // customer's documents list (which is also injected into every stop
+        // for that customer by /api/driver/stops/[id]/documents). Stop-level
+        // attachments must NOT set customerId, otherwise a single-stop invoice
+        // would leak into every other stop of that customer.
+        const resolvedCustomerId = assignment.stopId ? null : assignment.customerId;
 
-          // Create base Document record
-          const document = await prisma.document.create({
+        let document = await prisma.document.findFirst({
+          where: {
+            filePath: upload.filePath,
+            customerId: resolvedCustomerId,
+            type: (assignment.docType as DocumentType) || "OTHER",
+            isDeleted: false,
+          },
+        });
+
+        if (!document) {
+          document = await prisma.document.create({
             data: {
-              url: uploadResult.url,
-              filePath: uploadResult.filePath,
-              fileName: uploadResult.originalName,
-              fileSize: uploadResult.size,
-              mimeType: mimeType,
-              documentType: (matchResult.docType as DocumentType) || "OTHER",
+              title: file.name,
+              description: `Batch intake — assigned by admin`,
+              type: (assignment.docType as DocumentType) || "OTHER",
+              filePath: upload.filePath,
+              fileName: upload.originalName,
+              fileSize: upload.fileSize,
+              mimeType: upload.mimeType,
               uploadedBy: adminId,
-              customerId: matchResult.resolvedTo.customerId,
+              customerId: resolvedCustomerId,
             },
           });
-          
-          finalDocId = document.id;
+        }
 
-          // If Flow is Stop, link it using StopDocument
-          if (matchResult.flow === "stop" && matchResult.resolvedTo.stopId) {
-            await prisma.stopDocument.create({
+        // Stop-level attachment: guard against duplicate link.
+        if (assignment.stopId) {
+          const existingLink = await prisma.stopDocument.findFirst({
+            where: {
+              stopId: assignment.stopId,
+              documentId: document.id,
+              isDeleted: false,
+            },
+          });
+          if (existingLink) {
+            skippedList.push({
+              fileName: assignment.fileName,
+              reason: "Already attached to this stop.",
+            });
+            skipped++;
+            await prisma.documentIntakeLog.create({
               data: {
-                stopId: matchResult.resolvedTo.stopId,
-                documentId: document.id,
+                batchId: batch.id,
+                fileName: assignment.fileName,
+                fileSize: file.size,
+                status: "UNMATCHED",
+                flow: "stop",
+                docType: assignment.docType as DocumentType,
+                resolvedToId: assignment.stopId,
+                errorMessage: "Duplicate: already attached to this stop.",
               },
             });
+            continue;
+          }
+          await prisma.stopDocument.create({
+            data: { stopId: assignment.stopId, documentId: document.id },
+          });
 
-            // Specific side-effects based on Plan
-            if (matchResult.docType === "INVOICE" && matchResult.anchorType === "invoice") {
+          // Sync reference number back to the Stop, matching the behavior of
+          // the legacy single-file upload route (/api/admin/documents). Only
+          // applies to stop-level invoice / credit memo uploads.
+          const refNumber = (assignment.referenceNumber || "").trim();
+          if (refNumber) {
+            const stopUpdate: { quickbooksInvoiceNum?: string; creditMemoNumber?: string } = {};
+            if (assignment.docType === "INVOICE") {
+              stopUpdate.quickbooksInvoiceNum = refNumber;
+            } else if (assignment.docType === "CREDIT_MEMO") {
+              stopUpdate.creditMemoNumber = refNumber;
+            }
+            if (Object.keys(stopUpdate).length > 0) {
               await prisma.stop.update({
-                where: { id: matchResult.resolvedTo.stopId },
-                data: { quickbooksInvoiceNum: matchResult.anchorValue },
-              });
-            } else if (matchResult.docType === "CREDIT_MEMO") {
-              await prisma.creditMemo.create({
-                data: {
-                  stopId: matchResult.resolvedTo.stopId,
-                  amount: 0, // Placeholder, can be edited later
-                  number: matchResult.anchorType === "invoice" ? `CM-${matchResult.anchorValue}` : `CM-STOP-${matchResult.resolvedTo.sequence}`,
-                  reason: "Uploaded via automated document intake",
-                },
+                where: { id: assignment.stopId },
+                data: stopUpdate,
               });
             }
           }
-
-          // Generate a log for this successful commitment
-          await prisma.documentIntakeLog.create({
-            data: {
-              batchId,
-              fileName,
-              fileSize,
-              status: "MATCHED",
-              flow: matchResult.flow,
-              anchorType: matchResult.anchorType,
-              anchorValue: matchResult.anchorValue,
-              docType: matchResult.docType as DocumentType | undefined,
-              resolvedToId: matchResult.flow === "stop" ? matchResult.resolvedTo.stopId : matchResult.resolvedTo.customerId,
-            },
-          });
-
-        } catch (uploadOrDbError: any) {
-          console.error("Error committing file:", uploadOrDbError);
-          // If commit fails, log it as an error
-          await prisma.documentIntakeLog.create({
-            data: {
-              batchId,
-              fileName,
-              fileSize,
-              status: "UNMATCHED",
-              errorMessage: `Commit failed: ${uploadOrDbError.message}`,
-            },
-          });
-          matchResult.status = "UNMATCHED";
-          matchResult.reason = `Commit failed: ${uploadOrDbError.message}`;
         }
-      } else if (!isDryRun && !isMatched && batchId) {
-         // Create UNMATCHED log
-         await prisma.documentIntakeLog.create({
+
+        await prisma.documentIntakeLog.create({
           data: {
-            batchId,
-            fileName,
-            fileSize,
+            batchId: batch.id,
+            fileName: file.name,
+            fileSize: file.size,
+            status: "MATCHED",
+            flow: assignment.stopId ? "stop" : "customer",
+            docType: assignment.docType as DocumentType,
+            resolvedToId: assignment.stopId || assignment.customerId,
+          },
+        });
+
+        committed++;
+      } catch (err: any) {
+        console.error("Commit error for", assignment.fileName, err);
+        errors.push({ fileName: assignment.fileName, error: err.message || "Unknown error" });
+        await prisma.documentIntakeLog.create({
+          data: {
+            batchId: batch.id,
+            fileName: assignment.fileName,
+            fileSize: file.size,
             status: "UNMATCHED",
-            errorMessage: matchResult.reason,
+            errorMessage: err.message,
           },
         });
       }
-
-      results.push(matchResult);
     }
 
-    // Finalize Batch if it was a commit
-    if (!isDryRun && batchId) {
-      await prisma.documentIntakeBatch.update({
-        where: { id: batchId },
-        data: {
-          status: "COMMITTED",
-          matchedCount,
-          unmatchedCount,
-        },
-      });
-    }
+    const failed = errors.length;
+    await prisma.documentIntakeBatch.update({
+      where: { id: batch.id },
+      data: {
+        status: "COMMITTED",
+        matchedCount: committed,
+        unmatchedCount: failed + skipped,
+      },
+    });
 
     return NextResponse.json({
-      dryRun: isDryRun,
-      totalFiles: files.length,
-      matched: matchedCount,
-      unmatched: unmatchedCount,
-      results,
+      committed,
+      failed,
+      skipped,
+      total: assignments.length,
+      errors,
+      skippedList,
     });
 
   } catch (error: any) {
-    console.error("Error processing document intake:", error);
-    return NextResponse.json(
-      { message: error.message || "Internal server error" },
-      { status: 500 }
-    );
+    console.error("Intake error:", error);
+    return NextResponse.json({ message: error.message || "Internal server error" }, { status: 500 });
   }
 }
