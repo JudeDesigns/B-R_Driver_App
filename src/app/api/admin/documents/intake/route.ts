@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
       customerId: string;
       docType: string;
       referenceNumber?: string;   // invoice / credit memo / PO number
+      amount?: string;            // invoice total or credit memo amount
     }
     const assignments: Assignment[] = JSON.parse(assignmentsRaw);
 
@@ -240,22 +241,58 @@ export async function POST(request: NextRequest) {
             data: { stopId: assignment.stopId, documentId: document.id },
           });
 
-          // Sync reference number back to the Stop, matching the behavior of
-          // the legacy single-file upload route (/api/admin/documents). Only
-          // applies to stop-level invoice / credit memo uploads.
+          // Sync reference number and amount back to the Stop record, matching
+          // the behaviour of the legacy single-file upload route.
           const refNumber = (assignment.referenceNumber || "").trim();
-          if (refNumber) {
-            const stopUpdate: { quickbooksInvoiceNum?: string; creditMemoNumber?: string } = {};
+          const amountStr = (assignment.amount || "").trim();
+          const parsedAmount = amountStr !== "" ? parseFloat(amountStr) : null;
+          const hasValidAmount = parsedAmount !== null && !isNaN(parsedAmount);
+
+          if (refNumber || hasValidAmount) {
+            const stopUpdate: {
+              quickbooksInvoiceNum?: string;
+              amount?: number;
+              creditMemoNumber?: string;
+              creditMemoAmount?: number;
+            } = {};
+
             if (assignment.docType === "INVOICE") {
-              stopUpdate.quickbooksInvoiceNum = refNumber;
+              if (refNumber) stopUpdate.quickbooksInvoiceNum = refNumber;
+              if (hasValidAmount) stopUpdate.amount = parsedAmount!;
             } else if (assignment.docType === "CREDIT_MEMO") {
-              stopUpdate.creditMemoNumber = refNumber;
+              if (refNumber) stopUpdate.creditMemoNumber = refNumber;
+              if (hasValidAmount) stopUpdate.creditMemoAmount = parsedAmount!;
             }
+
             if (Object.keys(stopUpdate).length > 0) {
               await prisma.stop.update({
-                where: { id: assignment.stopId },
+                where: { id: assignment.stopId! },
                 data: stopUpdate,
               });
+            }
+
+            // For credit memos, also create/update the CreditMemo record
+            // (mirrors the single-file upload route behaviour).
+            if (assignment.docType === "CREDIT_MEMO" && hasValidAmount) {
+              const cmNum = refNumber || "N/A";
+              const existingCM = await prisma.creditMemo.findFirst({
+                where: { stopId: assignment.stopId!, creditMemoNumber: cmNum, isDeleted: false },
+              });
+              if (existingCM) {
+                await prisma.creditMemo.update({
+                  where: { id: existingCM.id },
+                  data: { creditMemoAmount: parsedAmount!, documentId: document.id, updatedAt: new Date() },
+                });
+              } else {
+                await prisma.creditMemo.create({
+                  data: {
+                    stopId: assignment.stopId!,
+                    creditMemoNumber: cmNum,
+                    creditMemoAmount: parsedAmount!,
+                    documentId: document.id,
+                  },
+                });
+              }
             }
           }
         }

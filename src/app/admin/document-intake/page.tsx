@@ -47,6 +47,7 @@ interface FileRow {
   assignedCustomer: CustomerOption | null;
   docType: string;
   referenceNumber: string;
+  amount: string;
   excluded: boolean;
   searchQuery: string;
   searchResults: StopOption[];
@@ -103,6 +104,7 @@ function buildRow(file: File, scan: ScanResult): FileRow {
     assignedCustomer: null,
     docType: defaultType,
     referenceNumber,
+    amount: '',
     excluded: false,
     searchQuery: scan.resolvedTo
       ? `${scan.resolvedTo.customerName} — Inv ${scan.resolvedTo.invoiceNum}`
@@ -245,6 +247,7 @@ export default function DocumentIntakePage() {
   const handleDocTypeChange = (id: string, docType: string) => updateRow(id, { docType });
   const handleReferenceNumberChange = (id: string, referenceNumber: string) =>
     updateRow(id, { referenceNumber });
+  const handleAmountChange = (id: string, amount: string) => updateRow(id, { amount });
   const handleToggleExclude = (id: string, excluded: boolean) => updateRow(id, { excluded });
 
   const handleSelectStop = (id: string, stop: StopOption) => {
@@ -352,6 +355,11 @@ export default function DocumentIntakePage() {
         referenceNumber:
           r.attachMode === 'stop' && REF_NUMBER_TYPES.has(r.docType)
             ? (r.referenceNumber || '').trim()
+            : '',
+        // Amount only applies to stop-level invoices and credit memos.
+        amount:
+          r.attachMode === 'stop' && (r.docType === 'INVOICE' || r.docType === 'CREDIT_MEMO')
+            ? (r.amount || '').trim()
             : '',
       }));
       fd.append('assignments', JSON.stringify(assignments));
@@ -733,6 +741,22 @@ export default function DocumentIntakePage() {
                                 value={row.referenceNumber}
                                 onChange={(e) => handleReferenceNumberChange(row.id, e.target.value)}
                                 placeholder="Enter number"
+                                className="w-32 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                          )}
+                          {row.attachMode === 'stop' && (row.docType === 'INVOICE' || row.docType === 'CREDIT_MEMO') && (
+                            <div>
+                              <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                                {row.docType === 'CREDIT_MEMO' ? 'Credit Amount ($)' : 'Invoice Amount ($)'}
+                              </label>
+                              <input
+                                type="number"
+                                value={row.amount}
+                                onChange={(e) => handleAmountChange(row.id, e.target.value)}
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
                                 className="w-32 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                               />
                             </div>
