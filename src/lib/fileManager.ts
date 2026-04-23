@@ -36,7 +36,7 @@ export interface ThumbnailRecord {
 }
 
 export class FileManager {
-  private baseUploadPath = path.join(process.cwd(), 'uploads');
+  private baseUploadPath = path.join(process.cwd(), 'public', 'uploads');
   
   constructor() {
     this.ensureDirectoryStructure();
@@ -61,7 +61,9 @@ export class FileManager {
       return existingFile;
     }
 
-    // Generate organized file path
+    // Generate organized file path — for documents, match the flat structure
+    // used by the single-file upload route (/api/admin/documents) so that all
+    // documents end up in the same public/uploads/documents/ folder.
     const storedName = this.generateStoredName(originalName, mimeType);
     const filePath = this.generateFilePath(options.category, options.subCategory, storedName);
     const fullPath = path.join(this.baseUploadPath, filePath);
@@ -83,12 +85,15 @@ export class FileManager {
       where: { name: options.category },
     });
 
+    // Build the URL-accessible path (files live under public/uploads/)
+    const urlFilePath = `/uploads/${filePath.split(path.sep).join('/')}`;
+
     // Create file record
     const fileRecord = await prisma.file.create({
       data: {
         originalName,
         storedName,
-        filePath,
+        filePath: urlFilePath,
         fileSize: processedBuffer.length,
         mimeType,
         categoryId: fileCategory?.id,
@@ -103,7 +108,7 @@ export class FileManager {
       await this.generateThumbnails(fileRecord.id, fullPath);
     }
 
-    return fileRecord;
+    return fileRecord as unknown as FileRecord;
   }
 
   /**
@@ -170,7 +175,7 @@ export class FileManager {
 
     const oldFiles = await prisma.file.findMany({
       where: {
-        category,
+        category: { name: category },
         createdAt: { lt: cutoffDate },
         isArchived: false,
       },
@@ -181,8 +186,10 @@ export class FileManager {
     for (const file of oldFiles) {
       try {
         // Move file to archive directory
-        const currentPath = path.join(this.baseUploadPath, file.filePath);
-        const archivePath = path.join(this.baseUploadPath, 'archive', file.filePath);
+        // file.filePath is stored as /uploads/..., strip the prefix for disk operations
+        const relativePath = file.filePath.replace(/^\/uploads\//, '');
+        const currentPath = path.join(this.baseUploadPath, relativePath);
+        const archivePath = path.join(this.baseUploadPath, 'archive', relativePath);
         
         await fs.mkdir(path.dirname(archivePath), { recursive: true });
         await fs.rename(currentPath, archivePath);
@@ -193,7 +200,7 @@ export class FileManager {
           data: {
             isArchived: true,
             archivedAt: new Date(),
-            filePath: path.join('archive', file.filePath),
+            filePath: `/uploads/archive/${relativePath.split(path.sep).join('/')}`,
           },
         });
 
@@ -251,36 +258,49 @@ export class FileManager {
   }
 
   private async findDuplicate(checksum: string): Promise<FileRecord | null> {
-    return await prisma.file.findFirst({
+    const existing = await prisma.file.findFirst({
       where: { checksum, isArchived: false },
-    });
+    }) as unknown as FileRecord | null;
+
+    // Ignore stale records that have wrong/old paths (no /uploads/ prefix).
+    // These were created before the storage path was corrected. Returning them
+    // would cause new Document records to inherit the bad path and 404.
+    if (existing && !existing.filePath.startsWith('/uploads/')) {
+      return null;
+    }
+
+    return existing;
   }
 
   private generateStoredName(originalName: string, mimeType: string): string {
     const timestamp = Date.now();
-    const random = crypto.randomBytes(8).toString('hex');
-    const extension = this.getExtensionFromMimeType(mimeType);
-    return `${timestamp}_${random}${extension}`;
+    // Use the sanitized original name (matching the manual upload route convention)
+    // so filenames remain recognisable: timestamp_Glen_Rose_Invoice.pdf
+    const sanitized = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    return `${timestamp}_${sanitized}`;
   }
 
   private generateFilePath(category: string, subCategory: string | undefined, fileName: string): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    // Documents (batch intake and manual upload) always go into the flat
+    // documents/ folder — no year/month nesting — so both routes produce
+    // identical paths: public/uploads/documents/<fileName>  →  /uploads/documents/<fileName>
+    if (category === 'documents') {
+      return path.join('documents', fileName);
+    }
 
-    // Map categories to directory paths
+    // Map non-document categories to their organized directory paths
     const categoryPaths: Record<string, string> = {
       'delivery-photos': 'images/delivery-photos',
-      'safety-checks': 'images/safety-checks',
-      'documents': 'documents/other',
-      'invoices': 'documents/invoices',
-      'credit-memos': 'documents/credit-memos',
-      'statements': 'documents/statements',
-      'pdfs': 'pdfs/delivery-receipts',
-      'reports': 'pdfs/reports',
+      'safety-checks':   'images/safety-checks',
+      'pdfs':            'pdfs/delivery-receipts',
+      'reports':         'pdfs/reports',
     };
 
-    const basePath = categoryPaths[category] || 'documents/other';
+    const now = new Date();
+    const year  = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+
+    const basePath = categoryPaths[category] || 'documents';
     const parts = [basePath, year.toString(), month];
 
     if (subCategory) parts.push(subCategory);
