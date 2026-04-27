@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSecureToken } from "./server-crypto";
 
 // Rate limiting configuration
 interface RateLimitConfig {
@@ -39,7 +38,11 @@ const rateLimitConfigs: Record<string, RateLimitConfig> = {
  * Rate limiting middleware
  */
 export function rateLimit(request: NextRequest): NextResponse | null {
-  const ip = request.ip || request.headers.get("x-forwarded-for") || "unknown";
+  // request.ip was removed in Next.js 15; read from headers instead.
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
   const path = request.nextUrl.pathname;
 
   // Find matching rate limit config
@@ -53,7 +56,6 @@ export function rateLimit(request: NextRequest): NextResponse | null {
 
   const key = `${ip}:${path}`;
   const now = Date.now();
-  const windowStart = now - config.windowMs;
 
   // Clean up old entries
   for (const [storeKey, data] of rateLimitStore.entries()) {
@@ -111,7 +113,9 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
+    // camera=(self) allows the app itself to open the camera (required for
+    // capture="environment" on Android). Third-party iframes remain blocked.
+    "camera=(self), microphone=(), geolocation=()"
   );
 
   // Content Security Policy
@@ -251,7 +255,11 @@ export class SecurityLogger {
       timestamp: new Date().toISOString(),
       event,
       details,
-      ip: request?.ip || request?.headers.get("x-forwarded-for") || "unknown",
+      // request.ip was removed in Next.js 15; read from headers instead.
+      ip:
+        request?.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+        request?.headers.get("x-real-ip") ||
+        "unknown",
       userAgent: request?.headers.get("user-agent") || "unknown",
       path: request?.nextUrl.pathname || "unknown",
     };

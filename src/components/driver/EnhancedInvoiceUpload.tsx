@@ -289,13 +289,14 @@ export default function EnhancedInvoiceUpload({
           Upload Invoice Images
         </h3>
 
-        {/* File Input */}
+        {/* File Input — capture="environment" opens the rear camera directly
+            on Android Chrome. iOS shows a sheet with camera + library options. */}
         <div className="mb-4">
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            multiple
+            capture="environment"
             onChange={handleFileSelect}
             className="hidden"
           />
