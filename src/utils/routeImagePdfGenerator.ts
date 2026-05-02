@@ -153,23 +153,35 @@ export async function generateRouteImagePDF(
 
         for (let gridStart = 0; gridStart < stop.invoiceImageUrls.length; gridStart += imagesPerGrid) {
           const gridImages = stop.invoiceImageUrls.slice(gridStart, gridStart + imagesPerGrid);
+
+          // Read all files in this 4-image grid concurrently — disk I/O is the
+          // dominant cost on routes with many uploads. Embedding still has to
+          // be serialized because pdf-lib mutates the document.
+          const fileReads = await Promise.all(
+            gridImages.map(async (imageUrl, i) => {
+              const globalIndex = gridStart + i;
+              try {
+                const imagePath = path.join(process.cwd(), "public", imageUrl);
+                const imageBuffer = await fs.readFile(imagePath);
+                if (!imageBuffer || imageBuffer.length === 0) {
+                  throw new Error("Empty image file");
+                }
+                return { imageUrl, imageBuffer, globalIndex, error: null as Error | null };
+              } catch (error) {
+                return { imageUrl, imageBuffer: null, globalIndex, error: error as Error };
+              }
+            })
+          );
+
           const embeddedImages: { image: PDFImage; width: number; height: number; url: string; index: number }[] = [];
 
-          // Load and process images for this 2x2 grid
-          for (let i = 0; i < gridImages.length; i++) {
-            const imageUrl = gridImages[i];
-            const globalIndex = gridStart + i;
+          for (const { imageUrl, imageBuffer, globalIndex, error: readError } of fileReads) {
+            if (readError || !imageBuffer) {
+              console.warn(`Failed to load image ${imageUrl}:`, readError);
+              continue;
+            }
 
             try {
-              // Load and embed the image
-              const imagePath = path.join(process.cwd(), "public", imageUrl);
-              const imageBuffer = await fs.readFile(imagePath);
-
-              // Validate image buffer
-              if (!imageBuffer || imageBuffer.length === 0) {
-                throw new Error("Empty image file");
-              }
-
               let embeddedImage: PDFImage;
 
               // Detect actual file format by examining file header, not extension
@@ -212,7 +224,7 @@ export async function generateRouteImagePDF(
               console.log(`✅ Loaded image ${globalIndex + 1} for 2x2 grid`);
 
             } catch (error) {
-              console.warn(`Failed to load image ${imageUrl}:`, error);
+              console.warn(`Failed to embed image ${imageUrl}:`, error);
               // Skip failed images but continue with grid
             }
           }

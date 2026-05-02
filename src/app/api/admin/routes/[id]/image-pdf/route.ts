@@ -3,6 +3,12 @@ import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { generateRouteImagePDF } from "@/utils/routeImagePdfGenerator";
 
+// PDF assembly with many embedded images can run well past the default 10s
+// serverless budget. 5 minutes is more than enough for the largest routes
+// we've seen and matches the client-side AbortController timeout.
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }

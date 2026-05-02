@@ -31,7 +31,15 @@ export default function EnhancedInvoiceUpload({
   const [showPreview, setShowPreview] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  // Track which image is being replaced (if any)
+  const [replacingImageId, setReplacingImageId] = useState<string | null>(null);
+  // Gallery picker — supports multi-select.
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Camera input — single shot with `capture="environment"` so iOS Safari and
+  // Android Chrome both open the rear camera directly instead of showing an
+  // action sheet. `multiple` is intentionally omitted; some mobile browsers
+  // ignore `capture` when `multiple` is also present.
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Clear existing images for this stop
   const clearExistingImages = async () => {
@@ -152,17 +160,31 @@ export default function EnhancedInvoiceUpload({
       uploaded: false,
     }));
 
-    // Add to existing images (or replace if first selection)
-    setImages(prev => images.length === 0 ? newImages : [...prev, ...newImages]);
+    // Handle replacement if active
+    if (replacingImageId && newImages.length > 0) {
+      setImages(prev => prev.map(img =>
+        img.id === replacingImageId
+          ? { ...newImages[0], id: replacingImageId } // Keep original ID to avoid jumpiness
+          : img
+      ));
+      setReplacingImageId(null);
+    } else {
+      // Add to existing images (or replace if first selection)
+      setImages(prev => images.length === 0 ? newImages : [...prev, ...newImages]);
+    }
+
     setError('');
 
     if (shouldCompress) {
       console.log(`📱 Client-side compression completed for ${processedFiles.length} images`);
     }
 
-    // Reset file input to allow re-selection of same files
+    // Reset both inputs so the same file/photo can be re-selected.
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
     }
   };
 
@@ -177,24 +199,6 @@ export default function EnhancedInvoiceUpload({
       }
       return updated;
     });
-  };
-
-  // Replace an image
-  const replaceImage = (id: string) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file && file.type.startsWith('image/')) {
-        setImages(prev => prev.map(img =>
-          img.id === id
-            ? { ...img, file, preview: URL.createObjectURL(file), uploaded: false }
-            : img
-        ));
-      }
-    };
-    input.click();
   };
 
   // Show confirmation dialog before upload (only if there are existing images)
@@ -290,6 +294,7 @@ export default function EnhancedInvoiceUpload({
         </h3>
 
         <div className="mb-4">
+          {/* Hidden gallery picker — multi-select, no capture. */}
           <input
             ref={fileInputRef}
             type="file"
@@ -298,32 +303,71 @@ export default function EnhancedInvoiceUpload({
             onChange={handleFileSelect}
             className="hidden"
           />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors disabled:opacity-50"
-          >
-            <div className="space-y-2">
-              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div className="text-gray-600">
-                <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
-              </div>
-              <p className="text-sm text-gray-500">PNG, JPG, JPEG up to 10MB each</p>
+          {/* Hidden camera input — capture="environment" forces the rear
+              camera on iOS Safari and Android Chrome. No `multiple` here:
+              several mobile browsers ignore `capture` when both are set. */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {images.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={isUploading}
+                className="border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
+              >
+                <div className="space-y-2">
+                  <svg className="mx-auto h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <div className="text-blue-700 font-semibold">Take Photo</div>
+                  <p className="text-xs text-blue-600">Open camera</p>
+                </div>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
+              >
+                <div className="space-y-2">
+                  <svg className="mx-auto h-10 w-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <div className="text-gray-700 font-semibold">Choose from Gallery</div>
+                  <p className="text-xs text-gray-500">Pick existing photos</p>
+                </div>
+              </button>
             </div>
-          </button>
+          ) : null}
         </div>
 
-        {/* Add More Images Button */}
+        {/* Add More Images — same two-option pattern */}
         {images.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isUploading}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Take Photo
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              + Add More Images
+              + Add from Gallery
             </button>
           </div>
         )}
@@ -370,13 +414,30 @@ export default function EnhancedInvoiceUpload({
                 {/* Image Actions - Enhanced visibility */}
                 <div className="absolute inset-0 bg-black bg-opacity-60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center space-x-3">
                   <button
-                    onClick={() => replaceImage(image.id)}
+                    onClick={() => {
+                      setReplacingImageId(image.id);
+                      cameraInputRef.current?.click();
+                    }}
                     disabled={isUploading}
                     className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 disabled:opacity-50 shadow-lg transform hover:scale-105 transition-transform"
-                    title="Replace image"
+                    title="Replace with camera"
                   >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReplacingImageId(image.id);
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploading}
+                    className="bg-gray-600 text-white p-3 rounded-full hover:bg-gray-700 disabled:opacity-50 shadow-lg transform hover:scale-105 transition-transform"
+                    title="Replace from gallery"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </button>
                   <button
@@ -394,13 +455,30 @@ export default function EnhancedInvoiceUpload({
                 {/* Mobile-friendly action buttons (always visible on small screens) */}
                 <div className="md:hidden absolute bottom-2 right-2 flex space-x-1">
                   <button
-                    onClick={() => replaceImage(image.id)}
+                    onClick={() => {
+                      setReplacingImageId(image.id);
+                      cameraInputRef.current?.click();
+                    }}
                     disabled={isUploading}
                     className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:opacity-50 shadow-lg"
-                    title="Replace"
+                    title="Replace with camera"
                   >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" />
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReplacingImageId(image.id);
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploading}
+                    className="bg-gray-600 text-white p-2 rounded-full hover:bg-gray-700 disabled:opacity-50 shadow-lg"
+                    title="Replace from gallery"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </button>
                   <button

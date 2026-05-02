@@ -131,17 +131,40 @@ export async function generateImagePDF(route: Route): Promise<void> {
     throw new Error("No images found in this route to generate PDF");
   }
 
-  const response = await fetch(`/api/admin/routes/${route.id}/image-pdf`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  // Generation can take a few minutes for routes with many images. Use an
+  // AbortController with a 5-minute ceiling so we surface a clear timeout
+  // message instead of the browser's generic "Failed to fetch".
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/admin/routes/${route.id}/image-pdf`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error("PDF generation timed out after 5 minutes. The route may have too many images — try again or contact support.");
+    }
+    throw new Error("Lost connection while generating PDF. The server may still be processing — wait a moment and check the route, or try again.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Failed to generate image PDF");
+    let message = "Failed to generate image PDF";
+    try {
+      const errorData = await response.json();
+      message = errorData.message || message;
+    } catch {
+      // Non-JSON error body (e.g. proxy 504 HTML) — keep the default message.
+    }
+    throw new Error(message);
   }
 
   // Download the generated PDF
