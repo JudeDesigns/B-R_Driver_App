@@ -76,6 +76,7 @@ export default function SafetyPhotoBox({
                     <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-green-300 shadow-sm">
                         <img src={currentUrl} alt={label} className="w-full h-full object-cover" />
                         <button
+                            type="button"
                             onClick={triggerCapture}
                             className="absolute bottom-2 right-2 bg-white/90 p-2 rounded-full shadow-lg text-xs font-bold text-gray-800 hover:bg-white"
                         >
