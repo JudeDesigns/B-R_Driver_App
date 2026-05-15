@@ -410,10 +410,26 @@ export async function PATCH(
                 },
               });
 
-              // Format delivery time
+              // Format delivery time in PST timezone (matches admin email routes)
               const deliveryTime = updatedStop.completionTime
-                ? new Date(updatedStop.completionTime).toLocaleString()
-                : new Date().toLocaleString();
+                ? new Date(updatedStop.completionTime).toLocaleString("en-US", {
+                    timeZone: "America/Los_Angeles",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "numeric",
+                    hour12: true,
+                  })
+                : new Date().toLocaleString("en-US", {
+                    timeZone: "America/Los_Angeles",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "numeric",
+                    hour12: true,
+                  });
 
               // Get return reasons
               const returnReasons = returns.map(
