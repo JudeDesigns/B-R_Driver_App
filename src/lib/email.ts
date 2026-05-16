@@ -7,7 +7,7 @@ export const EMAIL_CONFIG = {
   // Set to true: send to both office AND customers
   SEND_TO_CUSTOMERS: true,
   // Office email address (always receives emails)
-  OFFICE_EMAIL: process.env.OFFICE_EMAIL || 'infobrfood@gmail.com',
+  OFFICE_EMAIL: process.env.OFFICE_EMAIL || 'info@brfood.us',
 };
 
 // Configure the email transporter
@@ -313,7 +313,7 @@ export const sendDeliveryConfirmationEmail = async (
     console.log(`Email configuration - SEND_TO_CUSTOMERS: ${EMAIL_CONFIG.SEND_TO_CUSTOMERS}`);
 
     const info = await transporter.sendMail({
-      from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'infobrfood@gmail.com'}>`,
+      from: `"B&R Food Services" <${process.env.EMAIL_FROM || 'info@brfood.us'}>`,
       to: actualRecipient,
       subject: emailSubject,
       html: emailRecord.body,

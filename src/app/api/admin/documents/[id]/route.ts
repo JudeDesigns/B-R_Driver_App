@@ -230,10 +230,24 @@ export async function DELETE(
       },
     });
 
-    // Optionally delete the physical file
+    // Optionally delete the physical file — but ONLY if no other live
+    // Document rows reference the same path. Batch intake dedups by
+    // content checksum, so one physical PDF can back many Document rows
+    // (e.g. same flyer assigned to many customers). Deleting the file
+    // when siblings still reference it 404s every other row.
     try {
-      const fullPath = path.join(process.cwd(), "public", document.filePath);
-      await unlink(fullPath);
+      const otherRefs = await prisma.document.count({
+        where: {
+          filePath: document.filePath,
+          isDeleted: false,
+          id: { not: id },
+        },
+      });
+
+      if (otherRefs === 0) {
+        const fullPath = path.join(process.cwd(), "public", document.filePath);
+        await unlink(fullPath);
+      }
     } catch (fileError) {
       console.warn("Could not delete physical file:", fileError);
       // Continue even if file deletion fails

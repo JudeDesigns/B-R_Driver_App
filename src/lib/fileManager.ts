@@ -260,12 +260,37 @@ export class FileManager {
   private async findDuplicate(checksum: string): Promise<FileRecord | null> {
     const existing = await prisma.file.findFirst({
       where: { checksum, isArchived: false },
+      orderBy: { createdAt: 'desc' },
     }) as unknown as FileRecord | null;
+
+    if (!existing) {
+      return null;
+    }
 
     // Ignore stale records that have wrong/old paths (no /uploads/ prefix).
     // These were created before the storage path was corrected. Returning them
     // would cause new Document records to inherit the bad path and 404.
-    if (existing && !existing.filePath.startsWith('/uploads/')) {
+    if (!existing.filePath.startsWith('/uploads/')) {
+      return null;
+    }
+
+    // Verify the physical file still exists on disk. If it has been removed
+    // (e.g. via a prior admin delete that wiped a shared file), this row is
+    // orphaned — treat it as no-duplicate so the caller writes a fresh copy.
+    // Archive the orphan row so subsequent uploads of the same content don't
+    // keep re-checking it on every call.
+    const diskPath = path.join(process.cwd(), 'public', existing.filePath);
+    try {
+      await fs.access(diskPath);
+    } catch {
+      try {
+        await prisma.file.update({
+          where: { id: existing.id },
+          data: { isArchived: true, archivedAt: new Date() },
+        });
+      } catch (archiveErr) {
+        console.warn('Failed to archive orphaned File row:', archiveErr);
+      }
       return null;
     }
 
