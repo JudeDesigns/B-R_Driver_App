@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import { sendDeliveryConfirmationEmail } from "@/lib/email";
+import { uploadFileExists } from "@/lib/uploadFilePaths";
 
 // POST /api/admin/stops/[id]/send-email - Send delivery confirmation email
 export async function POST(
@@ -120,11 +121,20 @@ export async function POST(
     // Send the email with PDF attachment (controlled by EMAIL_CONFIG.SEND_TO_CUSTOMERS)
     const sendToCustomer = true; // Let EMAIL_CONFIG.SEND_TO_CUSTOMERS control the behavior
 
-    // Use existing PDF if available
+    // Use existing PDF if available — and verify it's actually on disk
+    // before invoking the email path (which would otherwise throw when it
+    // tries to read the missing file). This keeps customer-facing errors
+    // clean when a prior cleanup wiped the PDF.
     if (!stop.signedInvoicePdfUrl) {
       return NextResponse.json(
         { message: "No PDF available for this stop. Please ensure images have been uploaded and processed." },
         { status: 400 }
+      );
+    }
+    if (!(await uploadFileExists(stop.signedInvoicePdfUrl))) {
+      return NextResponse.json(
+        { message: "The delivery PDF for this stop is missing on the server. Please ask the driver to re-upload invoice images." },
+        { status: 409 }
       );
     }
 

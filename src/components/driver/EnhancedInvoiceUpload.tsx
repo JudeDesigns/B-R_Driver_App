@@ -41,24 +41,12 @@ export default function EnhancedInvoiceUpload({
   // ignore `capture` when `multiple` is also present.
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Clear existing images for this stop
-  const clearExistingImages = async () => {
-    try {
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
-      const response = await fetch(`/api/driver/stops/${stopId}/clear-images`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        console.warn('Failed to clear existing images');
-      }
-    } catch (error) {
-      console.warn('Error clearing existing images:', error);
-    }
-  };
+  // Note: we intentionally do NOT pre-clear server-side files here. The
+  // upload route writes new files under a fresh sessionId, so they never
+  // collide with the previous session on disk. Old files are cleaned up
+  // atomically by the upload route AFTER the new DB write succeeds. This
+  // prevents the previous race where a failed/abandoned re-upload would
+  // wipe the prior session's files and leave the Stop pointing at 404s.
 
   // Function to compress image on client side
   const compressImage = async (file: File, maxSizeKB: number = 800): Promise<File> => {
@@ -131,9 +119,10 @@ export default function EnhancedInvoiceUpload({
       return;
     }
 
-    // If this is the first selection (no existing images), clear everything
+    // Reset local UI state for a fresh selection. Server-side files from
+    // the previous session are NOT touched here — the upload route swaps
+    // and cleans atomically after the new DB write succeeds.
     if (images.length === 0) {
-      await clearExistingImages();
       setPdfUrl('');
       setShowPreview(false);
       setSuccess('');

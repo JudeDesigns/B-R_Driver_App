@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { promisify } from "util";
 import { emitStopStatusUpdate } from "@/app/api/socketio/route";
+import { deleteUploadFiles } from "@/lib/uploadFilePaths";
 
 const writeFileAsync = promisify(fs.writeFile);
 const mkdirAsync = promisify(fs.mkdir);
@@ -305,6 +306,17 @@ export async function POST(
     // Create the public URL for the PDF
     const pdfUrl = `/uploads/pdf/${fileName}.pdf`;
 
+    // Capture the previous image set and PDF before overwriting so we can
+    // atomically clean up the orphans only AFTER the DB write succeeds.
+    // This replaces the old destructive "clear-images before upload" pattern
+    // that wiped files on disk before the new ones were committed.
+    const previousImageUrls: string[] = Array.isArray(stop.invoiceImageUrls)
+      ? (stop.invoiceImageUrls as string[])
+      : [];
+    const previousPdfUrl: string | null = stop.signedInvoicePdfUrl ?? null;
+
+    const newImageUrls = imageUrls?.map(img => img.url) || [];
+
     // Update the stop with the PDF URL and image URLs
     await prisma.stop.update({
       where: {
@@ -312,11 +324,31 @@ export async function POST(
       },
       data: {
         signedInvoicePdfUrl: pdfUrl,
-        invoiceImageUrls: imageUrls?.map(img => img.url) || [], // Store image URLs for admin preview
+        invoiceImageUrls: newImageUrls, // Store image URLs for admin preview
         // Don't automatically update status here since the client will handle it
         // This allows for better control flow and error handling on the client side
       },
     });
+
+    // Swap-and-clean: now that the DB points at the new files, remove any
+    // previous-session image files that are no longer referenced. Same for
+    // the previous PDF if it changed. Failures are logged but never fatal —
+    // the new upload is already committed.
+    try {
+      const newImageSet = new Set(newImageUrls);
+      const orphanImages = previousImageUrls.filter((u) => u && !newImageSet.has(u));
+      const orphanPdf =
+        previousPdfUrl && previousPdfUrl !== pdfUrl ? [previousPdfUrl] : [];
+      const toDelete = [...orphanImages, ...orphanPdf];
+      if (toDelete.length > 0) {
+        const deleted = await deleteUploadFiles(toDelete);
+        console.log(
+          `Swap-and-clean for stop ${stop.id}: removed ${deleted.length}/${toDelete.length} orphaned upload(s).`
+        );
+      }
+    } catch (cleanupError) {
+      console.warn("Post-upload orphan cleanup failed (non-fatal):", cleanupError);
+    }
 
     // Test email notification (optional - remove this in production)
     console.log(`=== EMAIL NOTIFICATION TEST ===`);

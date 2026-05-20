@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import { sendDeliveryConfirmationEmail } from "@/lib/email";
+import { uploadFileExists } from "@/lib/uploadFilePaths";
 
 // POST /api/admin/routes/[id]/send-emails - Send delivery confirmation emails for all completed stops in a route
 export async function POST(
@@ -176,6 +177,22 @@ export async function POST(
             orderNumber: stop.orderNumberWeb || "N/A",
             status: 'skipped',
             reason: 'No PDF available'
+          });
+          continue;
+        }
+
+        // Verify the PDF still exists on disk. If a prior cleanup removed
+        // the file we'd otherwise throw inside the email path and abort the
+        // entire batch — instead, skip this stop and continue with the rest.
+        if (!(await uploadFileExists(stop.signedInvoicePdfUrl))) {
+          console.warn(`⚠️ Skipping stop ${stop.id} - PDF file missing on disk: ${stop.signedInvoicePdfUrl}`);
+          emailResults.skipped++;
+          emailResults.details.push({
+            stopId: stop.id,
+            customer: stop.customer.name,
+            orderNumber: stop.orderNumberWeb || "N/A",
+            status: 'skipped',
+            reason: 'PDF file missing on server (needs re-upload)'
           });
           continue;
         }

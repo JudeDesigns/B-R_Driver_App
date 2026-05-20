@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { existingUploadUrls, uploadFileExists } from "@/lib/uploadFilePaths";
 
 // GET /api/admin/stops/[id] - Get stop details
 export async function GET(
@@ -154,7 +155,22 @@ export async function GET(
       });
     }
 
-    return NextResponse.json(stop);
+    // Self-heal: never surface invoice URLs whose backing files are missing
+    // on disk. Prevents the admin UI from rendering broken <img> tags or
+    // links that 404 (e.g. files removed by a prior destructive cleanup).
+    const sanitizedInvoiceImageUrls = Array.isArray(stop.invoiceImageUrls)
+      ? await existingUploadUrls(stop.invoiceImageUrls as string[])
+      : [];
+    const sanitizedSignedPdfUrl = stop.signedInvoicePdfUrl
+      && (await uploadFileExists(stop.signedInvoicePdfUrl))
+        ? stop.signedInvoicePdfUrl
+        : null;
+
+    return NextResponse.json({
+      ...stop,
+      invoiceImageUrls: sanitizedInvoiceImageUrls,
+      signedInvoicePdfUrl: sanitizedSignedPdfUrl,
+    });
   } catch (error) {
     console.error("Error fetching stop:", error);
     return NextResponse.json(
