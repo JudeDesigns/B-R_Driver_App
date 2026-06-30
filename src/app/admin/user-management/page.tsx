@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import EnhancedTable from "@/components/ui/EnhancedTable";
@@ -56,13 +56,28 @@ export default function UserManagementPage() {
 
   const router = useRouter();
 
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (token) {
       fetchUsers();
     }
   }, [token, roleFilter, limit, offset]);
 
-  const fetchUsers = async () => {
+  // Debounced search: reset to page 1 and fetch after 300ms pause
+  useEffect(() => {
+    if (!token) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setOffset(0);
+      fetchUsers(0);
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchTerm]);
+
+  const fetchUsers = async (overrideOffset?: number) => {
     if (!token) return;
 
     setLoading(true);
@@ -71,8 +86,9 @@ export default function UserManagementPage() {
     try {
       const queryParams = new URLSearchParams();
       if (roleFilter !== "ALL") queryParams.append("role", roleFilter);
+      if (searchTerm) queryParams.append("search", searchTerm);
       queryParams.append("limit", limit.toString());
-      queryParams.append("offset", offset.toString());
+      queryParams.append("offset", (overrideOffset !== undefined ? overrideOffset : offset).toString());
 
       const response = await fetch(
         `/api/super-admin/users?${queryParams.toString()}`,
@@ -337,12 +353,7 @@ export default function UserManagementPage() {
             {/* Content area (grows to fill available space) */}
             <div className="flex-grow">
               <EnhancedTable
-                data={users.filter(user => {
-                  const matchesSearch = searchTerm === "" ||
-                    user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    user.username.toLowerCase().includes(searchTerm.toLowerCase());
-                  return matchesSearch;
-                })}
+                data={users}
                 keyField="id"
                 isLoading={loading}
                 emptyState={

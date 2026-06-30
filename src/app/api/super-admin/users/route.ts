@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters for filtering
     const { searchParams } = new URL(request.url);
     const role = searchParams.get("role");
+    const search = searchParams.get("search") || "";
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -34,6 +35,12 @@ export async function GET(request: NextRequest) {
     };
     if (role && role !== "ALL") {
       whereClause.role = role;
+    }
+    if (search) {
+      whereClause.OR = [
+        { username: { contains: search, mode: "insensitive" } },
+        { fullName: { contains: search, mode: "insensitive" } },
+      ];
     }
 
     // Fetch users

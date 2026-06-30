@@ -16,6 +16,7 @@ interface UploadResult {
   rowsSucceeded?: number;
   rowsFailed?: number;
   isUpdate?: boolean;
+  unmatchedDriverNames?: string[];
 }
 
 interface PreviewResult {
@@ -408,6 +409,39 @@ export default function RouteUploadPage() {
                   <ul className="list-disc pl-7 mt-2 text-sm">
                     {result.warnings.map((warning, index) => (
                       <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result?.unmatchedDriverNames && result.unmatchedDriverNames.length > 0 && (
+                <div className="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4">
+                  <div className="flex items-center mb-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 mr-2 text-red-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728"
+                      />
+                    </svg>
+                    <p className="font-semibold">Unrecognized Drivers in CSV</p>
+                  </div>
+                  <p className="text-sm mb-2">
+                    The following driver name(s) from the spreadsheet do not match any active Driver account.
+                    Their stops have been saved but will <strong>not be visible to any driver</strong> until
+                    a matching account exists. Please create these accounts in{" "}
+                    <a href="/admin/user-management" className="underline font-medium">User Management</a>.
+                  </p>
+                  <ul className="list-disc pl-7 text-sm">
+                    {result.unmatchedDriverNames.map((name, index) => (
+                      <li key={index} className="font-mono">{name}</li>
                     ))}
                   </ul>
                 </div>

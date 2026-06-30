@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       rowsSucceeded: parseResult.rowsSucceeded,
       rowsFailed: parseResult.rowsFailed,
       isUpdate: isUpdate,
+      unmatchedDriverNames: result.unmatchedDriverNames,
     });
   } catch (error) {
     console.error("Route upload error:", error);

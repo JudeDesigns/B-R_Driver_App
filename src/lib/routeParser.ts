@@ -99,7 +99,7 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
       header: 1,
       defval: null, // Use null for empty cells for faster processing
       blankrows: false, // Skip blank rows for better performance
-    });
+    }) as any[][];
 
     if (data.length < 2) {
       result.errors.push("Excel file does not contain enough data");
@@ -303,8 +303,8 @@ export async function parseRouteExcel(buffer: Buffer): Promise<ParsingResult> {
           }
         }
 
-        // Get the driver name from the row
-        const rawDriverName = row[columnIndices.driver]?.toString() || "";
+        // Get the driver name from the row — trim whitespace to prevent invisible mismatches
+        const rawDriverName = row[columnIndices.driver]?.toString().trim() || "";
 
         // Check if this driver should be ignored
         if (shouldIgnoreDriver(rawDriverName)) {
@@ -521,7 +521,7 @@ export async function saveRouteToDatabase(
   uploadedBy: string,
   fileName: string,
   action?: string | null
-): Promise<{ route: Route; isUpdate: boolean }> {
+): Promise<{ route: Route; isUpdate: boolean; unmatchedDriverNames: string[] }> {
   // Performance optimization: Use a more efficient transaction with optimized batch operations
   return await prisma.$transaction(async (tx) => {
     // Initialize customerInvoiceMap at the top level of the transaction
@@ -551,135 +551,72 @@ export async function saveRouteToDatabase(
     }
     parsedRoute.stops = validStops;
 
-    // Performance optimization: Use a Set for O(1) lookups of unique driver names
+    // Collect unique trimmed driver name strings from the CSV
     const driverNamesSet = new Set<string>();
     for (const stop of parsedRoute.stops) {
       if (stop.driverName) {
-        driverNamesSet.add(stop.driverName);
+        driverNamesSet.add(stop.driverName); // already trimmed at parse time
       }
     }
-    const driverNames = Array.from(driverNamesSet);
+    const csvDriverNames = Array.from(driverNamesSet);
 
-    // Map to store driver objects by name for quick lookup
-    const driverMap = new Map<string, User>();
-
-    // Performance optimization: Batch query existing drivers first
-    // Query for active drivers with DRIVER role
-    const existingDrivers = await tx.user.findMany({
-      where: {
-        username: {
-          in: driverNames,
-        },
-        role: "DRIVER",
-        isDeleted: false,
-      },
+    // Load ALL active DRIVER accounts from the DB so we can do a
+    // case-insensitive match against both username and fullName.
+    // This prevents split sections caused by casing / whitespace differences.
+    const allDriverUsers = await tx.user.findMany({
+      where: { role: "DRIVER", isDeleted: false },
+      select: { id: true, username: true, fullName: true },
     });
 
-    // Add existing drivers to the map
-    for (const driver of existingDrivers) {
-      driverMap.set(driver.username, driver);
+    // Build a lookup: lowercased key → canonical username
+    // We index both username and fullName so either can match the CSV value.
+    const driverLookup = new Map<string, string>(); // lowerKey → username
+    for (const u of allDriverUsers) {
+      driverLookup.set(u.username.toLowerCase(), u.username);
+      if (u.fullName) {
+        driverLookup.set(u.fullName.toLowerCase(), u.username);
+      }
     }
 
-    // IMPORTANT: Also check for ANY users with these usernames (regardless of role/deletion status)
-    // to prevent unique constraint violations
-    const allExistingUsers = await tx.user.findMany({
-      where: {
-        username: {
-          in: driverNames,
-        },
-      },
-      select: {
-        username: true,
-        role: true,
-        isDeleted: true,
-      },
-    });
+    // Map: CSV raw name → canonical username (or null if no match found)
+    const csvToCanonical = new Map<string, string | null>();
+    const unmatchedDriverNames: string[] = [];
 
-    // Create a set of usernames that already exist in the database
-    const existingUsernames = new Set(allExistingUsers.map(u => u.username));
-
-    // Process each missing driver
-    const missingDriverNames = driverNames.filter(
-      (name) => !driverMap.has(name) && !existingUsernames.has(name)
-    );
-
-    // Log warnings for usernames that exist but aren't active drivers
-    for (const user of allExistingUsers) {
-      if (!driverMap.has(user.username)) {
+    for (const csvName of csvDriverNames) {
+      const canonical = driverLookup.get(csvName.toLowerCase()) ?? null;
+      csvToCanonical.set(csvName, canonical);
+      if (!canonical) {
+        unmatchedDriverNames.push(csvName);
         console.warn(
-          `[ROUTE UPLOAD] Username "${user.username}" already exists with role: ${user.role}, isDeleted: ${user.isDeleted}. ` +
-          `Cannot create as DRIVER. Please use a different username or update the existing user.`
+          `[ROUTE UPLOAD] Driver "${csvName}" not found in the system. ` +
+          `Stops will be saved with the raw CSV name until a matching account is created.`
+        );
+      } else {
+        console.log(
+          `[ROUTE UPLOAD] Driver "${csvName}" resolved to canonical username "${canonical}".`
         );
       }
     }
 
-    // Performance optimization: Process drivers in parallel batches
-    const driverCreationPromises = missingDriverNames.map(
-      async (driverName) => {
-        try {
-          // Generate a default password based on the driver's name: {name}123
-          const defaultPassword = `${driverName}123`;
-          // Note: In production, consider implementing stronger password policies
-          // and requiring drivers to change their password on first login
-          const hashedPassword = defaultPassword;
-
-          // Create the new driver
-          const driver = await tx.user.create({
-            data: {
-              username: driverName,
-              password: hashedPassword,
-              role: "DRIVER",
-              fullName: driverName, // Use the same name for fullName initially
-            },
-          });
-
-          console.log(
-            `[ROUTE UPLOAD] Created new driver: ${driverName} with default password`
-          );
-
-          return driver;
-        } catch (error) {
-          // If there's an error creating the driver (e.g., duplicate username with different case)
-          // Log the error but don't throw - this allows the route upload to continue
-          console.error(
-            `[ROUTE UPLOAD] Failed to create driver "${driverName}": ${
-              (error as Error).message
-            }`
-          );
-
-          // Try to find if this user exists with a different case or status
-          const existingUser = await tx.user.findFirst({
-            where: {
-              username: {
-                equals: driverName,
-                mode: 'insensitive', // Case-insensitive search
-              },
-            },
-          });
-
-          if (existingUser) {
-            console.warn(
-              `[ROUTE UPLOAD] Found existing user "${existingUser.username}" (role: ${existingUser.role}, isDeleted: ${existingUser.isDeleted}). ` +
-              `Using this user for stops assigned to "${driverName}".`
-            );
-            return existingUser;
-          }
-
-          // If we still can't find the user, return null and we'll handle it below
-          return null;
-        }
+    // Rewrite each stop's driverName to the canonical username where possible.
+    // If no match, keep the trimmed CSV value so it is at least consistent.
+    for (const stop of parsedRoute.stops) {
+      const canonical = csvToCanonical.get(stop.driverName);
+      if (canonical) {
+        stop.driverName = canonical;
       }
-    );
-
-    // Wait for all driver creations to complete
-    const newDriversResults = await Promise.all(driverCreationPromises);
-
-    // Filter out null results and add valid drivers to the map
-    const newDrivers = newDriversResults.filter((driver): driver is User => driver !== null);
-
-    for (const driver of newDrivers) {
-      driverMap.set(driver.username, driver);
+      // If null (unmatched), leave stop.driverName as-is (trimmed CSV string)
     }
+
+    // driverMap is still used by legacy code paths below — populate from allDriverUsers
+    const driverMap = new Map<string, User>();
+    for (const u of allDriverUsers as User[]) {
+      driverMap.set(u.username, u);
+    }
+
+    // Expose unmatched names on parsedRoute so the caller can surface them
+    // in the API response. We attach them as a non-schema property.
+    (parsedRoute as any).unmatchedDriverNames = unmatchedDriverNames;
 
     // Find the admin user who is uploading the route
     const adminUser = await tx.user.findUnique({
@@ -1155,6 +1092,7 @@ export async function saveRouteToDatabase(
     return {
       route,
       isUpdate,
+      unmatchedDriverNames: (parsedRoute as any).unmatchedDriverNames ?? [],
     };
   });
 }
