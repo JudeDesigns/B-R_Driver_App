@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { generateRouteImagePDF } from "@/utils/routeImagePdfGenerator";
+import { promises as fs } from "fs";
+import path from "path";
 
 // PDF assembly with many embedded images can run well past the default 10s
 // serverless budget. 5 minutes is more than enough for the largest routes
@@ -150,19 +152,21 @@ export async function POST(
 
     console.log(`📄 PDF ready for download: ${fileName}`);
 
-    // Convert Buffer → Uint8Array so NextResponse streams it correctly.
-    // Passing a Node.js Buffer directly to NextResponse can cause the response
-    // to hang silently for large files in Next.js 15.
-    const pdfUint8 = new Uint8Array(pdfBuffer);
+    // Write the PDF to a temp file in public/uploads/pdfs/ and return a
+    // download URL instead of streaming 87MB+ through Next.js's response
+    // pipeline, which silently stalls for large buffers in Next.js 15.
+    const pdfDir = path.join(process.cwd(), "public", "uploads", "pdfs");
+    await fs.mkdir(pdfDir, { recursive: true });
+    const pdfPath = path.join(pdfDir, fileName);
+    await fs.writeFile(pdfPath, pdfBuffer);
 
-    // Return the PDF for download
-    return new NextResponse(pdfUint8, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': pdfBuffer.length.toString(),
-      },
+    console.log(`📄 PDF written to disk: ${pdfPath}`);
+
+    // Return the public URL — nginx already serves /uploads/ as static files
+    return NextResponse.json({
+      url: `/uploads/pdfs/${fileName}`,
+      fileName,
+      size: pdfBuffer.length,
     });
 
   } catch (error) {

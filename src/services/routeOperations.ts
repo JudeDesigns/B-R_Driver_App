@@ -167,19 +167,20 @@ export async function generateImagePDF(route: Route): Promise<void> {
     throw new Error(message);
   }
 
-  // Download the generated PDF
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
+  // API now returns a JSON object with a download URL instead of streaming
+  // the binary directly. This avoids Next.js 15 stalling on large buffers.
+  const { url, fileName: serverFileName } = await response.json();
 
   // Use the filename format: Route_[RouteNumber]_[YYYY-MM-DD].pdf
   const routeDate = new Date(route.date).toISOString().split('T')[0];
-  a.download = `Route_${route.routeNumber || 'unknown'}_${routeDate}.pdf`;
+  const downloadName = serverFileName || `Route_${route.routeNumber || 'unknown'}_${routeDate}.pdf`;
 
+  // Trigger browser download from the static URL
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = downloadName;
   document.body.appendChild(a);
   a.click();
-  window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
 
