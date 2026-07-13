@@ -148,7 +148,9 @@ export async function POST(
 
     // Create filename with route number and date
     const routeDate = new Date(route.date).toISOString().split('T')[0]; // YYYY-MM-DD format
-    const fileName = `Route_${route.routeNumber || 'unknown'}_${routeDate}.pdf`;
+    // Sanitize filename: replace spaces with underscores to avoid URL encoding issues
+    const safeRouteNumber = (route.routeNumber || 'unknown').replace(/\s+/g, '_');
+    const fileName = `Route_${safeRouteNumber}_${routeDate}.pdf`;
 
     console.log(`📄 PDF ready for download: ${fileName}`);
 
