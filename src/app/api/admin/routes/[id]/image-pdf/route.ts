@@ -116,7 +116,7 @@ export async function POST(
       route: {
         id: route.id,
         routeNumber: route.routeNumber,
-        date: route.date,
+        date: route.date instanceof Date ? route.date.toISOString() : route.date,
       },
       stopsGroupedByDriver: sortedStopsGroupedByDriver,
       totalDrivers: sortedDrivers.length,
@@ -150,8 +150,13 @@ export async function POST(
 
     console.log(`📄 PDF ready for download: ${fileName}`);
 
+    // Convert Buffer → Uint8Array so NextResponse streams it correctly.
+    // Passing a Node.js Buffer directly to NextResponse can cause the response
+    // to hang silently for large files in Next.js 15.
+    const pdfUint8 = new Uint8Array(pdfBuffer);
+
     // Return the PDF for download
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfUint8, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
