@@ -337,7 +337,51 @@ export async function PUT(
             routeNumber: true,
             date: true,
             status: true,
+            // Include driver so the stop detail page doesn't crash after saving
+            driver: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+              },
+            },
           },
+        },
+        adminNotes: {
+          where: { isDeleted: false },
+          orderBy: { createdAt: "desc" },
+          include: {
+            admin: {
+              select: { id: true, username: true, fullName: true },
+            },
+          },
+        },
+        stopDocuments: {
+          where: {
+            isDeleted: false,
+            document: { isDeleted: false, isActive: true },
+          },
+          include: {
+            document: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                type: true,
+                fileName: true,
+                filePath: true,
+                fileSize: true,
+                mimeType: true,
+                createdAt: true,
+                uploader: {
+                  select: { id: true, username: true, fullName: true },
+                },
+              },
+            },
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
         },
       },
     });

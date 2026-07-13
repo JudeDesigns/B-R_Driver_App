@@ -72,7 +72,9 @@ export async function PATCH(
         id: stopId,
       },
       data: {
-        driverNameFromUpload: newDriver.fullName || newDriver.username,
+        // Always store the canonical username so grouping is consistent with
+        // the CSV upload path (which was fixed to also store username).
+        driverNameFromUpload: newDriver.username,
       },
       include: {
         customer: true,

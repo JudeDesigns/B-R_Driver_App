@@ -102,7 +102,9 @@ export async function POST(
         sequence: nextSequence,
         address: data.address || customer.address || "", // Use provided address or customer's address
         customerNameFromUpload: data.customerNameFromUpload,
-        driverNameFromUpload: driver.fullName || driver.username,
+        // Always store the canonical username so grouping is consistent with
+        // the CSV upload path (which was fixed to also store username).
+        driverNameFromUpload: driver.username,
         orderNumberWeb: data.orderNumberWeb || null,
         quickbooksInvoiceNum: data.quickbooksInvoiceNum || null,
         initialDriverNotes: data.initialDriverNotes || null,

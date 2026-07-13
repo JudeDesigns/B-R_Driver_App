@@ -440,10 +440,26 @@ export default function RouteDetailPage({
   const getStopsGroupedByDriver = () => {
     if (!route) return {};
 
+    // Build a case-insensitive lookup: lowercased name/username → canonical username.
+    // This normalises driverNameFromUpload values that differ by casing, whitespace,
+    // or were stored as fullName instead of username (pre-fix uploads).
+    const driverLookup = new Map<string, string>();
+    drivers.forEach((d) => {
+      driverLookup.set(d.username.toLowerCase(), d.username);
+      if (d.fullName) driverLookup.set(d.fullName.toLowerCase(), d.username);
+    });
+    // Also ensure the route's own driver is in the lookup
+    if (route.driver) {
+      driverLookup.set(route.driver.username.toLowerCase(), route.driver.username);
+      if (route.driver.fullName) driverLookup.set(route.driver.fullName.toLowerCase(), route.driver.username);
+    }
+
     const grouped: Record<string, Stop[]> = {};
 
     route.stops.forEach((stop) => {
-      const driverName = stop.driverNameFromUpload || route.driver.username;
+      const raw = stop.driverNameFromUpload || route.driver?.username || "Unassigned";
+      // Normalise to canonical username where possible; fall back to trimmed raw value
+      const driverName = driverLookup.get(raw.trim().toLowerCase()) ?? raw.trim();
       if (!grouped[driverName]) {
         grouped[driverName] = [];
       }
