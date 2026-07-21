@@ -44,6 +44,7 @@ interface Stop {
   paymentFlagNotPaid?: boolean;
   customer: {
     name: string;
+    paymentTerms?: string | null;
   };
   hasReturns?: boolean;
 }

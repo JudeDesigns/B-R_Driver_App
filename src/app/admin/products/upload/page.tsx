@@ -339,7 +339,7 @@ export default function ProductUploadPage() {
                 </div>
               </div>
 
-              <div className="bg-primary-blue bg-opacity-5 p-5 rounded-lg mb-6">
+              <div className="bg-primary-blue/5 p-5 rounded-lg mb-6">
                 <div className="flex items-start">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

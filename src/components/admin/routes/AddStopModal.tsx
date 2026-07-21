@@ -1,6 +1,7 @@
 'use client';
 
 import CustomerDropdown from "@/components/ui/CustomerDropdown";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 interface Driver {
   id: string;
@@ -48,7 +49,7 @@ export default function AddStopModal({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div className="fixed inset-0 bg-gray-600/50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
         <div className="mt-3">
           <div className="flex items-center justify-between mb-4">
@@ -87,19 +88,16 @@ export default function AddStopModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assign to Driver *
                 </label>
-                <select
+                <SearchableSelect
+                  options={drivers.map((driver) => ({
+                    value: driver.id,
+                    label: driver.fullName || driver.username,
+                  }))}
                   value={form.driverId}
-                  onChange={(e) => setForm(prev => ({ ...prev, driverId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(val) => setForm(prev => ({ ...prev, driverId: val }))}
+                  placeholder="Select a driver"
                   required
-                >
-                  <option value="">Select a driver</option>
-                  {drivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.fullName || driver.username}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>

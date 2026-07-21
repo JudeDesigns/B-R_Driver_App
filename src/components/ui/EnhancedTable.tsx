@@ -243,7 +243,7 @@ export default function EnhancedTable<T>({
                               : "text-gray-600"
                           } text-${column.align || "left"}`}
                         >
-                          {cellContent}
+                          {cellContent as React.ReactNode}
                         </td>
                       );
                     })}

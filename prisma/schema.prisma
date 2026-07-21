@@ -8,34 +8,37 @@ datasource db {
 }
 
 model User {
-  id                      String                   @id @default(uuid())
-  username                String                   @unique
-  password                String
-  role                    Role                     @default(DRIVER)
-  fullName                String?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  isDeleted               Boolean                  @default(false)
-  attendanceAppUserId     String?
-  cachedClockInStatus     Boolean                  @default(false)
-  cachedClockInStatusAt   DateTime?
-  lastClockInStatusCheck  DateTime?
-  lastKnownLatitude       Float?
-  lastKnownLongitude      Float?
-  lastLocationUpdate      DateTime?
-  locationAccuracy        Float?
-  adminNotes              AdminNote[]              @relation("AdminNotes")
-  dailyKPIs               DailyKPI[]               @relation("DriverKPIs")
-  documentAcknowledgments DocumentAcknowledgment[] @relation("DriverDocumentAcknowledgments")
-  documents               Document[]               @relation("DocumentUploads")
-  driverLocations         DriverLocation[]         @relation("DriverLocationUpdates")
-  files                   File[]                   @relation("FileUploads")
-  routes                  Route[]                  @relation("DriverRoutes")
-  safetyChecks            SafetyCheck[]            @relation("DriverSafetyChecks")
-  safetyDeclarations      SafetyDeclaration[]      @relation("DriverSafetyDeclarations")
-  systemDocumentUploads   SystemDocument[]         @relation("SystemDocumentUploads")
-  vehicleAssignments      VehicleAssignment[]      @relation("DriverVehicleAssignments")
-  documentIntakeBatches   DocumentIntakeBatch[]    @relation("DocumentIntakeBatches")
+  id                          String                    @id @default(uuid())
+  username                    String                    @unique
+  password                    String
+  role                        Role                      @default(DRIVER)
+  fullName                    String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+  isDeleted                   Boolean                   @default(false)
+  attendanceAppUserId         String?
+  cachedClockInStatus         Boolean                   @default(false)
+  cachedClockInStatusAt       DateTime?
+  lastClockInStatusCheck      DateTime?
+  lastKnownLatitude           Float?
+  lastKnownLongitude          Float?
+  lastLocationUpdate          DateTime?
+  locationAccuracy            Float?
+  adminNotes                  AdminNote[]               @relation("AdminNotes")
+  dailyKPIs                   DailyKPI[]                @relation("DriverKPIs")
+  documentAcknowledgments     DocumentAcknowledgment[]  @relation("DriverDocumentAcknowledgments")
+  documents                   Document[]                @relation("DocumentUploads")
+  driverLocations             DriverLocation[]          @relation("DriverLocationUpdates")
+  files                       File[]                    @relation("FileUploads")
+  routes                      Route[]                   @relation("DriverRoutes")
+  safetyChecks                SafetyCheck[]             @relation("DriverSafetyChecks")
+  safetyDeclarations          SafetyDeclaration[]       @relation("DriverSafetyDeclarations")
+  systemDocumentUploads       SystemDocument[]          @relation("SystemDocumentUploads")
+  vehicleAssignments          VehicleAssignment[]       @relation("DriverVehicleAssignments")
+  documentIntakeBatches       DocumentIntakeBatch[]     @relation("DocumentIntakeBatches")
+  routeCloseoutAssignments    RouteCloseoutAssignment[] @relation("DriverCloseoutAssignments")
+  routeCloseoutChecks         RouteCloseoutCheck[]      @relation("DriverCloseoutChecks")
+  closeoutInstructionsUpdates CloseoutInstructions[]    @relation("CloseoutInstructionsUpdates")
 
   @@index([role])
   @@index([isDeleted])
@@ -68,25 +71,27 @@ model Customer {
 }
 
 model Route {
-  id                      String                   @id @default(uuid())
+  id                      String                    @id @default(uuid())
   routeNumber             String?
-  date                    DateTime                 @default(now())
-  status                  RouteStatus              @default(PENDING)
+  date                    DateTime                  @default(now())
+  status                  RouteStatus               @default(PENDING)
   driverId                String?
   uploadedBy              String?
-  uploadedAt              DateTime                 @default(now())
+  uploadedAt              DateTime                  @default(now())
   sourceFile              String?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  isDeleted               Boolean                  @default(false)
-  dailyKPIs               DailyKPI[]               @relation("RouteKPIs")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  isDeleted               Boolean                   @default(false)
+  dailyKPIs               DailyKPI[]                @relation("RouteKPIs")
   documentAcknowledgments DocumentAcknowledgment[]
   driverLocations         DriverLocation[]
-  driver                  User?                    @relation("DriverRoutes", fields: [driverId], references: [id])
+  driver                  User?                     @relation("DriverRoutes", fields: [driverId], references: [id])
   safetyChecks            SafetyCheck[]
-  safetyDeclarations      SafetyDeclaration[]      @relation("RouteSafetyDeclarations")
+  safetyDeclarations      SafetyDeclaration[]       @relation("RouteSafetyDeclarations")
   stops                   Stop[]
   vehicleAssignments      VehicleAssignment[]
+  closeoutAssignments     RouteCloseoutAssignment[]
+  closeoutChecks          RouteCloseoutCheck[]
 
   @@index([routeNumber])
   @@index([date])
@@ -122,23 +127,25 @@ model Vehicle {
 }
 
 model SystemDocument {
-  id              String                   @id @default(uuid())
-  documentType    SystemDocumentType
-  filePath        String
-  fileName        String
-  isActive        Boolean                  @default(true)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  isDeleted       Boolean                  @default(false)
-  category        DocumentCategory
-  description     String?
-  fileSize        Int
-  isRequired      Boolean                  @default(false)
-  mimeType        String
-  title           String
-  uploadedBy      String
-  acknowledgments DocumentAcknowledgment[]
-  uploader        User                     @relation("SystemDocumentUploads", fields: [uploadedBy], references: [id])
+  id                String                   @id @default(uuid())
+  documentType      SystemDocumentType
+  filePath          String
+  fileName          String
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  isDeleted         Boolean                  @default(false)
+  category          DocumentCategory
+  description       String?
+  fileSize          Int
+  isRequired        Boolean                  @default(false)
+  mimeType          String
+  title             String
+  uploadedBy        String
+  requiresSignature Boolean                  @default(false)
+  version           Int                      @default(1)
+  acknowledgments   DocumentAcknowledgment[]
+  uploader          User                     @relation("SystemDocumentUploads", fields: [uploadedBy], references: [id])
 
   @@index([isRequired])
   @@index([isActive])
@@ -149,24 +156,32 @@ model SystemDocument {
 }
 
 model DocumentAcknowledgment {
-  id             String         @id @default(uuid())
-  documentId     String
-  driverId       String
-  acknowledgedAt DateTime       @default(now())
-  ipAddress      String?
-  userAgent      String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  routeId        String?
-  document       SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  driver         User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
-  route          Route?         @relation(fields: [routeId], references: [id])
+  id                String         @id @default(uuid())
+  documentId        String
+  driverId          String
+  acknowledgedAt    DateTime       @default(now())
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  routeId           String?
+  documentVersion   Int            @default(1)
+  signatureImageUrl String?
+  signedPdfUrl      String?
+  isValid           Boolean        @default(true)
+  invalidatedAt     DateTime?
+  invalidatedBy     String?
+  document          SystemDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  driver            User           @relation("DriverDocumentAcknowledgments", fields: [driverId], references: [id], onDelete: Cascade)
+  route             Route?         @relation(fields: [routeId], references: [id])
 
-  @@unique([documentId, driverId, routeId])
   @@index([driverId])
   @@index([documentId])
   @@index([routeId])
   @@index([acknowledgedAt])
+  @@index([documentVersion])
+  @@index([isValid])
+  @@index([documentId, driverId, isValid])
   @@map("document_acknowledgments")
 }
 
@@ -636,6 +651,67 @@ model DailyKPI {
   @@map("daily_kpis")
 }
 
+model RouteCloseoutAssignment {
+  id         String       @id @default(uuid())
+  routeId    String
+  driverId   String
+  type       CloseoutType
+  assignedBy String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  route      Route        @relation(fields: [routeId], references: [id])
+  driver     User         @relation("DriverCloseoutAssignments", fields: [driverId], references: [id])
+
+  @@unique([routeId, driverId])
+  @@index([routeId])
+  @@index([driverId])
+  @@map("route_closeout_assignments")
+}
+
+model CloseoutInstructions {
+  id           String       @id @default(uuid())
+  type         CloseoutType @unique
+  instructions String
+  updatedBy    String
+  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime     @default(now())
+  updater      User         @relation("CloseoutInstructionsUpdates", fields: [updatedBy], references: [id])
+
+  @@map("closeout_instructions")
+}
+
+model RouteCloseoutCheck {
+  id              String       @id @default(uuid())
+  routeId         String
+  driverId        String
+  type            CloseoutType
+  contactedPerson String
+  pendingPickup   Boolean
+  note            String?
+  photoUrl        String
+  createdAt       DateTime     @default(now())
+  route           Route        @relation(fields: [routeId], references: [id])
+  driver          User         @relation("DriverCloseoutChecks", fields: [driverId], references: [id])
+
+  @@index([routeId])
+  @@index([driverId])
+  @@index([createdAt])
+  @@map("route_closeout_checks")
+}
+
+model EndOfDayOverdueAlert {
+  id         String   @id @default(uuid())
+  routeId    String
+  driverId   String
+  notifiedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([routeId, driverId])
+  @@index([routeId])
+  @@index([driverId])
+  @@map("end_of_day_overdue_alerts")
+}
+
 enum DocumentCategory {
   SAFETY
   COMPLIANCE
@@ -683,6 +759,11 @@ enum StopStatus {
 enum ChecklistType {
   START_OF_DAY
   END_OF_DAY
+}
+
+enum CloseoutType {
+  WAREHOUSE
+  JETRO
 }
 
 enum UploadStatus {
@@ -745,21 +826,21 @@ model DocumentIntakeBatch {
 }
 
 model DocumentIntakeLog {
-  id             String              @id @default(uuid())
-  batchId        String
-  fileName       String
-  fileSize       Int
-  status         IntakeMatchStatus
-  flow           String?             // "stop" or "customer"
-  anchorType     String?             // "invoice", "route_seq", "group_code"
-  anchorValue    String?             // e.g "10045" or "R12_S04"
-  docType        DocumentType?       // DocumentType enum
-  resolvedToId   String?             // The UUID of the matched Stop or Customer
-  errorMessage   String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  isDeleted      Boolean             @default(false)
-  batch          DocumentIntakeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  id           String              @id @default(uuid())
+  batchId      String
+  fileName     String
+  fileSize     Int
+  status       IntakeMatchStatus
+  flow         String? // "stop" or "customer"
+  anchorType   String? // "invoice", "route_seq", "group_code"
+  anchorValue  String? // e.g "10045" or "R12_S04"
+  docType      DocumentType? // DocumentType enum
+  resolvedToId String? // The UUID of the matched Stop or Customer
+  errorMessage String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  isDeleted    Boolean             @default(false)
+  batch        DocumentIntakeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId])
   @@index([status])
@@ -777,4 +858,3 @@ enum IntakeMatchStatus {
   UNMATCHED
   MANUAL_RESOLVED
 }
-

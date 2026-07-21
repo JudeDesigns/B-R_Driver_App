@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 import * as argon2 from "argon2";
+import { Role } from "@prisma/client";
 
 // GET /api/admin/users - Get all users with pagination and search
 export async function GET(request: NextRequest) {
@@ -29,6 +30,10 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get("offset") || "0");
     const search = searchParams.get("search") || "";
     const role = searchParams.get("role") || "";
+    const validRole =
+      role && (Object.values(Role) as string[]).includes(role)
+        ? (role as Role)
+        : undefined;
 
     // Build the where clause for search and role filter
     const where = {
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
             ],
           }
         : {}),
-      ...(role ? { role } : {}),
+      ...(validRole ? { role: validRole } : {}),
     };
 
     // Get users with pagination

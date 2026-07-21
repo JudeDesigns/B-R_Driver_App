@@ -424,7 +424,7 @@ export default function EndRoutePage() {
                                   <input
                                     type="text"
                                     placeholder="Enter location"
-                                    className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                                    className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                                     value={
                                       warehouseLocations[returnItem.id] || ""
                                     }
@@ -443,7 +443,7 @@ export default function EndRoutePage() {
                                   <input
                                     type="text"
                                     placeholder="Enter credit #"
-                                    className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                                    className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                                     value={
                                       vendorCreditNums[returnItem.id] || ""
                                     }

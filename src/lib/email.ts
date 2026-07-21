@@ -372,6 +372,64 @@ export const sendDeliveryConfirmationEmail = async (
   }
 };
 
+// Send a signed system document notification email (with the signed PDF
+// and/or signature image attached) to the office and, if available, the
+// driver. Reuses the same transporter pattern as the delivery confirmation
+// email above. This is intentionally simple (no DB email-record tracking)
+// since system document signatures aren't tied to a Stop/CustomerEmail row.
+export const sendSignedDocumentEmail = async (params: {
+  documentTitle: string;
+  driverName: string;
+  driverEmail?: string | null;
+  signedAt: Date;
+  attachments: { filename: string; content: Buffer; contentType?: string }[];
+}) => {
+  const { documentTitle, driverName, driverEmail, signedAt, attachments } = params;
+
+  try {
+    const recipients = [EMAIL_CONFIG.OFFICE_EMAIL];
+    if (driverEmail && driverEmail.trim() !== "") {
+      recipients.push(driverEmail);
+    }
+    const actualRecipient = recipients.join(", ");
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <body style="font-family: Arial, sans-serif; color: #000000;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2>Document Signed - B&amp;R Food Services</h2>
+          <p><strong>${driverName}</strong> has signed the document "<strong>${documentTitle}</strong>".</p>
+          <p>Signed at: ${signedAt.toLocaleString()}</p>
+          <p>The signed document is attached to this email.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const transporter = createTransporter();
+
+    const info = await transporter.sendMail({
+      from: `"B&R Food Services" <${process.env.EMAIL_FROM || "info@brfood.us"}>`,
+      to: actualRecipient,
+      subject: `Document Signed - ${driverName} - ${documentTitle}`,
+      html: emailHtml,
+      attachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType,
+      })),
+    });
+
+    console.log(`✅ Signed document email sent successfully - Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending signed document email:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+};
+
 export default {
   sendDeliveryConfirmationEmail,
+  sendSignedDocumentEmail,
 };

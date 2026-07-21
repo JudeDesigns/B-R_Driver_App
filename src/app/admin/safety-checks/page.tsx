@@ -51,6 +51,15 @@ interface SafetyCheck {
   responses: any;
 }
 
+interface OverdueEndOfDayEntry {
+  routeId: string;
+  routeNumber: string | null;
+  driverId: string;
+  driverName: string;
+  lastStopCompletionTime: string;
+  hoursOverdue: number;
+}
+
 export default function SafetyChecksPage() {
   const [safetyChecks, setSafetyChecks] = useState<SafetyCheck[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +128,66 @@ export default function SafetyChecksPage() {
     fetchSafetyChecks();
   }, [router, limit, offset, filterType, dateFrom, dateTo]);
 
+  // Driver warnings: end-of-day notes submitted by drivers that dispatch
+  // should be informed about. Loaded separately (unfiltered by the table's
+  // pagination/type filter) so the warning panel always shows the latest
+  // ones regardless of what the admin is currently filtering the table by.
+  const [driverWarnings, setDriverWarnings] = useState<SafetyCheck[]>([]);
+  const [showAllWarnings, setShowAllWarnings] = useState(false);
+
+  useEffect(() => {
+    const fetchDriverWarnings = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch(
+          `/api/admin/safety-checks?type=END_OF_DAY&limit=50&offset=0`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const withNotes = (data.safetyChecks || []).filter(
+          (check: SafetyCheck) => check.notes && check.notes.trim().length > 0
+        );
+        setDriverWarnings(withNotes);
+      } catch (err) {
+        console.error("Error fetching driver warnings:", err);
+      }
+    };
+
+    fetchDriverWarnings();
+  }, []);
+
+  // Overdue End-of-Day: drivers whose last stop on a route was completed
+  // more than 3 hours ago and who have not yet submitted an End-of-Day
+  // safety check for that route.
+  const [overdueEndOfDay, setOverdueEndOfDay] = useState<OverdueEndOfDayEntry[]>([]);
+
+  useEffect(() => {
+    const fetchOverdueEndOfDay = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch(`/api/admin/safety-checks/overdue-end-of-day`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        setOverdueEndOfDay(data.overdue || []);
+      } catch (err) {
+        console.error("Error fetching overdue end-of-day drivers:", err);
+      }
+    };
+
+    fetchOverdueEndOfDay();
+  }, []);
+
   const handlePageChange = (page: number) => {
     setOffset((page - 1) * limit);
   };
@@ -170,6 +239,81 @@ export default function SafetyChecksPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-medium text-black">Safety Checks</h1>
       </div>
+
+      {/* Overdue End-of-Day */}
+      {overdueEndOfDay.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-amber-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-amber-800 flex items-center gap-2">
+              <span>⏰</span> Overdue End-of-Day
+            </h2>
+            <span className="text-sm text-amber-700">{overdueEndOfDay.length} driver(s)</span>
+          </div>
+          <div className="p-6 space-y-3">
+            {overdueEndOfDay.map((entry) => (
+              <div
+                key={`${entry.routeId}-${entry.driverId}`}
+                className="bg-white border border-amber-200 rounded-lg p-4"
+              >
+                <p className="text-sm font-medium text-gray-900">
+                  {entry.driverName} —{" "}
+                  {entry.routeNumber ? `Route ${entry.routeNumber}` : `Route ${entry.routeId}`}
+                </p>
+                <p className="text-sm text-gray-700 mt-1">
+                  Last stop completed {entry.hoursOverdue} hours ago — End-of-Day not yet submitted.
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Warning — Inform Dispatch */}
+      {driverWarnings.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-red-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-red-800 flex items-center gap-2">
+              <span>⚠️</span> Driver Warning — Inform Dispatch
+            </h2>
+            <span className="text-sm text-red-700">{driverWarnings.length} note(s)</span>
+          </div>
+          <div className="p-6 space-y-3">
+            {(showAllWarnings ? driverWarnings : driverWarnings.slice(0, 3)).map((check) => (
+              <div
+                key={check.id}
+                className="bg-white border border-red-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {check.driver.fullName || check.driver.username} —{" "}
+                    {check.route.routeNumber
+                      ? `Route ${check.route.routeNumber}`
+                      : `Route from ${new Date(check.route.date).toLocaleDateString()}`}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{check.notes}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(check.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleViewDetails(check)}
+                  className="self-start px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded whitespace-nowrap"
+                >
+                  View Details
+                </button>
+              </div>
+            ))}
+            {driverWarnings.length > 3 && (
+              <button
+                onClick={() => setShowAllWarnings((prev) => !prev)}
+                className="text-sm text-red-700 hover:text-red-900 font-medium"
+              >
+                {showAllWarnings ? "Show less" : `Show all ${driverWarnings.length}`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-card overflow-hidden">
         <div className="px-6 py-4 border-b border-mono-200">
@@ -297,7 +441,7 @@ export default function SafetyChecksPage() {
 
       {/* Safety Check Details Modal */}
       {showDetails && selectedSafetyCheck && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-medium text-gray-900">
@@ -338,46 +482,6 @@ export default function SafetyChecksPage() {
                   <p><span className="font-medium">Mileage End:</span> {selectedSafetyCheck.mileage2 || "N/A"}</p>
                   <p><span className="font-medium">Diesel Level:</span> {selectedSafetyCheck.dieselLevel || "N/A"}</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Equipment Information
-                </h4>
-                <div className="space-y-2">
-                  <p><span className="font-medium">Doll Number:</span> {selectedSafetyCheck.dollNumber || "N/A"}</p>
-                  <p><span className="font-medium">Truck Jack Number:</span> {selectedSafetyCheck.truckJackNumber || "N/A"}</p>
-                  <p><span className="font-medium">Pallet Jack Number:</span> {selectedSafetyCheck.palletJackNumber || "N/A"}</p>
-                  <p><span className="font-medium">Strap Level:</span> {selectedSafetyCheck.strapLevel || "N/A"}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Fuel Information
-                </h4>
-                <div className="space-y-2">
-                  <p><span className="font-medium">Diesel Amount:</span> {selectedSafetyCheck.dieselAmount !== null ? selectedSafetyCheck.dieselAmount : "N/A"}</p>
-                  <p><span className="font-medium">Credit Card Number:</span> {selectedSafetyCheck.creditCardNumber || "N/A"}</p>
-                  <p><span className="font-medium">Fuel Cap Key Number:</span> {selectedSafetyCheck.fuelCapKeyNumber || "N/A"}</p>
-                  <p><span className="font-medium">Credit Card Cash Amount:</span> {selectedSafetyCheck.creditCardCashAmount !== null ? `$${selectedSafetyCheck.creditCardCashAmount}` : "N/A"}</p>
-                  <p><span className="font-medium">Cash Back Amount:</span> {selectedSafetyCheck.cashBackAmount !== null ? `$${selectedSafetyCheck.cashBackAmount}` : "N/A"}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
-                Safety Verification
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <p><span className="font-medium">Front Lights Photo:</span> {formatBoolean(selectedSafetyCheck.frontLightsPhoto)}</p>
-                <p><span className="font-medium">Electricity Box Photo:</span> {formatBoolean(selectedSafetyCheck.electricityBoxPhoto)}</p>
-                <p><span className="font-medium">Pallets Photo:</span> {formatBoolean(selectedSafetyCheck.palletsPhoto)}</p>
-                <p><span className="font-medium">Vehicle Condition Video:</span> {formatBoolean(selectedSafetyCheck.vehicleConditionVideo)}</p>
-                <p><span className="font-medium">Called Warehouse:</span> {formatBoolean(selectedSafetyCheck.calledWarehouse)}</p>
               </div>
             </div>
 

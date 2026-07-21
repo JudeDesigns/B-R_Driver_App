@@ -106,8 +106,8 @@ export default function VehiclesPage() {
     setOffset(0);
   };
 
-  const handlePageChange = (newOffset: number) => {
-    setOffset(newOffset);
+  const handlePageChange = (page: number) => {
+    setOffset((page - 1) * limit);
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -310,9 +310,9 @@ export default function VehiclesPage() {
       {/* Pagination */}
       {totalCount > limit && (
         <Pagination
-          currentOffset={offset}
-          limit={limit}
-          totalCount={totalCount}
+          totalItems={totalCount}
+          itemsPerPage={limit}
+          currentPage={Math.floor(offset / limit) + 1}
           onPageChange={handlePageChange}
         />
       )}

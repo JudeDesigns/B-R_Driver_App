@@ -59,41 +59,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // SAFETY CHECK ENFORCEMENT: Get routes that have completed safety checks
-    const completedSafetyCheckRoutes = await prisma.safetyCheck.findMany({
-      where: {
-        driverId: decoded.id,
-        type: "START_OF_DAY",
-        isDeleted: false,
-        ...(date ? {
-          route: {
-            date: {
-              gte: date === getPSTDateString() ? getTodayStartUTC() : createPSTDateFromString(date),
-              lte: date === getPSTDateString() ? getTodayEndUTC() : toPSTEndOfDay(createPSTDateFromString(date)),
-            },
-          },
-        } : {}),
-      },
-      select: {
-        routeId: true,
-      },
-    });
-
-    const safetyCompletedRouteIds = completedSafetyCheckRoutes.map(check => check.routeId);
-
-    // Log safety check enforcement for debugging
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Stops API - Safety Check Enforcement:", {
-        driverId: decoded.id,
-        driverUsername: driver.username,
-        requestedDate: date,
-        safetyCompletedRouteIds,
-        safetyChecksFound: completedSafetyCheckRoutes.length,
-      });
-    }
+    // NOTE: Safety-check enforcement happens when a driver opens a specific
+    // stop's details (see /api/driver/stops/[id]), not at the list level.
+    // Drivers should be able to view their stops list immediately; the
+    // safety checklist is only required before they can act on a stop.
 
     // Find all stops assigned to this driver (exclude completed stops unless specifically requested)
-    // ONLY return stops from routes where safety checks have been completed
     const stops = await prisma.stop.findMany({
       where: {
         AND: [
@@ -109,12 +80,6 @@ export async function GET(request: NextRequest) {
                 ]
               }
             ],
-          },
-          // SAFETY CHECK ENFORCEMENT: Only show stops from routes with completed safety checks
-          {
-            routeId: {
-              in: safetyCompletedRouteIds.length > 0 ? safetyCompletedRouteIds : [],
-            },
           },
           // Other filters
           { isDeleted: false },

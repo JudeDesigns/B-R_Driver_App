@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 
+interface CustomerSearchRow {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string;
+  groupCode: string | null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 Customer search API called");
@@ -66,7 +75,7 @@ export async function GET(request: NextRequest) {
     // Use raw SQL to handle NULL values properly
     console.log(`🔍 Searching for customers matching "${query}"...`);
 
-    const customers = await prisma.$queryRaw`
+    const customers = await prisma.$queryRaw<CustomerSearchRow[]>`
       SELECT id, name, email, phone, address, "groupCode"
       FROM customers
       WHERE (

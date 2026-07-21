@@ -125,13 +125,13 @@ export default function RoutesPage() {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case "PENDING":
-        return "bg-primary-orange bg-opacity-10 text-primary-orange";
+        return "bg-primary-orange/10 text-primary-orange";
       case "IN_PROGRESS":
-        return "bg-primary-blue bg-opacity-10 text-primary-blue";
+        return "bg-primary-blue/10 text-primary-blue";
       case "COMPLETED":
-        return "bg-primary-green bg-opacity-10 text-primary-green";
+        return "bg-primary-green/10 text-primary-green";
       case "CANCELLED":
-        return "bg-primary-red bg-opacity-10 text-primary-red";
+        return "bg-primary-red/10 text-primary-red";
       default:
         return "bg-mono-200 text-mono-700";
     }
@@ -251,7 +251,7 @@ export default function RoutesPage() {
                 type="date"
                 value={dateFilter}
                 onChange={handleDateFilterChange}
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
               />
             </div>
             <div>
@@ -261,7 +261,7 @@ export default function RoutesPage() {
               <select
                 value={statusFilter}
                 onChange={handleStatusFilterChange}
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
               >
                 <option value="">All Statuses</option>
                 <option value="PENDING">Pending</option>
@@ -277,7 +277,7 @@ export default function RoutesPage() {
                   setStatusFilter("");
                   setOffset(0);
                 }}
-                className="w-full py-2 px-4 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200"
+                className="w-full py-2 px-4 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200"
               >
                 Clear Filters
               </button>
@@ -285,7 +285,7 @@ export default function RoutesPage() {
           </div>
 
           {error && (
-            <div className="bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg mb-4">
+            <div className="bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg mb-4">
               {error}
             </div>
           )}
@@ -395,7 +395,7 @@ export default function RoutesPage() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && routeToDelete && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600/50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">

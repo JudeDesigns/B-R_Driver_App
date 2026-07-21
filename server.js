@@ -43,6 +43,7 @@ app.prepare().then(() => {
             ".png": "image/png",
             ".gif": "image/gif",
             ".webp": "image/webp",
+            ".pdf": "application/pdf",
           };
           res.writeHead(200, { "Content-Type": mimeTypes[ext] || "application/octet-stream" });
           res.end(content);
@@ -77,6 +78,25 @@ app.prepare().then(() => {
     console.log(`> Server running on http://${hostname}:${port}`);
     console.log(`> WebSocket server running on ws://${hostname}:${port}`);
   });
+
+  // Poll for overdue End-of-Day submissions every 15 minutes and send an
+  // email notification to the office for any newly-detected cases. Runs
+  // in-process via an internal-only API route (no auth needed since it's
+  // never exposed in the UI and only reachable from this server process).
+  setInterval(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:${port}/api/internal/check-overdue-end-of-day`,
+        { method: "POST" }
+      );
+      const data = await response.json();
+      console.log(
+        `> Overdue End-of-Day check complete: processed=${data.processed}, newAlerts=${data.newAlerts}`
+      );
+    } catch (err) {
+      console.error("> Overdue End-of-Day check failed:", err);
+    }
+  }, 15 * 60 * 1000);
 });
 
 // Export Socket.IO event emitter functions from src/lib/socket.js

@@ -35,6 +35,12 @@
   --font-sans: "SF Pro Text", "SF Pro Display", var(--font-geist-sans);
   --font-display: "SF Pro Display", var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-primary-blue: var(--color-primary-blue);
+  --color-primary-purple: var(--color-primary-purple);
+  --color-primary-green: var(--color-primary-green);
+  --color-primary-red: var(--color-primary-red);
+  --color-primary-orange: var(--color-primary-orange);
+  --color-primary-cyan: var(--color-primary-cyan);
 }
 
 /* Disable dark mode - keep app in light mode regardless of system preference */
@@ -80,4 +86,14 @@ nav::-webkit-scrollbar-thumb {
 
 nav::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar scroll area: keep scrolling, hide the visible scrollbar */
+.sidebar-scroll-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.sidebar-scroll-hidden::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }

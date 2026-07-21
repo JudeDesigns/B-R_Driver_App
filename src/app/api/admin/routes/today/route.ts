@@ -51,6 +51,13 @@ export async function GET(request: NextRequest) {
             isDeleted: false,
           },
           include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
             stopDocuments: {
               where: {
                 isDeleted: false,

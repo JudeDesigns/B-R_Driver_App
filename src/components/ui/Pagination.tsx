@@ -92,7 +92,7 @@ export default function Pagination({
             <select
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-              className="rounded border-gray-300 text-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+              className="rounded border-gray-300 text-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
             >
               {itemsPerPageOptions.map((option) => (
                 <option key={option} value={option}>

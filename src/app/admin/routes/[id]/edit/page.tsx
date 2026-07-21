@@ -18,7 +18,7 @@ interface Driver {
   fullName: string | null;
 }
 
-export default function EditRoutePage({ params }: { params: { id: string } }) {
+export default function EditRoutePage({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the params object using React.use()
   const unwrappedParams = use(params);
   const routeId = unwrappedParams.id;
@@ -292,7 +292,7 @@ export default function EditRoutePage({ params }: { params: { id: string } }) {
                     name="routeNumber"
                     value={formData.routeNumber}
                     onChange={handleChange}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
 
@@ -310,7 +310,7 @@ export default function EditRoutePage({ params }: { params: { id: string } }) {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
 
@@ -327,7 +327,7 @@ export default function EditRoutePage({ params }: { params: { id: string } }) {
                     value={formData.status}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   >
                     <option value="PENDING">Pending</option>
                     <option value="IN_PROGRESS">In Progress</option>

@@ -148,7 +148,7 @@ export async function PATCH(
 
         // Calculate total payment amount
         const totalAmount = body.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
-        const allMethods = [...new Set(body.payments.map((p: any) => p.method))];
+        const allMethods: string[] = [...new Set<string>(body.payments.map((p: any) => p.method as string))];
 
         // Update stop with aggregated payment info and set payment status
         const updatedStop = await tx.stop.update({

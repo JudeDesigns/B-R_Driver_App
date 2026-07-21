@@ -4,7 +4,14 @@ import { verifyToken } from "@/lib/auth";
 
 /**
  * POST /api/driver/system-documents/acknowledge
- * Acknowledge a system document
+ * Acknowledge a system document (simple "I Have Read This" flow).
+ * Only valid for documents where requiresSignature === false. Use
+ * /api/driver/system-documents/sign for documents that require a signature.
+ *
+ * Acknowledgment is now a lifetime + version concept: a driver only needs to
+ * acknowledge a document once per document version (not once per route). The
+ * routeId is still accepted/stored for audit/back-compat purposes but no
+ * longer scopes the "already acknowledged" check.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -44,14 +51,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already acknowledged for this specific route
-    // Use findFirst because routeId can be null, which findUnique doesn't handle well for composite keys
+    if (document.requiresSignature) {
+      return NextResponse.json(
+        {
+          message:
+            "This document requires a signature. Use /api/driver/system-documents/sign instead.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check for an existing current valid acknowledgment (lifetime + version
+    // scoped - the latest valid row matching the document's current version).
     const existingAcknowledgment = await prisma.documentAcknowledgment.findFirst({
       where: {
         documentId,
         driverId,
-        routeId: routeId || null,
-      } as any,
+        documentVersion: document.version,
+        isValid: true,
+      },
+      orderBy: {
+        acknowledgedAt: "desc",
+      },
     });
 
     if (existingAcknowledgment) {
@@ -73,9 +94,10 @@ export async function POST(request: NextRequest) {
         documentId,
         driverId,
         routeId: routeId || null,
+        documentVersion: document.version,
         ipAddress,
         userAgent,
-      } as any,
+      },
       include: {
         document: {
           select: {
@@ -103,7 +125,10 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/driver/system-documents/acknowledge
- * Get unacknowledged required documents for the driver
+ * Get required documents that the driver has not yet satisfied (acknowledged
+ * or signed, depending on requiresSignature) for the CURRENT version of each
+ * document. routeId is still accepted as a query param for backward
+ * compatibility/logging but no longer scopes the "already satisfied" check.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -122,7 +147,10 @@ export async function GET(request: NextRequest) {
 
     const driverId = decoded.id;
     const url = new URL(request.url);
+    // Accepted for backward compatibility/logging only - no longer used to
+    // scope the "already satisfied" check (lifetime + version model).
     const routeId = url.searchParams.get("routeId");
+    void routeId;
 
     // Get all required documents
     const requiredDocuments = await prisma.systemDocument.findMany({
@@ -134,21 +162,36 @@ export async function GET(request: NextRequest) {
       include: {
         acknowledgments: {
           where: {
-            driverId: driverId,
-            routeId: routeId || null,
-          } as any,
+            driverId,
+            isValid: true,
+          },
+          orderBy: {
+            acknowledgedAt: "desc",
+          },
         },
       },
     });
 
-    // Filter to only unacknowledged documents
-    const unacknowledgedDocuments = (requiredDocuments as any[]).filter(
-      doc => doc.acknowledgments.length === 0
-    );
+    // Filter to only documents where the driver has no valid acknowledgment
+    // matching the document's CURRENT version.
+    const unsatisfiedDocuments = requiredDocuments.filter((doc) => {
+      const currentValidAck = doc.acknowledgments.find(
+        (ack) => ack.documentVersion === doc.version
+      );
+      return !currentValidAck;
+    });
+
+    const documents = unsatisfiedDocuments.map((doc) => {
+      const { acknowledgments, ...rest } = doc;
+      return {
+        ...rest,
+        requiresSignature: doc.requiresSignature,
+      };
+    });
 
     return NextResponse.json({
-      unacknowledgedCount: unacknowledgedDocuments.length,
-      documents: unacknowledgedDocuments,
+      unacknowledgedCount: documents.length,
+      documents,
     });
   } catch (error) {
     console.error("Error fetching unacknowledged documents:", error);
@@ -158,4 +201,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

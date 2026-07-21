@@ -28,7 +28,7 @@ export default function InvoiceUpload({
   const [stopStatus, setStopStatus] = useState<string | null>(
     currentStopStatus || null
   );
-  const [pdfUrl, setPdfUrl] = useState<string | null>(existingPdfUrl);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(existingPdfUrl ?? null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
@@ -154,7 +154,7 @@ export default function InvoiceUpload({
 
   // Update pdfUrl when existingPdfUrl changes
   useEffect(() => {
-    setPdfUrl(existingPdfUrl);
+    setPdfUrl(existingPdfUrl ?? null);
   }, [existingPdfUrl]);
 
   // Update stopStatus when currentStopStatus changes
@@ -612,7 +612,7 @@ export default function InvoiceUpload({
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-start mb-4">
               <div className="flex-shrink-0">

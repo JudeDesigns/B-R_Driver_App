@@ -206,7 +206,12 @@ async function main() {
             data: {
                 documentType: 'COMPANY_POLICY',
                 fileName: 'policy.pdf',
-                filePath: '/docs/policy.pdf'
+                filePath: '/docs/policy.pdf',
+                category: 'POLICY',
+                fileSize: 1024,
+                mimeType: 'application/pdf',
+                title: 'Company Policy',
+                uploadedBy: admin.id
             }
         });
         console.log('   ✅ System Document Created');

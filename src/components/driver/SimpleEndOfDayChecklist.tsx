@@ -11,7 +11,6 @@ export interface SimpleEndOfDayCheckData {
   // Exactly the same fields as Start of Day
   date: string;
   truckNumber: string;
-  mileage: string;
   fuelLevel: string;
   odometerEnd: string; // Ending odometer reading for KPI tracking
 
@@ -37,7 +36,6 @@ export default function SimpleEndOfDayChecklist({
   const [formData, setFormData] = useState<SimpleEndOfDayCheckData>({
     date: new Date().toISOString().split("T")[0],
     truckNumber: "",
-    mileage: "",
     fuelLevel: "FULL",
     odometerEnd: "",
     equipmentCheckPhotoUrl: "",
@@ -50,10 +48,17 @@ export default function SimpleEndOfDayChecklist({
     notes: "",
   });
 
+  const [showLowFuelWarning, setShowLowFuelWarning] = useState(false);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
+
+    if (name === "fuelLevel") {
+      // Half tank or below (1/2, 1/4, EMPTY) triggers the dispatch warning
+      setShowLowFuelWarning(value === "1/2" || value === "1/4" || value === "EMPTY");
+    }
 
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
@@ -114,21 +119,6 @@ export default function SimpleEndOfDayChecklist({
           </div>
 
           <div>
-            <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
-              Mileage
-            </label>
-            <input
-              type="text"
-              id="mileage"
-              name="mileage"
-              value={formData.mileage}
-              onChange={handleChange}
-              required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
-            />
-          </div>
-
-          <div>
             <label htmlFor="fuelLevel" className="block text-sm font-medium text-gray-700 mb-1">
               Fuel Level
             </label>
@@ -147,6 +137,21 @@ export default function SimpleEndOfDayChecklist({
               <option value="EMPTY">Empty</option>
             </select>
           </div>
+
+          {showLowFuelWarning && (
+            <div className="sm:col-span-2 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <span className="text-xl">⚠️</span>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-semibold text-red-800">
+                    Your fuel level is at half a tank or below. Please contact dispatch for a gasoline or diesel card.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label htmlFor="odometerEnd" className="block text-sm font-medium text-gray-700 mb-1">

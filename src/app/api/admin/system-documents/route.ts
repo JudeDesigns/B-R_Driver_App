@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
     const documentType = formData.get("documentType") as string;
     const category = formData.get("category") as string;
     const isRequired = formData.get("isRequired") === "true";
+    const requiresSignature = formData.get("requiresSignature") === "true";
 
     // Validate required fields
     if (!file || !title || !documentType || !category) {
@@ -177,6 +178,7 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         mimeType: file.type,
         isRequired,
+        requiresSignature,
         uploadedBy: decoded.id,
       },
       include: {

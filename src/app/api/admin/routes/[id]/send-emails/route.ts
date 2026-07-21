@@ -9,6 +9,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const routeId = params.id;
   try {
     // Verify authentication
     const authHeader = request.headers.get("authorization");
@@ -22,9 +23,6 @@ export async function POST(
     if (!decoded || !decoded.id || !["ADMIN", "SUPER_ADMIN"].includes(decoded.role)) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    // Get the route ID from the URL
-    const routeId = params.id;
 
     console.log(`📧 Starting bulk email send for route: ${routeId}`);
 
@@ -41,32 +39,6 @@ export async function POST(
             isDeleted: false,
           },
           include: {
-            customer: true,
-            route: {
-              select: {
-                id: true,
-                routeNumber: true,
-              },
-            },
-            returns: {
-              where: {
-                isDeleted: false,
-              },
-            },
-          },
-          select: {
-            id: true,
-            customerName: true,
-            address: true,
-            orderNumberWeb: true,
-            quickbooksInvoiceNum: true,
-            amount: true,
-            creditMemoNumber: true, // Include credit memo number
-            creditMemoAmount: true, // Include credit memo amount
-            arrivalTime: true,
-            completionTime: true,
-            driverNotes: true,
-            signedInvoicePdfUrl: true, // Include PDF URL
             customer: true,
             route: {
               select: {

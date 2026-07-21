@@ -117,7 +117,7 @@ export function hasSlowConnection(): boolean {
   if (typeof navigator === 'undefined' || !('connection' in navigator)) return false;
   
   // @ts-ignore - navigator.connection is not in the TypeScript types
-  const connection = navigator.connection;
+  const connection: any = navigator.connection;
   
   if (!connection) return false;
   

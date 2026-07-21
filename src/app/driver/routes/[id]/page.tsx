@@ -120,7 +120,11 @@ export default function DriverRouteDetailPage({
 
       // If safety check is not completed and route is pending, redirect to safety check
       if (!data.safetyCheckCompleted && data.status === "PENDING") {
-        router.push(`/driver/safety-check/${routeId}`);
+        router.push(
+          `/driver/safety-check?routeId=${routeId}&redirect=${encodeURIComponent(
+            `/driver/routes/${routeId}`
+          )}`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -386,7 +390,7 @@ export default function DriverRouteDetailPage({
                       <button
                         onClick={handleCompleteRoute}
                         disabled={updatingStatus}
-                        className="ml-4 bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="ml-4 bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500/50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {updatingStatus ? "Updating..." : "Complete Route"}
                       </button>

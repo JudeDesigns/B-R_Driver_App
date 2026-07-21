@@ -204,7 +204,9 @@ export default function SafetyCheckPage() {
 
       // Refresh the page to update the navigation bar
       // Use a timestamp to force a fresh load and prevent caching issues
-      window.location.href = `/driver/stops?t=${Date.now()}`;
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get("redirect") || "/driver/stops";
+      window.location.href = `${redirectTo}${redirectTo.includes("?") ? "&" : "?"}t=${Date.now()}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

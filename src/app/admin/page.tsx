@@ -234,7 +234,7 @@ export default function AdminDashboard() {
                 {stats.completedStops}
               </p>
             </div>
-            <div className="bg-primary-blue bg-opacity-10 p-3 rounded-full">
+            <div className="bg-primary-blue/10 p-3 rounded-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6 text-primary-blue"
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
                 {stats.activeRoutes}
               </p>
             </div>
-            <div className="bg-primary-purple bg-opacity-10 p-3 rounded-full">
+            <div className="bg-primary-purple/10 p-3 rounded-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6 text-primary-purple"
@@ -292,7 +292,7 @@ export default function AdminDashboard() {
                 {stats.activeDrivers}
               </p>
             </div>
-            <div className="bg-primary-green bg-opacity-10 p-3 rounded-full">
+            <div className="bg-primary-green/10 p-3 rounded-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6 text-primary-green"
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
                 {stats.ongoingDeliveries}
               </p>
             </div>
-            <div className="bg-primary-orange bg-opacity-10 p-3 rounded-full">
+            <div className="bg-primary-orange/10 p-3 rounded-full">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6 text-primary-orange"
@@ -622,13 +622,13 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-mono-500">Database</span>
-                <span className="px-2 py-1 text-xs rounded-full bg-primary-green bg-opacity-10 text-primary-green font-medium">
+                <span className="px-2 py-1 text-xs rounded-full bg-primary-green/10 text-primary-green font-medium">
                   Connected
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-mono-500">API Services</span>
-                <span className="px-2 py-1 text-xs rounded-full bg-primary-green bg-opacity-10 text-primary-green font-medium">
+                <span className="px-2 py-1 text-xs rounded-full bg-primary-green/10 text-primary-green font-medium">
                   Online
                 </span>
               </div>

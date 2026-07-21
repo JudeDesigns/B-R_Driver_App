@@ -96,6 +96,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    if (!parseResult.route) {
+      return NextResponse.json(
+        { message: "No route data found in the file" },
+        { status: 400 }
+      );
+    }
+
     const response = {
       routeNumber,
       hasConflict: !!existingRoute,

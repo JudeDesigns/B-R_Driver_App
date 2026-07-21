@@ -353,7 +353,7 @@ export default function RouteUploadPage() {
         <div className="p-6">
           {success ? (
             <div className="space-y-4">
-              <div className="bg-primary-green bg-opacity-10 border border-primary-green border-opacity-30 text-primary-green px-4 py-3 rounded-lg mb-4">
+              <div className="bg-primary-green/10 border border-primary-green/30 text-primary-green px-4 py-3 rounded-lg mb-4">
                 <div className="flex items-center mb-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -388,7 +388,7 @@ export default function RouteUploadPage() {
               </div>
 
               {result?.warnings && result.warnings.length > 0 && (
-                <div className="bg-primary-orange bg-opacity-10 border border-primary-orange border-opacity-30 text-primary-orange px-4 py-3 rounded-lg mb-4">
+                <div className="bg-primary-orange/10 border border-primary-orange/30 text-primary-orange px-4 py-3 rounded-lg mb-4">
                   <div className="flex items-center mb-2">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -476,13 +476,13 @@ export default function RouteUploadPage() {
               <div className="flex space-x-4 mt-6">
                 <button
                   onClick={handleViewRoute}
-                  className="bg-black hover:bg-mono-800 text-white font-medium py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200"
+                  className="bg-black hover:bg-mono-800 text-white font-medium py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200"
                 >
                   View Route
                 </button>
                 <button
                   onClick={handleBackToDashboard}
-                  className="bg-mono-200 hover:bg-mono-300 text-mono-800 font-medium py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200"
+                  className="bg-mono-200 hover:bg-mono-300 text-mono-800 font-medium py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200"
                 >
                   Back to Dashboard
                 </button>
@@ -491,7 +491,7 @@ export default function RouteUploadPage() {
           ) : (
             <form onSubmit={handleSubmit}>
               {error && (
-                <div className="bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg mb-4 flex items-start">
+                <div className="bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg mb-4 flex items-start">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0"
@@ -601,7 +601,7 @@ export default function RouteUploadPage() {
                 </div>
               </div>
 
-              <div className="bg-primary-blue bg-opacity-5 p-5 rounded-lg mb-6">
+              <div className="bg-primary-blue/5 p-5 rounded-lg mb-6">
                 <div className="flex items-start">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -830,7 +830,7 @@ export default function RouteUploadPage() {
                   type="button"
                   onClick={handlePreview}
                   disabled={previewLoading || !file}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {previewLoading ? (
                     <div className="flex items-center justify-center">
@@ -865,7 +865,7 @@ export default function RouteUploadPage() {
                   <button
                     type="submit"
                     disabled={loading || !file}
-                    className="flex-1 bg-black hover:bg-mono-800 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-black hover:bg-mono-800 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <div className="flex items-center justify-center">
@@ -901,7 +901,7 @@ export default function RouteUploadPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmDialog(true)}
-                    className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-30 transition duration-200"
+                    className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500/30 transition duration-200"
                   >
                     Resolve Conflict
                   </button>
@@ -914,7 +914,7 @@ export default function RouteUploadPage() {
 
       {/* Conflict Resolution Dialog */}
       {showConfirmDialog && conflictDetected && existingRoute && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center mb-4">

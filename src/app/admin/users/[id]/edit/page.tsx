@@ -11,7 +11,7 @@ interface User {
   role: string;
 }
 
-export default function EditUserPage({ params }: { params: { id: string } }) {
+export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   // Unwrap the params object using React.use()
   const unwrappedParams = use(params);
   const userId = unwrappedParams.id;
@@ -299,7 +299,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     value={formData.username}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
 
@@ -316,7 +316,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     value={formData.role}
                     onChange={handleChange}
                     required
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   >
                     <option value="">Select a role</option>
                     <option value="ADMIN">Admin</option>
@@ -338,7 +338,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
 
@@ -365,7 +365,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
 
@@ -382,7 +382,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                   />
                 </div>
               </div>

@@ -307,7 +307,7 @@ export default function UserManagementPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name or username..."
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
               />
             </div>
             <div>
@@ -320,7 +320,7 @@ export default function UserManagementPage() {
                   setRoleFilter(e.target.value);
                   setOffset(0);
                 }}
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
               >
                 <option value="ALL">All Roles</option>
                 <option value="SUPER_ADMIN">Super Admin</option>
@@ -335,7 +335,7 @@ export default function UserManagementPage() {
                   setSearchTerm("");
                   setOffset(0);
                 }}
-                className="w-full py-2 px-4 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 transition duration-200"
+                className="w-full py-2 px-4 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 transition duration-200"
               >
                 Clear Filters
               </button>
@@ -343,7 +343,7 @@ export default function UserManagementPage() {
           </div>
 
           {error && (
-            <div className="bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg mb-4">
+            <div className="bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg mb-4">
               {error}
             </div>
           )}
@@ -457,7 +457,7 @@ export default function UserManagementPage() {
 
       {/* Create/Edit User Modal */}
       {showUserModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600/50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
@@ -569,7 +569,7 @@ export default function UserManagementPage() {
 
       {/* Delete User Modal */}
       {showDeleteModal && userToDelete && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600/50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">

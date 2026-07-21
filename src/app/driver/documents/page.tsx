@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDriverAuth, AuthLoadingSpinner, AccessDenied } from "@/hooks/useAuth";
+import SignatureCaptureModal from "@/components/driver/SignatureCaptureModal";
 
 interface SystemDocument {
   id: string;
@@ -19,6 +20,10 @@ interface SystemDocument {
   createdAt: string;
   isAcknowledged: boolean;
   acknowledgedAt: string | null;
+  requiresSignature: boolean;
+  signedPdfUrl: string | null;
+  documentVersion: number;
+  currentVersion: number;
 }
 
 export default function DriverDocumentsPage() {
@@ -31,6 +36,8 @@ export default function DriverDocumentsPage() {
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [signingDocument, setSigningDocument] = useState<SystemDocument | null>(null);
+  const [signing, setSigning] = useState(false);
 
   const categories = [
     { value: "ALL", label: "All Documents" },
@@ -114,6 +121,40 @@ export default function DriverDocumentsPage() {
       setError(err instanceof Error ? err.message : "Failed to acknowledge document");
     } finally {
       setAcknowledging(null);
+    }
+  };
+
+  const handleSign = async (signatureDataUrl: string) => {
+    if (!signingDocument) return;
+
+    try {
+      setSigning(true);
+      setError("");
+
+      const response = await fetch("/api/driver/system-documents/sign", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          documentId: signingDocument.id,
+          signatureImageBase64: signatureDataUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to sign document");
+      }
+
+      setSigningDocument(null);
+      // Refresh documents list
+      await fetchDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to sign document");
+    } finally {
+      setSigning(false);
     }
   };
 
@@ -308,7 +349,7 @@ export default function DriverDocumentsPage() {
                                   clipRule="evenodd"
                                 />
                               </svg>
-                              Acknowledged on{" "}
+                              {doc.requiresSignature ? "Signed on" : "Acknowledged on"}{" "}
                               {new Date(doc.acknowledgedAt).toLocaleDateString()}
                             </div>
                           )}
@@ -323,7 +364,25 @@ export default function DriverDocumentsPage() {
                         >
                           View Document
                         </a>
-                        {!doc.isAcknowledged && (
+                        {doc.isAcknowledged && doc.requiresSignature && doc.signedPdfUrl && (
+                          <a
+                            href={doc.signedPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 bg-gray-700 text-white text-center px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium touch-manipulation tap-target"
+                          >
+                            View Signed Copy
+                          </a>
+                        )}
+                        {!doc.isAcknowledged && doc.requiresSignature && (
+                          <button
+                            onClick={() => setSigningDocument(doc)}
+                            className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 touch-manipulation tap-target"
+                          >
+                            ✍️ Sign Document
+                          </button>
+                        )}
+                        {!doc.isAcknowledged && !doc.requiresSignature && (
                           <button
                             onClick={() => handleAcknowledge(doc.id)}
                             disabled={acknowledging === doc.id}
@@ -408,6 +467,14 @@ export default function DriverDocumentsPage() {
           </>
         )}
       </div>
+
+      <SignatureCaptureModal
+        isOpen={!!signingDocument}
+        documentTitle={signingDocument?.title || ""}
+        onCancel={() => setSigningDocument(null)}
+        onSubmit={handleSign}
+        submitting={signing}
+      />
     </div>
   );
 }

@@ -64,7 +64,13 @@ export async function GET(
     }
 
     // Get routes assigned to this user (if they're a driver)
-    let assignedRoutes = [];
+    let assignedRoutes: Array<{
+      id: string;
+      routeNumber: string | null;
+      date: Date;
+      status: string;
+      _count: { stops: number };
+    }> = [];
     if (user.role === "DRIVER") {
       // Look for routes where this driver has assigned stops
       assignedRoutes = await prisma.route.findMany({
@@ -187,7 +193,7 @@ export async function PATCH(
       try {
         sessionManager.invalidateUserSessions(id, 'Password changed by admin');
       } catch (error) {
-        console.warn("Failed to invalidate user sessions:", error.message);
+        console.warn("Failed to invalidate user sessions:", error instanceof Error ? error.message : String(error));
       }
     }
 

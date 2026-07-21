@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface SearchInputProps {
   value: string;
@@ -16,16 +16,28 @@ export default function SearchInput({
   debounceTime = 300,
 }: SearchInputProps) {
   const [inputValue, setInputValue] = useState(value);
+  // Tracks the last value we emitted via onChange, so we can tell whether an
+  // incoming `value` prop change was caused by our own debounced update
+  // (in which case we must NOT overwrite what the user is currently typing)
+  // or by something external (e.g. a parent-triggered reset/clear).
+  const lastEmittedValue = useRef(value);
 
-  // Update local state when prop value changes
+  // Only resync local state when the prop changes for a reason other than
+  // our own debounced emit. Resyncing unconditionally caused typed
+  // characters to be wiped mid-keystroke (most noticeable on Windows/slower
+  // re-renders).
   useEffect(() => {
-    setInputValue(value);
+    if (value !== lastEmittedValue.current) {
+      setInputValue(value);
+      lastEmittedValue.current = value;
+    }
   }, [value]);
 
   // Debounce the onChange callback
   useEffect(() => {
     const handler = setTimeout(() => {
       if (inputValue !== value) {
+        lastEmittedValue.current = inputValue;
         onChange(inputValue);
       }
     }, debounceTime);
@@ -67,6 +79,7 @@ export default function SearchInput({
           className="absolute inset-y-0 right-0 flex items-center pr-3"
           onClick={() => {
             setInputValue("");
+            lastEmittedValue.current = "";
             onChange("");
           }}
         >

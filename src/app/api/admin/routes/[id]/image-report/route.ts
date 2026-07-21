@@ -11,7 +11,15 @@ export async function POST(
 ) {
   try {
     // Verify authentication and admin access
-    const decoded = await verifyToken(request);
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { message: "Authentication required" },
+        { status: 401 }
+      );
+    }
+    const token = authHeader.split(" ")[1];
+    const decoded = verifyToken(token) as any;
     if (!decoded) {
       return NextResponse.json(
         { message: "Authentication required" },
@@ -159,7 +167,7 @@ export async function POST(
     console.log(`💾 ZIP archive ready for download`);
 
     // Return the ZIP for download
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(zipBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',

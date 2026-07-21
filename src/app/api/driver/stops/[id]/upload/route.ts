@@ -128,6 +128,27 @@ export async function POST(
       );
     }
 
+    // SAFETY CHECK ENFORCEMENT: Check if driver has completed safety check for this route
+    const safetyCheck = await prisma.safetyCheck.findFirst({
+      where: {
+        routeId: stop.routeId,
+        driverId: decoded.id,
+        type: "START_OF_DAY",
+        isDeleted: false,
+      },
+    });
+
+    if (!safetyCheck) {
+      return NextResponse.json(
+        {
+          message: "Safety check must be completed before uploading documents",
+          requiresSafetyCheck: true,
+          routeId: stop.routeId,
+        },
+        { status: 403 }
+      );
+    }
+
     // Process the uploaded file
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -143,6 +164,11 @@ export async function POST(
     const imageIndex = parseInt(formData.get('imageIndex') as string || '0');
     const totalImages = parseInt(formData.get('totalImages') as string || '1');
     const sessionId = formData.get('sessionId') as string || Math.random().toString(36).substring(2, 15);
+    // Category tag used only for the admin "All Financial" PDF filter below.
+    // Does not affect the combined image set, PDF, or customer email, which
+    // continue to include every image exactly as before.
+    const category = formData.get('category') as string;
+    const categoryTag = category === 'delivery' ? 'dlv' : 'fin';
 
     // Check file type
     if (!file.type.startsWith("image/")) {
@@ -155,9 +181,11 @@ export async function POST(
     // Read the file as an ArrayBuffer
     const fileBuffer = await file.arrayBuffer();
 
-    // Create a unique filename with session ID for grouping
+    // Create a unique filename with session ID for grouping. The category
+    // tag is embedded so the admin "All Financial" report can later filter
+    // by it; it has no effect on the combined image set used everywhere else.
     const timestamp = new Date().getTime();
-    const fileName = `invoice_${stop.id}_${timestamp}_${sessionId}_img${imageIndex + 1}`;
+    const fileName = `invoice_${stop.id}_${timestamp}_${sessionId}_${categoryTag}_img${imageIndex + 1}`;
 
     // Ensure the uploads directory exists
     const uploadsDir = path.join(process.cwd(), "public", "uploads");
@@ -206,8 +234,11 @@ export async function POST(
     // FIXED: Collect ALL images from current upload session
     const allImages = [];
 
-    // Get all images from this upload session (based on sessionId pattern)
-    const sessionPattern = new RegExp(`invoice_${stop.id}_\\d+_${sessionId}_img\\d+\\.jpg$`);
+    // Get all images from this upload session (based on sessionId pattern).
+    // Matches both the new `_<cat>_img<N>.jpg` format and the legacy
+    // `_img<N>.jpg` format (for any files already on disk from before this
+    // change), so no in-flight uploads are dropped.
+    const sessionPattern = new RegExp(`invoice_${stop.id}_\\d+_${sessionId}_(?:fin_|dlv_)?img\\d+\\.jpg$`);
 
     try {
       const files = await readdirAsync(uploadsDir);

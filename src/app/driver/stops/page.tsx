@@ -59,12 +59,6 @@ export default function DriverStopsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [token, setToken] = useState<string | null>(null);
-  const [safetyCheckCompleted, setSafetyCheckCompleted] = useState(false);
-  const [showSafetyModal, setShowSafetyModal] = useState(false);
-  const [routesNeedingChecks, setRoutesNeedingChecks] = useState<
-    Array<{ id: string; routeNumber: string | null; date: string }>
-  >([]);
-  const [completedRouteIds, setCompletedRouteIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid" | "map">("grid");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -125,13 +119,13 @@ export default function DriverStopsPage() {
 
   useEffect(() => {
     if (token) {
-      checkSafetyStatus();
+      fetchStops();
     }
   }, [token]);
 
   // Set up WebSocket connection and event listeners
   useEffect(() => {
-    if (!isConnected || !safetyCheckCompleted) return;
+    if (!isConnected) return;
 
     // Join the driver's room
     let userId;
@@ -202,7 +196,7 @@ export default function DriverStopsPage() {
       unsubscribeRouteStatus();
       unsubscribeStopStatus();
     };
-  }, [isConnected, safetyCheckCompleted, joinRoom, subscribe]);
+  }, [isConnected, joinRoom, subscribe]);
 
   // Filter and sort stops when dependencies change
   useEffect(() => {
@@ -269,67 +263,18 @@ export default function DriverStopsPage() {
 
   // Simulate fetching weather data
   useEffect(() => {
-    if (safetyCheckCompleted) {
-      // Simulated weather data
-      const weatherTypes = ["sunny", "cloudy", "rainy", "stormy", "snowy"];
-      const randomWeather =
-        weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
-      const randomTemp = Math.floor(Math.random() * 30) + 50; // 50-80°F
+    // Simulated weather data
+    const weatherTypes = ["sunny", "cloudy", "rainy", "stormy", "snowy"];
+    const randomWeather =
+      weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+    const randomTemp = Math.floor(Math.random() * 30) + 50; // 50-80°F
 
-      setWeatherData({
-        type: randomWeather,
-        temperature: randomTemp,
-        location: "Current Location",
-      });
-    }
-  }, [safetyCheckCompleted]);
-
-  const checkSafetyStatus = async () => {
-    if (!token) return;
-
-    try {
-      // Get today's date in PST timezone in YYYY-MM-DD format
-      const today = getPSTDateString();
-
-      const response = await fetch(
-        `/api/driver/safety-check/status?date=${today}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          // Add cache: 'no-store' to prevent caching
-          cache: "no-store",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Safety check status:", data);
-
-        // Store the routes that need safety checks
-        setRoutesNeedingChecks(data.routesNeedingChecks || []);
-        setCompletedRouteIds(data.completedRouteIds || []);
-
-        // Set overall safety check status
-        setSafetyCheckCompleted(data.hasCompletedChecks || false);
-
-        if (data.hasCompletedChecks) {
-          // If all safety checks are completed, fetch stops and hide modal
-          setShowSafetyModal(false);
-          fetchStops();
-        } else {
-          // If any safety check is not completed, show modal and DO NOT fetch stops
-          setShowSafetyModal(true);
-          setLoading(false);
-          // Clear any existing stops to prevent access
-          setStops([]);
-        }
-      }
-    } catch (error) {
-      console.error("Error checking safety status:", error);
-      setLoading(false);
-    }
-  };
+    setWeatherData({
+      type: randomWeather,
+      temperature: randomTemp,
+      location: "Current Location",
+    });
+  }, []);
 
   const fetchStops = async () => {
     if (!token) return;
@@ -353,22 +298,7 @@ export default function DriverStopsPage() {
       }
 
       const data = await response.json();
-
-      // If we have completed route IDs, filter stops to only show those from routes with completed safety checks
-      if (completedRouteIds.length > 0 && !safetyCheckCompleted) {
-        // Filter stops to only include those from routes with completed safety checks
-        const filteredStops = data.stops.filter((stop: any) =>
-          completedRouteIds.includes(stop.routeId)
-        );
-        console.log(
-          "Filtered stops based on completed safety checks:",
-          filteredStops.length
-        );
-        setStops(filteredStops || []);
-      } else {
-        // If all safety checks are completed or no routes have completed checks, show all stops
-        setStops(data.stops || []);
-      }
+      setStops(data.stops || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -637,121 +567,10 @@ export default function DriverStopsPage() {
     );
   };
 
-  // Safety modal component
-  const SafetyCheckModal = () => {
-    // Format date for display in PST timezone
-    const formatRouteDate = (dateString: string) => {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        timeZone: "America/Los_Angeles",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 mb-20 sm:mb-0 max-h-[85vh] overflow-y-auto">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-yellow-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">
-              Safety Check Required
-            </h3>
-            <p className="mt-2 text-sm text-gray-500">
-              You must complete the safety checklist for each route before you
-              can view all your stops. This helps ensure both your safety and
-              the safety of others.
-            </p>
-
-            {/* Show routes that need safety checks */}
-            {routesNeedingChecks.length > 0 && (
-              <div className="mt-4 border-t border-gray-200 pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  Routes Needing Safety Checks:
-                </h4>
-                <div className="max-h-40 overflow-y-auto">
-                  <ul className="divide-y divide-gray-200">
-                    {routesNeedingChecks.map((route) => (
-                      <li
-                        key={route.id}
-                        className="py-2 flex justify-between items-center"
-                      >
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-gray-800">
-                            Route {route.routeNumber || "Unknown"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {formatRouteDate(route.date)}
-                          </p>
-                        </div>
-                        <Link
-                          href={`/driver/safety-check?routeId=${route.id}`}
-                          className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800 transition duration-200"
-                        >
-                          Complete
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Show message about completed routes */}
-            {completedRouteIds.length > 0 && (
-              <div className="mt-4 text-xs text-green-600">
-                <p>
-                  You have completed safety checks for{" "}
-                  {completedRouteIds.length} route(s).
-                </p>
-                <p>You can view stops for these routes below.</p>
-              </div>
-            )}
-          </div>
-          <div className="mt-6">
-            <Link
-              href="/driver/safety-check"
-              className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200"
-            >
-              Complete Safety Checklist
-            </Link>
-            <button
-              onClick={() => router.push("/driver")}
-              className="w-full block text-center bg-white border border-gray-300 text-gray-700 font-medium py-3 px-4 rounded mt-3 hover:bg-gray-50 transition duration-200"
-            >
-              Back to Dashboard
-            </button>
-            {completedRouteIds.length > 0 && (
-              <button
-                onClick={() => setShowSafetyModal(false)}
-                className="w-full block text-center bg-white text-gray-700 font-medium py-3 px-4 rounded mt-3 hover:bg-gray-50 transition duration-200"
-              >
-                View Available Stops
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-20 px-3 sm:px-6">
       {/* Location Tracker - Runs in background when driver has active stops */}
-      {safetyCheckCompleted && filteredStops.length > 0 && (() => {
+      {filteredStops.length > 0 && (() => {
         // Find the first active (non-completed) stop to track location
         const activeStop = filteredStops.find(stop => stop.status !== 'COMPLETED');
         if (activeStop) {
@@ -809,10 +628,14 @@ export default function DriverStopsPage() {
             )}
           </div>
 
-          {safetyCheckCompleted && !loading && stops.length > 0 && (
+          {!loading && stops.length > 0 && (
             <div className="flex items-center space-x-2">
               <RouteMapLink
-                stops={stops}
+                stops={stops.map((s) => ({
+                  sequence: s.sequence,
+                  address: s.customer.address,
+                  customer: { name: s.customer.name },
+                }))}
                 variant="link"
                 size="sm"
               />
@@ -840,7 +663,7 @@ export default function DriverStopsPage() {
         </div>
 
         {/* View Mode Tabs - Mobile Optimized */}
-        {safetyCheckCompleted && !loading && stops.length > 0 && (
+        {!loading && stops.length > 0 && (
           <div className="flex justify-between mt-3 bg-gray-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode("list")}
@@ -925,14 +748,14 @@ export default function DriverStopsPage() {
       </div>
 
       {/* Weather widget (conditionally shown) */}
-      {showWeather && safetyCheckCompleted && !loading && stops.length > 0 && (
+      {showWeather && !loading && stops.length > 0 && (
         <div className="animate-fade-in">
           <WeatherWidget />
         </div>
       )}
 
       {/* Search and filters */}
-      {safetyCheckCompleted && !loading && stops.length > 0 && (
+      {!loading && stops.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 space-y-3 sm:space-y-4">
           {/* Search Bar */}
           <div className="relative">
@@ -1079,7 +902,7 @@ export default function DriverStopsPage() {
       `}</style>
 
       {/* Route summary cards */}
-      {safetyCheckCompleted && !loading && stops.length > 0 && (
+      {!loading && stops.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="flex items-center justify-between">
@@ -1186,7 +1009,6 @@ export default function DriverStopsPage() {
 
       {/* Map View - Google Maps Integration */}
       {viewMode === "map" &&
-        safetyCheckCompleted &&
         !loading &&
         stops.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -1200,7 +1022,11 @@ export default function DriverStopsPage() {
               {/* Full Route Map Link */}
               <div className="text-center">
                 <RouteMapLink
-                  stops={filteredStops}
+                  stops={filteredStops.map((s) => ({
+                    sequence: s.sequence,
+                    address: s.customer.address,
+                    customer: { name: s.customer.name },
+                  }))}
                   variant="button"
                   size="lg"
                   className="w-full sm:w-auto"
@@ -1255,7 +1081,6 @@ export default function DriverStopsPage() {
 
       {/* Grid View */}
       {viewMode === "grid" &&
-        safetyCheckCompleted &&
         !loading &&
         stops.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -1426,7 +1251,6 @@ export default function DriverStopsPage() {
 
       {/* List View */}
       {viewMode === "list" &&
-        safetyCheckCompleted &&
         !loading &&
         stops.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -1571,11 +1395,8 @@ export default function DriverStopsPage() {
           </div>
         )}
 
-      {/* Safety Modal */}
-      {showSafetyModal && <SafetyCheckModal />}
-
       {/* Loading State */}
-      {loading && !showSafetyModal ? (
+      {loading ? (
         <div className="flex justify-center items-center h-60">
           <div className="relative">
             <div className="h-24 w-24 rounded-full border-t-2 border-b-2 border-black animate-spin"></div>
@@ -1642,7 +1463,7 @@ export default function DriverStopsPage() {
             Return to Dashboard
           </button>
         </div>
-      ) : safetyCheckCompleted && !showSafetyModal && stops.length === 0 ? (
+      ) : stops.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <svg
             className="mx-auto h-16 w-16 text-gray-400"

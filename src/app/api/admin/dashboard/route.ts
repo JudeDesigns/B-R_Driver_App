@@ -105,6 +105,9 @@ export async function GET(request: NextRequest) {
         where: {
           isDeleted: false,
         },
+        orderBy: {
+          status: "asc",
+        },
         _count: {
           id: true,
         },
@@ -118,6 +121,9 @@ export async function GET(request: NextRequest) {
             gte: today,
             lt: tomorrow,
           },
+        },
+        orderBy: {
+          status: "asc",
         },
         _count: {
           id: true,
@@ -151,6 +157,9 @@ export async function GET(request: NextRequest) {
         where: {
           isDeleted: false,
         },
+        orderBy: {
+          status: "asc",
+        },
         _count: {
           id: true,
         },
@@ -166,6 +175,9 @@ export async function GET(request: NextRequest) {
               lt: tomorrow,
             },
           },
+        },
+        orderBy: {
+          status: "asc",
         },
         _count: {
           id: true,

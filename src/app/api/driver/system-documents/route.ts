@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
         const type = url.searchParams.get("type");
         const category = url.searchParams.get("category");
         const isRequired = url.searchParams.get("isRequired");
-        const routeId = url.searchParams.get("routeId");
 
         const whereClause: any = {
             isActive: true,
@@ -45,18 +44,20 @@ export async function GET(request: NextRequest) {
             whereClause.isRequired = isRequired === "true";
         }
 
-        // Fetch documents with acknowledgment status
+        // Fetch documents with acknowledgment status. Acknowledgment status is
+        // now a lifetime + version concept: only the latest valid
+        // acknowledgment matching the document's CURRENT version counts as
+        // "acknowledged"/"signed" for this driver.
         const documents = await prisma.systemDocument.findMany({
             where: whereClause,
             include: {
                 acknowledgments: {
                     where: {
                         driverId: driverId,
-                        routeId: routeId || null,
-                    } as any,
-                    select: {
-                        id: true,
-                        acknowledgedAt: true,
+                        isValid: true,
+                    },
+                    orderBy: {
+                        acknowledgedAt: "desc",
                     },
                 },
             },
@@ -65,12 +66,23 @@ export async function GET(request: NextRequest) {
             },
         });
 
-        // Transform the response to include isAcknowledged flag
-        const documentsWithStatus = (documents as any[]).map(doc => ({
-            ...doc,
-            isAcknowledged: doc.acknowledgments.length > 0,
-            acknowledgedAt: doc.acknowledgments[0]?.acknowledgedAt || null,
-        }));
+        // Transform the response to include isAcknowledged flag plus
+        // signature-related fields for the current version.
+        const documentsWithStatus = documents.map(doc => {
+            const currentValidAck = doc.acknowledgments.find(
+                (ack) => ack.documentVersion === doc.version
+            );
+            const { acknowledgments, ...rest } = doc;
+            return {
+                ...rest,
+                isAcknowledged: !!currentValidAck,
+                acknowledgedAt: currentValidAck?.acknowledgedAt || null,
+                requiresSignature: doc.requiresSignature,
+                signedPdfUrl: currentValidAck?.signedPdfUrl || null,
+                documentVersion: doc.version,
+                currentVersion: doc.version,
+            };
+        });
 
         return NextResponse.json({ documents: documentsWithStatus });
     } catch (error) {

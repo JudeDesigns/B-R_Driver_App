@@ -16,6 +16,7 @@ interface SearchableSelectProps {
   required?: boolean;
   className?: string;
   emptyMessage?: string;
+  disabled?: boolean;
 }
 
 export default function SearchableSelect({
@@ -25,7 +26,8 @@ export default function SearchableSelect({
   placeholder = "Select an option...",
   required = false,
   className = "",
-  emptyMessage = "No options available"
+  emptyMessage = "No options available",
+  disabled = false
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,9 +113,10 @@ export default function SearchableSelect({
       {/* Selected Value Display */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
-        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-left focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white flex items-center justify-between ${
+        disabled={disabled}
+        className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-left focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed ${
           !value ? "text-gray-400" : "text-gray-900"
         }`}
         aria-haspopup="listbox"

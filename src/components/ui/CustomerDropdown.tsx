@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface Customer {
   id: string;
@@ -37,6 +37,13 @@ export default function CustomerDropdown({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customName, setCustomName] = useState("");
 
+  // Search combobox state
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // Load all customers when component mounts
   useEffect(() => {
     loadCustomers();
@@ -46,10 +53,11 @@ export default function CustomerDropdown({
   useEffect(() => {
     if (value && !selectedCustomer) {
       // Check if the value matches any customer
-      const matchingCustomer = customers.find(c => c.name === value);
+      const matchingCustomer = customers.find((c) => c.name === value);
       if (matchingCustomer) {
         setSelectedCustomer(matchingCustomer);
         setShowCustomInput(false);
+        setQuery(matchingCustomer.name);
       } else {
         // It's a custom name
         setCustomName(value);
@@ -57,6 +65,17 @@ export default function CustomerDropdown({
       }
     }
   }, [value, customers, selectedCustomer]);
+
+  // Close the results list when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -82,14 +101,16 @@ export default function CustomerDropdown({
 
         if (data.customers && Array.isArray(data.customers)) {
           // Convert API response to our Customer interface
-          const customerList = data.customers.map((customer: any) => ({
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            phone: customer.contactInfo, // API uses contactInfo field
-            address: customer.address,
-            groupCode: customer.groupCode,
-          })).sort((a: Customer, b: Customer) => a.name.localeCompare(b.name));
+          const customerList = data.customers
+            .map((customer: any) => ({
+              id: customer.id,
+              name: customer.name,
+              email: customer.email,
+              phone: customer.contactInfo, // API uses contactInfo field
+              address: customer.address,
+              groupCode: customer.groupCode,
+            }))
+            .sort((a: Customer, b: Customer) => a.name.localeCompare(b.name));
 
           setCustomers(customerList);
           console.log(`✅ Loaded ${customerList.length} customers from database`);
@@ -109,30 +130,75 @@ export default function CustomerDropdown({
     }
   };
 
-  const handleCustomerSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const customerId = e.target.value;
-    
-    if (customerId === "custom") {
-      // User wants to enter a custom name
+  const filteredCustomers =
+    query.trim() === ""
+      ? customers
+      : customers.filter((c) =>
+          c.name.toLowerCase().includes(query.trim().toLowerCase())
+        );
+
+  const selectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowCustomInput(false);
+    setCustomName("");
+    setQuery(customer.name);
+    setIsOpen(false);
+    onChange(customer.name, customer);
+  };
+
+  const selectCustomOption = () => {
+    setSelectedCustomer(null);
+    setShowCustomInput(true);
+    setCustomName("");
+    setQuery("");
+    setIsOpen(false);
+    onChange("");
+    // Focus the custom-name input on the next tick
+    setTimeout(() => {
+      document.getElementById("customer-custom-name-input")?.focus();
+    }, 0);
+  };
+
+  const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    setIsOpen(true);
+    setHighlightedIndex(0);
+    if (selectedCustomer) {
+      // User is typing again after having selected someone; clear the selection
       setSelectedCustomer(null);
-      setShowCustomInput(true);
-      setCustomName("");
       onChange("");
-    } else if (customerId === "") {
-      // User selected placeholder
-      setSelectedCustomer(null);
-      setShowCustomInput(false);
-      setCustomName("");
-      onChange("");
-    } else {
-      // User selected an existing customer
-      const customer = customers.find(c => c.id === customerId);
-      if (customer) {
-        setSelectedCustomer(customer);
-        setShowCustomInput(false);
-        setCustomName("");
-        onChange(customer.name, customer);
+    }
+  };
+
+  const handleInputFocus = () => {
+    setIsOpen(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setIsOpen(true);
+      return;
+    }
+    if (!isOpen) return;
+
+    const optionsCount = filteredCustomers.length + 1; // +1 for "Enter custom name"
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % optionsCount);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + optionsCount) % optionsCount);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightedIndex === filteredCustomers.length) {
+        selectCustomOption();
+      } else if (filteredCustomers[highlightedIndex]) {
+        selectCustomer(filteredCustomers[highlightedIndex]);
       }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
     }
   };
 
@@ -144,24 +210,24 @@ export default function CustomerDropdown({
 
   return (
     <div className="space-y-2">
-      {/* Customer Dropdown */}
-      <div className="relative">
-        <select
-          value={selectedCustomer?.id || (showCustomInput ? "custom" : "")}
-          onChange={handleCustomerSelect}
+      {/* Searchable Customer Combobox */}
+      <div className="relative" ref={containerRef}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={handleQueryChange}
+          onFocus={handleInputFocus}
+          onKeyDown={handleKeyDown}
+          placeholder={loading ? "Loading customers..." : placeholder}
           required={required && !showCustomInput}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
           disabled={loading}
-        >
-          <option value="">{loading ? "Loading customers..." : placeholder}</option>
-          {customers.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name}
-              {customer.groupCode && ` (${customer.groupCode})`}
-            </option>
-          ))}
-          <option value="custom">+ Enter custom name</option>
-        </select>
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+        />
 
         {loading && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -171,12 +237,49 @@ export default function CustomerDropdown({
             </svg>
           </div>
         )}
+
+        {isOpen && !loading && (
+          <ul className="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md border border-gray-300 bg-white shadow-lg">
+            {filteredCustomers.length === 0 && (
+              <li className="px-3 py-2 text-sm text-gray-500">No customers match your search.</li>
+            )}
+            {filteredCustomers.map((customer, index) => (
+              <li
+                key={customer.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectCustomer(customer);
+                }}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                className={`px-3 py-2 text-sm cursor-pointer ${
+                  index === highlightedIndex ? "bg-blue-100" : "hover:bg-gray-100"
+                }`}
+              >
+                {customer.name}
+                {customer.groupCode && ` (${customer.groupCode})`}
+              </li>
+            ))}
+            <li
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectCustomOption();
+              }}
+              onMouseEnter={() => setHighlightedIndex(filteredCustomers.length)}
+              className={`px-3 py-2 text-sm cursor-pointer border-t border-gray-200 text-blue-600 ${
+                highlightedIndex === filteredCustomers.length ? "bg-blue-100" : "hover:bg-gray-100"
+              }`}
+            >
+              + Enter custom name
+            </li>
+          </ul>
+        )}
       </div>
 
       {/* Custom Name Input */}
       {showCustomInput && (
         <div>
           <input
+            id="customer-custom-name-input"
             type="text"
             value={customName}
             onChange={handleCustomNameChange}
@@ -184,9 +287,7 @@ export default function CustomerDropdown({
             required={required}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Entering a new customer name
-          </p>
+          <p className="text-xs text-gray-500 mt-1">Entering a new customer name</p>
         </div>
       )}
 

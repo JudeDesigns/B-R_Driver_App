@@ -113,7 +113,7 @@ export async function generateImageReport(route: Route): Promise<void> {
 /**
  * Generate and download route image PDF (replaces ZIP archive)
  */
-export async function generateImagePDF(route: Route): Promise<void> {
+export async function generateImagePDF(route: Route, financialOnly: boolean = false): Promise<{ endDayWorkflow?: { triggered: boolean; runIdSlug?: string; error?: string } }> {
   // Check both localStorage and sessionStorage for token
   let token = localStorage.getItem("token");
   if (!token) {
@@ -145,6 +145,7 @@ export async function generateImagePDF(route: Route): Promise<void> {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ financialOnly }),
       signal: controller.signal,
     });
   } catch (err) {
@@ -169,13 +170,15 @@ export async function generateImagePDF(route: Route): Promise<void> {
 
   // API now returns a JSON object with a download URL instead of streaming
   // the binary directly. This avoids Next.js 15 stalling on large buffers.
-  const { url } = await response.json();
+  const { url, endDayWorkflow } = await response.json();
 
   // Build absolute URL so the browser fetches the static file from nginx,
   // not through the Next.js API. window.open is used because programmatic
   // a.click() on non-user-gesture paths is blocked by some browsers.
   const absoluteUrl = `${window.location.origin}${url}`;
   window.open(absoluteUrl, '_blank');
+
+  return { endDayWorkflow };
 }
 
 /**

@@ -787,6 +787,32 @@ export async function PATCH(
           console.error("Error auto-starting next stop:", autoStartError);
           // If auto-start fails, still return the updated current stop, just without the nextStopId
         }
+      } else {
+        // No more pending/in-progress stops assigned to this driver on this
+        // route — this was their final stop. Signal the client to open the
+        // End-of-Day Safety Page automatically (or the route check-in page
+        // first, if a closeout assignment is configured for this driver).
+        const closeoutAssignment = await prisma.routeCloseoutAssignment.findUnique({
+          where: {
+            routeId_driverId: {
+              routeId: stop.routeId,
+              driverId: decoded.id,
+            },
+          },
+        });
+
+        if (closeoutAssignment) {
+          return NextResponse.json({
+            ...updatedStop,
+            isLastStopForDriver: true,
+            requiresRouteCheckin: true,
+          });
+        }
+
+        return NextResponse.json({
+          ...updatedStop,
+          isLastStopForDriver: true,
+        });
       }
     }
 

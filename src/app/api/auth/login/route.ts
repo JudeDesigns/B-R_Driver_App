@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     try {
       sessionManager.clearUserInvalidation(userId);
     } catch (error) {
-      console.warn("Failed to clear user session invalidation:", error.message);
+      console.warn("Failed to clear user session invalidation:", error instanceof Error ? error.message : String(error));
     }
 
     // Generate JWT token with extended expiration for drivers

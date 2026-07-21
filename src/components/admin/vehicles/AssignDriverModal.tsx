@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 interface Driver {
     id: string;
@@ -84,7 +85,7 @@ export default function AssignDriverModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Assign Driver
@@ -104,19 +105,16 @@ export default function AssignDriverModal({
                         {loading ? (
                             <div className="text-sm text-gray-500">Loading drivers...</div>
                         ) : (
-                            <select
+                            <SearchableSelect
+                                options={drivers.map((driver) => ({
+                                    value: driver.id,
+                                    label: driver.fullName || driver.username,
+                                }))}
                                 value={selectedDriverId}
-                                onChange={(e) => setSelectedDriverId(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                onChange={setSelectedDriverId}
+                                placeholder="-- Select a Driver --"
                                 required
-                            >
-                                <option value="">-- Select a Driver --</option>
-                                {drivers.map((driver) => (
-                                    <option key={driver.id} value={driver.id}>
-                                        {driver.fullName || driver.username}
-                                    </option>
-                                ))}
-                            </select>
+                            />
                         )}
                     </div>
 

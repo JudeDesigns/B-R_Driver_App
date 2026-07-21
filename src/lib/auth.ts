@@ -116,7 +116,7 @@ export function generateToken(payload: Record<string, unknown>, expiresIn: strin
     expiresIn,
     issuer: "br-food-services",
     audience: "br-food-services-users",
-  });
+  } as jwt.SignOptions);
 }
 
 // Function to verify a JWT token
@@ -149,7 +149,8 @@ export function verifyToken(token: string, options: { ignoreExpiration?: boolean
       }
     } catch (sessionError) {
       // If session management fails, log but don't block login
-      console.warn("Session management check failed, allowing login:", sessionError.message);
+      const message = sessionError instanceof Error ? sessionError.message : String(sessionError);
+      console.warn("Session management check failed, allowing login:", message);
     }
 
     return decoded;

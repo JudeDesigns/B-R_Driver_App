@@ -240,6 +240,18 @@ export default function EndOfDayCheckPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
+
+        if (errorData.requiresRouteCheckin && errorData.routeId) {
+          setError(
+            errorData.message ||
+              "You must complete your route check-in before submitting End-of-Day. Redirecting..."
+          );
+          setTimeout(() => {
+            router.push(`/driver/route-checkin?routeId=${errorData.routeId}`);
+          }, 1500);
+          return;
+        }
+
         throw new Error(
           errorData.message || "Failed to submit end-of-day check"
         );

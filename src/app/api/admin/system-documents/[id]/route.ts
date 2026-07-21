@@ -93,7 +93,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const { title, description, documentType, category, isRequired, isActive } = body;
+    const { title, description, documentType, category, isRequired, isActive, requiresSignature } = body;
 
     // Build update data
     const updateData: any = {};
@@ -103,6 +103,7 @@ export async function PATCH(
     if (category !== undefined) updateData.category = category;
     if (isRequired !== undefined) updateData.isRequired = isRequired;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (requiresSignature !== undefined) updateData.requiresSignature = requiresSignature;
 
     const document = await prisma.systemDocument.update({
       where: { id, isDeleted: false },

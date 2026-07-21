@@ -405,7 +405,7 @@ export default function CustomersPage() {
                 placeholder="Search customers..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30 pl-10"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30 pl-10"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
@@ -427,7 +427,7 @@ export default function CustomersPage() {
           </div>
 
           {error && (
-            <div className="bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg mb-4">
+            <div className="bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg mb-4">
               {error}
             </div>
           )}
@@ -575,7 +575,7 @@ export default function CustomersPage() {
       </div>
       {/* Bulk Update Modal */}
       {showBulkUpdateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Update {selectedCustomers.length} Customers
@@ -599,14 +599,14 @@ export default function CustomersPage() {
                       groupCode: e.target.value,
                     })
                   }
-                  className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                  className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                   placeholder="Leave empty to keep current values"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg">
+              <div className="mt-4 bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg">
                 {error}
               </div>
             )}

@@ -159,7 +159,7 @@ export default function TodaysRoutesSidebar() {
       </button>
 
       {expanded && (
-        <div className="mt-1 ml-4 space-y-1">
+        <div className="mt-1 ml-4 pl-2 space-y-1 border-l-2 border-gray-700">
           {loading ? (
             <div className="py-2 px-4 text-gray-400 text-sm">
               Loading routes...

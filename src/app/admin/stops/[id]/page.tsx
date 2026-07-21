@@ -9,6 +9,7 @@ import { useOptimizedAdminStopDetails } from "@/hooks/useOptimizedSocketEvents";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
 import { formatDriverNotes } from "@/utils/notesFormatter";
 import DocumentPreview from "@/components/admin/DocumentPreview";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 interface Document {
   id: string;
@@ -32,6 +33,15 @@ interface StopDocument {
   document: Document;
   isPrinted: boolean;
   printedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Payment {
+  id: string;
+  amount: number;
+  method: string;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +76,8 @@ interface Stop {
   stopDocuments: StopDocument[];
   createdAt: string;
   updatedAt: string;
+  _lastUpdated?: string;
+  payments: Payment[];
 }
 
 interface Customer {
@@ -928,7 +940,7 @@ export default function StopDetailPage({
                           sequence: parseInt(e.target.value),
                         })
                       }
-                      className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                      className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                     />
                   </div>
 
@@ -945,7 +957,7 @@ export default function StopDetailPage({
                       onChange={(e) =>
                         setFormData({ ...formData, status: e.target.value })
                       }
-                      className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                      className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                     >
                       <option value="PENDING">Pending</option>
                       <option value="ON_THE_WAY">On The Way</option>
@@ -977,7 +989,7 @@ export default function StopDetailPage({
                             amount: parseFloat(e.target.value),
                           })
                         }
-                        className="w-full rounded-lg border-mono-300 shadow-sm pl-7 focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                        className="w-full rounded-lg border-mono-300 shadow-sm pl-7 focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                       />
                     </div>
                   </div>
@@ -1020,7 +1032,7 @@ export default function StopDetailPage({
                       })
                     }
                     rows={3}
-                    className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                    className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                   ></textarea>
                 </div>
 
@@ -1063,18 +1075,16 @@ export default function StopDetailPage({
                     </h3>
                     {showDriverSelect ? (
                       <div className="mt-1 flex items-center space-x-2">
-                        <select
+                        <SearchableSelect
+                          options={drivers.map((driver) => ({
+                            value: driver.id,
+                            label: driver.fullName || driver.username,
+                          }))}
                           value={selectedDriverId}
-                          onChange={(e) => setSelectedDriverId(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-blue"
-                        >
-                          <option value="">Select a driver</option>
-                          {drivers.map((driver) => (
-                            <option key={driver.id} value={driver.id}>
-                              {driver.fullName || driver.username}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setSelectedDriverId}
+                          placeholder="Select a driver"
+                          className="w-56"
+                        />
                         <button
                           onClick={handleReassignDriver}
                           disabled={!selectedDriverId || reassigningDriver}
@@ -1171,7 +1181,7 @@ export default function StopDetailPage({
                             Driver Recorded:
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {stop.payments.map((payment: any, index: number) => (
+                            {stop.payments.map((payment: Payment, index: number) => (
                               <span
                                 key={index}
                                 className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
@@ -1689,7 +1699,7 @@ export default function StopDetailPage({
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     rows={3}
-                    className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                    className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                     placeholder="Add a note for the driver..."
                   ></textarea>
                 </div>
@@ -1810,7 +1820,7 @@ export default function StopDetailPage({
                                 setEditedNoteContent(e.target.value)
                               }
                               rows={3}
-                              className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                              className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                             ></textarea>
                             <div className="flex justify-end space-x-2">
                               <button

@@ -17,7 +17,6 @@ export interface SimpleSafetyCheckData {
   // Basic vehicle check
   date: string;
   truckNumber: string;
-  mileage: string;
   fuelLevel: string;
   odometerStart: string; // Starting odometer reading for KPI tracking
 
@@ -52,7 +51,6 @@ export default function SimpleSafetyChecklist({
   const [formData, setFormData] = useState<SimpleSafetyCheckData>({
     date: new Date().toISOString().split("T")[0],
     truckNumber: vehicle?.vehicleNumber || "",
-    mileage: "",
     fuelLevel: "FULL",
     odometerStart: "",
     printerTestDone: false,
@@ -70,6 +68,7 @@ export default function SimpleSafetyChecklist({
 
   const [safetyInstructions, setSafetyInstructions] = useState<string | null>(null);
   const [showFuelInstructions, setShowFuelInstructions] = useState(false);
+  const [showLowFuelWarning, setShowLowFuelWarning] = useState(false);
 
   useEffect(() => {
     if (vehicle?.vehicleNumber) {
@@ -124,6 +123,8 @@ export default function SimpleSafetyChecklist({
       } else {
         setShowFuelInstructions(false);
       }
+      // Half tank or below (HALF, QUARTER, LOW) triggers the dispatch warning
+      setShowLowFuelWarning(value === "HALF" || value === "QUARTER" || value === "LOW");
     }
 
     if (type === "checkbox") {
@@ -209,22 +210,6 @@ export default function SimpleSafetyChecklist({
           </div>
 
           <div>
-            <label htmlFor="mileage" className="block text-sm font-medium text-gray-700 mb-1">
-              Current Mileage
-            </label>
-            <input
-              type="text"
-              id="mileage"
-              name="mileage"
-              value={formData.mileage}
-              onChange={handleChange}
-              required
-              placeholder="e.g., 125,432"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent mobile-input"
-            />
-          </div>
-
-          <div>
             <label htmlFor="fuelLevel" className="block text-sm font-medium text-gray-700 mb-1">
               Fuel Level
             </label>
@@ -265,6 +250,22 @@ export default function SimpleSafetyChecklist({
             </p>
           </div>
         </div>
+
+        {/* Low Fuel Warning (half tank or below) */}
+        {showLowFuelWarning && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg animate-fade-in">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="text-xl">⚠️</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-semibold text-red-800">
+                  Your fuel level is at half a tank or below. Please contact dispatch for a gasoline or diesel card.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Conditional Fuel Instructions */}
         {showFuelInstructions && vehicle?.fuelInstructions && (

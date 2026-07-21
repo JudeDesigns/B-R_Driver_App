@@ -256,6 +256,47 @@ export default function StopDetailPage({
     }
   }, [token, fetchStopDetails]);
 
+  // Safety-check gate: a driver cannot view stop details until they've
+  // completed the START_OF_DAY safety check for this stop's route. They can
+  // still see the route list and Google Maps link elsewhere; only this
+  // detail page is gated. The API also enforces this server-side so a deep
+  // link can't bypass it.
+  useEffect(() => {
+    if (!token || !stop?.route?.id) return;
+
+    let cancelled = false;
+
+    const checkSafetyStatus = async () => {
+      try {
+        const response = await fetch(`/api/driver/safety-check/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+
+        if (!response.ok || cancelled) return;
+
+        const data = await response.json();
+        const completedRouteIds: string[] = data.completedRouteIds || [];
+
+        if (!completedRouteIds.includes(stop.route.id)) {
+          router.replace(
+            `/driver/safety-check?routeId=${stop.route.id}&redirect=${encodeURIComponent(
+              `/driver/stops/${unwrappedParams.id}`
+            )}`
+          );
+        }
+      } catch (error) {
+        console.error("Error checking safety-check status:", error);
+      }
+    };
+
+    checkSafetyStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, stop?.route?.id, router, unwrappedParams.id]);
+
   // Effect to handle delivery timer - calculate time from ON_THE_WAY to ARRIVED
   useEffect(() => {
     if (!stop) return;
@@ -475,6 +516,17 @@ export default function StopDetailPage({
           if (responseData.nextStopId) {
             console.log(`Redirecting to next stop: ${responseData.nextStopId}`);
             router.push(`/driver/stops/${responseData.nextStopId}`);
+          } else if (responseData.requiresRouteCheckin) {
+            // Final stop on the route for this driver, and they have an
+            // end-of-route closeout check-in assigned — send them there
+            // first, before the End-of-Day Safety Page.
+            console.log("Final stop completed, redirecting to Route Check-in Page");
+            router.push(`/driver/route-checkin?routeId=${stop.route.id}`);
+          } else if (responseData.isLastStopForDriver) {
+            // Final stop on the route for this driver — automatically open
+            // the End-of-Day Safety Page.
+            console.log("Final stop completed, redirecting to End-of-Day Safety Page");
+            router.push("/driver/end-of-day");
           } else {
             console.log("No next stop found, redirecting to stops list");
             router.push("/driver/stops");

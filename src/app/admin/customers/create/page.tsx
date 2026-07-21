@@ -217,7 +217,7 @@ export default function NewCustomerPage() {
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -234,7 +234,7 @@ export default function NewCustomerPage() {
                   name="groupCode"
                   value={formData.groupCode}
                   onChange={handleChange}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -252,7 +252,7 @@ export default function NewCustomerPage() {
                   value={formData.address}
                   onChange={handleChange}
                   required
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -269,7 +269,7 @@ export default function NewCustomerPage() {
                   name="contactInfo"
                   value={formData.contactInfo}
                   onChange={handleChange}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -286,7 +286,7 @@ export default function NewCustomerPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export default function NewCustomerPage() {
                   value={formData.paymentTerms}
                   onChange={handleChange}
                   placeholder="e.g. COD, Net 30"
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 />
               </div>
 
@@ -322,7 +322,7 @@ export default function NewCustomerPage() {
                   onChange={handleChange}
                   rows={3}
                   placeholder="Special delivery instructions for this customer..."
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 ></textarea>
               </div>
 
@@ -339,7 +339,7 @@ export default function NewCustomerPage() {
                   value={formData.preferences}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500/50"
                 ></textarea>
               </div>
             </div>

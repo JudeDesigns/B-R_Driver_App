@@ -61,7 +61,7 @@ export async function parseProductFile(buffer: Buffer): Promise<ParseResult> {
 
     // Process each row
     for (let i = 0; i < data.length; i++) {
-      const row = data[i];
+      const row = data[i] as Record<string, unknown>;
 
       try {
         // Try different possible column names for each field and ensure they are strings

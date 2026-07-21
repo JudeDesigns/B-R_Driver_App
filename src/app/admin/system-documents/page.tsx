@@ -15,6 +15,7 @@ interface SystemDocument {
   fileSize: number;
   mimeType: string;
   isRequired: boolean;
+  requiresSignature: boolean;
   isActive: boolean;
   createdAt: string;
   uploader: {
@@ -46,6 +47,7 @@ export default function SystemDocumentsPage() {
     documentType: "SAFETY_INSTRUCTIONS",
     category: "SAFETY",
     isRequired: false,
+    requiresSignature: false,
     file: null as File | null,
   });
 
@@ -134,6 +136,7 @@ export default function SystemDocumentsPage() {
       formData.append("documentType", uploadForm.documentType);
       formData.append("category", uploadForm.category);
       formData.append("isRequired", uploadForm.isRequired.toString());
+      formData.append("requiresSignature", uploadForm.requiresSignature.toString());
 
       const response = await fetch("/api/admin/system-documents", {
         method: "POST",
@@ -155,6 +158,7 @@ export default function SystemDocumentsPage() {
         documentType: "SAFETY_INSTRUCTIONS",
         category: "SAFETY",
         isRequired: false,
+        requiresSignature: false,
         file: null,
       });
       setShowUploadModal(false);
@@ -212,23 +216,8 @@ export default function SystemDocumentsPage() {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  };
-
-  const getCategoryBadgeColor = (category: string) => {
-    const colors: Record<string, string> = {
-      SAFETY: "bg-red-100 text-red-800",
-      COMPLIANCE: "bg-yellow-100 text-yellow-800",
-      PROCEDURE: "bg-blue-100 text-blue-800",
-      POLICY: "bg-purple-100 text-purple-800",
-      TRAINING: "bg-green-100 text-green-800",
-      REFERENCE: "bg-gray-100 text-gray-800",
-    };
-    return colors[category] || "bg-gray-100 text-gray-800";
-  };
+  const getCategoryLabel = (category: string) =>
+    categories.find((c) => c.value === category)?.label || category;
 
   // Filter documents based on search query
   const filteredDocuments = documents.filter((doc) => {
@@ -402,14 +391,14 @@ export default function SystemDocumentsPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {filteredDocuments.map((doc) => (
                   <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-gray-100 rounded">
+                    <td className="px-6 py-5 align-top">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 h-9 w-9 flex items-center justify-center bg-gray-100 rounded-lg">
                           <svg
-                            className="h-6 w-6 text-gray-600"
+                            className="h-5 w-5 text-gray-500"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -422,65 +411,77 @@ export default function SystemDocumentsPage() {
                             />
                           </svg>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {doc.title}
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {doc.title}
+                            </span>
                             {doc.isRequired && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-900 text-white">
                                 Required
                               </span>
                             )}
+                            {doc.requiresSignature && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border border-gray-300 text-gray-600">
+                                Signature required
+                              </span>
+                            )}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {doc.description || "No description"}
-                          </div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {formatFileSize(doc.fileSize)} • {doc.fileName}
+                          {doc.description && (
+                            <div className="text-sm text-gray-500 truncate max-w-xs">
+                              {doc.description}
+                            </div>
+                          )}
+                          <div
+                            className="text-xs text-gray-400 truncate max-w-xs"
+                            title={doc.fileName}
+                          >
+                            {doc.fileName}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryBadgeColor(
-                          doc.category
-                        )}`}
-                      >
-                        {doc.category}
-                      </span>
+                    <td className="px-6 py-5 align-top whitespace-nowrap text-sm text-gray-600">
+                      {getCategoryLabel(doc.category)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-5 align-top whitespace-nowrap text-sm text-gray-500">
                       {documentTypes.find((t) => t.value === doc.documentType)?.label ||
                         doc.documentType}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-5 align-top whitespace-nowrap text-sm text-gray-500">
                       {doc._count.acknowledgments} driver(s)
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-5 align-top whitespace-nowrap">
                       <button
                         onClick={() => handleToggleActive(doc.id, doc.isActive)}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           doc.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-green-50 text-green-700 border border-green-200"
+                            : "bg-gray-100 text-gray-500 border border-gray-200"
                         }`}
                       >
                         {doc.isActive ? "Active" : "Inactive"}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
+                    <td className="px-6 py-5 align-top whitespace-nowrap text-sm font-medium">
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => router.push(`/admin/system-documents/${doc.id}`)}
+                          className="text-gray-700 hover:text-gray-900"
+                        >
+                          Manage
+                        </button>
                         <a
                           href={doc.filePath}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-gray-700 hover:text-gray-900"
                         >
                           View
                         </a>
                         <button
                           onClick={() => handleDelete(doc.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-800"
                         >
                           Delete
                         </button>
@@ -495,7 +496,7 @@ export default function SystemDocumentsPage() {
 
         {/* Upload Modal */}
         {showUploadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
@@ -609,6 +610,22 @@ export default function SystemDocumentsPage() {
                     />
                     <label htmlFor="isRequired" className="ml-2 text-sm text-gray-700">
                       Required (drivers must acknowledge before starting their day)
+                    </label>
+                  </div>
+
+                  {/* Requires Signature */}
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="requiresSignature"
+                      checked={uploadForm.requiresSignature}
+                      onChange={(e) =>
+                        setUploadForm({ ...uploadForm, requiresSignature: e.target.checked })
+                      }
+                      className="h-4 w-4 text-black border-gray-300 rounded"
+                    />
+                    <label htmlFor="requiresSignature" className="ml-2 text-sm text-gray-700">
+                      Requires Signature (drivers must draw a signature to acknowledge, not just click a button)
                     </label>
                   </div>
 

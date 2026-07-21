@@ -138,7 +138,7 @@ export default function UsersPage() {
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30 pl-10"
+                className="w-full rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30 pl-10"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
@@ -160,7 +160,7 @@ export default function UsersPage() {
           </div>
 
           {error && (
-            <div className="bg-primary-red bg-opacity-10 border border-primary-red border-opacity-30 text-primary-red px-4 py-3 rounded-lg mb-4">
+            <div className="bg-primary-red/10 border border-primary-red/30 text-primary-red px-4 py-3 rounded-lg mb-4">
               {error}
             </div>
           )}
@@ -294,7 +294,7 @@ export default function UsersPage() {
                       id="itemsPerPage"
                       value={limit}
                       onChange={handleLimitChange}
-                      className="rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue focus:ring-opacity-30"
+                      className="rounded-lg border-mono-300 shadow-sm focus:border-primary-blue focus:ring focus:ring-primary-blue/30"
                     >
                       <option value="10">10 per page</option>
                       <option value="25">25 per page</option>
@@ -307,14 +307,14 @@ export default function UsersPage() {
                   <button
                     onClick={() => handlePageChange(Math.max(0, offset - limit))}
                     disabled={offset === 0}
-                    className="flex-1 sm:flex-none px-4 py-2 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+                    className="flex-1 sm:flex-none px-4 py-2 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => handlePageChange(offset + limit)}
                     disabled={offset + limit >= totalCount}
-                    className="flex-1 sm:flex-none px-4 py-2 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+                    className="flex-1 sm:flex-none px-4 py-2 border border-mono-300 rounded-lg text-sm font-medium text-mono-700 hover:bg-mono-100 focus:outline-none focus:ring-2 focus:ring-primary-blue/30 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
                   >
                     Next
                   </button>

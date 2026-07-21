@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
-import { toPSTStartOfDay } from "@/lib/timezone";
+import { toPSTStartOfDay, getPSTDate } from "@/lib/timezone";
+import { emitStopStatusUpdate } from "@/lib/socket";
 
 // POST /api/driver/safety-check - Submit a safety check
 export async function POST(request: NextRequest) {
@@ -85,6 +86,39 @@ export async function POST(request: NextRequest) {
         { message: "You are not assigned to this route" },
         { status: 403 }
       );
+    }
+
+    // ROUTE CLOSEOUT ENFORCEMENT: Before allowing an End-of-Day submission,
+    // make sure the driver has resolved any assigned end-of-route closeout
+    // check-in (Warehouse/Jetro) with no pending pickup.
+    if (type === "END_OF_DAY") {
+      const closeoutAssignment = await prisma.routeCloseoutAssignment.findUnique({
+        where: {
+          routeId_driverId: {
+            routeId,
+            driverId: decoded.id,
+          },
+        },
+      });
+
+      if (closeoutAssignment) {
+        const latestCheck = await prisma.routeCloseoutCheck.findFirst({
+          where: { routeId, driverId: decoded.id },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (!latestCheck || latestCheck.pendingPickup === true) {
+          return NextResponse.json(
+            {
+              message:
+                "You must complete your route check-in (no pending pickup) before submitting End-of-Day",
+              requiresRouteCheckin: true,
+              routeId,
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // Check if a safety check already exists for this route and driver
@@ -378,6 +412,49 @@ export async function POST(request: NextRequest) {
             status: "COMPLETED",
           },
         });
+      }
+    }
+
+    // Once the Start-of-Day check is completed, automatically start the
+    // timer for the driver's first stop by marking it ON_THE_WAY (if it's
+    // still PENDING). This mirrors the auto-start-next-stop behavior used
+    // when a stop is completed.
+    if (type === "START_OF_DAY") {
+      try {
+        const firstStop = await prisma.stop.findFirst({
+          where: {
+            routeId,
+            isDeleted: false,
+            status: "PENDING",
+            OR: [
+              { driverNameFromUpload: driver.username },
+              ...(driver.fullName ? [{ driverNameFromUpload: driver.fullName }] : []),
+            ],
+          },
+          orderBy: { sequence: "asc" },
+          include: { customer: { select: { name: true } } },
+        });
+
+        if (firstStop) {
+          const now = getPSTDate();
+          await prisma.stop.update({
+            where: { id: firstStop.id },
+            data: { status: "ON_THE_WAY", onTheWayTime: now },
+          });
+
+          emitStopStatusUpdate({
+            stopId: firstStop.id,
+            routeId,
+            status: "ON_THE_WAY",
+            driverId: decoded.id,
+            driverName,
+            customerName: firstStop.customer?.name || "Unknown Customer",
+            timestamp: now.toISOString(),
+          });
+        }
+      } catch (autoStartError) {
+        console.error("Error auto-starting first stop timer:", autoStartError);
+        // Non-fatal: the safety check itself still succeeded.
       }
     }
 

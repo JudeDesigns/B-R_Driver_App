@@ -28,9 +28,9 @@ import { useRouteDetails } from "@/hooks/useRouteDetails";
 import RouteSummary from "@/components/admin/routes/RouteSummary";
 import AddStopModal from "@/components/admin/routes/AddStopModal";
 import DeleteRouteDialog from "@/components/admin/routes/DeleteRouteDialog";
-import EmailResultsModal from "@/components/admin/routes/EmailResultsModal";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
-import { exportRoute, generateImageReport, generateImagePDF, sendBulkEmails, deleteRoute } from "@/services/routeOperations";
+import { exportRoute, generateImageReport, generateImagePDF, deleteRoute } from "@/services/routeOperations";
 import { addStop, updateStopSequence, fetchDrivers } from "@/services/stopOperations";
 
 interface Driver {
@@ -129,14 +129,21 @@ export default function RouteDetailPage({
     totalStops: number;
   } | null>(null);
 
-  // Email sending state
-  const [isSendingEmails, setIsSendingEmails] = useState(false);
-  const [emailResults, setEmailResults] = useState<any>(null);
-  const [showEmailResults, setShowEmailResults] = useState(false);
-
   // Image report generation state
   const [isGeneratingImageReport, setIsGeneratingImageReport] = useState(false);
   const [isGeneratingImagePDF, setIsGeneratingImagePDF] = useState(false);
+
+  // Driver reassignment (whole-route / driver-section) state
+  const [reassigningDriver, setReassigningDriver] = useState<string | null>(null);
+  const [reassignTargetDriverId, setReassignTargetDriverId] = useState<Record<string, string>>({});
+
+  // End-of-route closeout (Warehouse/Jetro) assignment state, keyed by driverId
+  const [closeoutAssignments, setCloseoutAssignments] = useState<Record<string, "WAREHOUSE" | "JETRO" | "">>({});
+  const [savingCloseoutAssignment, setSavingCloseoutAssignment] = useState<string | null>(null);
+
+  // "Generate PDF Report" type-selection prompt (All PDF vs All Financial)
+  const [showPdfReportPrompt, setShowPdfReportPrompt] = useState(false);
+
 
   // Add Stop Modal State
   const [showAddStopModal, setShowAddStopModal] = useState(false);
@@ -196,6 +203,7 @@ export default function RouteDetailPage({
   useEffect(() => {
     if (token) {
       handleFetchDrivers();
+      handleFetchCloseoutAssignments();
     }
   }, [token]);
 
@@ -210,6 +218,64 @@ export default function RouteDetailPage({
         return;
       }
       console.error("Error fetching drivers:", error);
+    }
+  };
+
+  // Fetch the per-driver end-of-route closeout (Warehouse/Jetro) assignments
+  const handleFetchCloseoutAssignments = async () => {
+    try {
+      const response = await fetch(`/api/admin/routes/${routeId}/closeout-assignment`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch closeout assignments");
+      }
+
+      const data = await response.json();
+      const assignmentMap: Record<string, "WAREHOUSE" | "JETRO" | ""> = {};
+      (data.assignments || []).forEach((assignment: any) => {
+        assignmentMap[assignment.driverId] = assignment.type;
+      });
+      setCloseoutAssignments(assignmentMap);
+    } catch (error) {
+      console.error("Error fetching closeout assignments:", error);
+    }
+  };
+
+  // Assign or unassign the end-of-route closeout type for a driver
+  const handleCloseoutAssignmentChange = async (
+    driverId: string,
+    type: "WAREHOUSE" | "JETRO" | ""
+  ) => {
+    setSavingCloseoutAssignment(driverId);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/routes/${routeId}/closeout-assignment`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          driverId,
+          type: type || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update closeout assignment");
+      }
+
+      setCloseoutAssignments((prev) => ({ ...prev, [driverId]: type }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred while updating the closeout assignment");
+    } finally {
+      setSavingCloseoutAssignment(null);
     }
   };
 
@@ -368,11 +434,13 @@ export default function RouteDetailPage({
     }
   };
 
-  // Generate and download route image PDF (replaces ZIP functionality)
-  const handleGenerateImagePDF = async () => {
+  // Generate and download route image PDF (replaces ZIP functionality).
+  // Opens a prompt letting the admin choose "All PDF" (unchanged, every
+  // image) or "All Financial" (financial documents only) instead of adding
+  // a second button.
+  const handleGenerateImagePDF = () => {
     if (!route) return;
 
-    // Check if route has any images
     const totalImages = route.stops.reduce((total, stop) => total + (stop.invoiceImageUrls?.length || 0), 0);
 
     if (totalImages === 0) {
@@ -380,43 +448,53 @@ export default function RouteDetailPage({
       return;
     }
 
-    // Count drivers and stops with images
-    const driversWithImages = new Set();
-    const stopsWithImages = route.stops.filter(stop => stop.invoiceImageUrls?.length > 0);
+    setShowPdfReportPrompt(true);
+  };
 
-    stopsWithImages.forEach(stop => {
-      if (stop.driverNameFromUpload) {
-        driversWithImages.add(stop.driverNameFromUpload);
-      }
-    });
+  const runGenerateImagePDF = async (financialOnly: boolean) => {
+    if (!route) return;
 
-    // Confirm PDF creation
-    const confirmed = confirm(
-      `📄 Generate PDF report for Route ${route.routeNumber}?\n\n` +
-      `This will create a professional PDF with:\n` +
-      `• ${driversWithImages.size} driver sections\n` +
-      `• ${stopsWithImages.length} stops with images\n` +
-      `• ${totalImages} high-quality embedded images\n` +
-      `• Customer names and stop details\n\n` +
-      `Continue?`
-    );
+    setShowPdfReportPrompt(false);
 
-    if (!confirmed) return;
+    const totalImages = financialOnly
+      ? route.stops.reduce(
+          (total, stop) =>
+            total + (stop.invoiceImageUrls?.filter((url: string) => !url.includes("_dlv_")).length || 0),
+          0
+        )
+      : route.stops.reduce((total, stop) => total + (stop.invoiceImageUrls?.length || 0), 0);
+
+    if (totalImages === 0) {
+      alert(
+        financialOnly
+          ? "❌ No financial documents found for this route."
+          : "❌ No images found for this route."
+      );
+      return;
+    }
 
     setIsGeneratingImagePDF(true);
 
     try {
-      await generateImagePDF(route);
+      const result = await generateImagePDF(route, financialOnly);
 
-      // Show success message
-      alert(
-        `✅ PDF report generated successfully!\n\n` +
-        `📄 The PDF contains:\n` +
-        `• Professional business document format\n` +
-        `• All ${totalImages} images in original quality\n` +
-        `• Organized by driver and customer\n` +
-        `• Ready for sharing and archiving`
-      );
+      if (financialOnly) {
+        const workflowStatus = result.endDayWorkflow?.triggered
+          ? "✅ EndDay automation run started automatically — no manual upload needed."
+          : "⚠️ Could not auto-start the EndDay automation (it may not be running locally). Please upload the PDF there manually.";
+        alert(
+          `✅ Financial documents PDF generated successfully!\n\n📄 The PDF contains ${totalImages} financial document image(s), organized by driver and customer.\n\n${workflowStatus}`
+        );
+      } else {
+        alert(
+          `✅ PDF report generated successfully!\n\n` +
+              `📄 The PDF contains:\n` +
+              `• Professional business document format\n` +
+              `• All ${totalImages} images in original quality\n` +
+              `• Organized by driver and customer\n` +
+              `• Ready for sharing and archiving`
+        );
+      }
     } catch (err) {
       console.error("📄 Error generating PDF report:", err);
 
@@ -435,6 +513,7 @@ export default function RouteDetailPage({
       setIsGeneratingImagePDF(false);
     }
   };
+
 
   // Function to group stops by driver
   const getStopsGroupedByDriver = () => {
@@ -472,63 +551,6 @@ export default function RouteDetailPage({
     });
 
     return grouped;
-  };
-
-  // Send emails for all completed stops in the route
-  const handleSendBulkEmails = async () => {
-    if (!route) return;
-
-    setIsSendingEmails(true);
-    setEmailResults(null);
-    setShowEmailResults(false);
-    setError(""); // Clear any previous errors
-    setSuppressErrors(true); // Suppress errors during email operation
-
-    try {
-      console.log("📧 Starting bulk email send for route:", routeId);
-
-      const data = await sendBulkEmails(route);
-
-      // Show success message
-      const completedCount = route.stops.filter(s => s.status === 'COMPLETED').length;
-      const successMessage = `✅ Bulk email sending completed! ${data.results?.sent || 0}/${completedCount} emails sent successfully.`;
-
-      setEmailResults(data);
-      setShowEmailResults(true);
-
-      // Show success alert
-      alert(successMessage);
-
-      console.log("📧 Bulk email results:", data);
-
-    } catch (err) {
-      console.error("📧 Error sending bulk emails:", err);
-
-      if (err instanceof Error && err.message === "Authentication required") {
-        router.push("/login");
-        return;
-      }
-
-      // More detailed error message
-      let errorMessage = "Failed to send emails";
-      if (err instanceof Error) {
-        if (err.message.includes("JSON")) {
-          errorMessage = "Server response error. Emails may have been sent - check your office email and server logs.";
-        } else {
-          errorMessage = err.message;
-        }
-      }
-
-      setError(errorMessage);
-
-      // Show error alert
-      alert(`❌ Error: ${errorMessage}`);
-
-    } finally {
-      setIsSendingEmails(false);
-      // Re-enable error display after a short delay
-      setTimeout(() => setSuppressErrors(false), 2000);
-    }
   };
 
   // Delete route functions
@@ -779,6 +801,53 @@ export default function RouteDetailPage({
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setAddingStop(false);
+    }
+  };
+
+  // Reassign every remaining (PENDING/ON_THE_WAY) stop for a driver section
+  // to a different driver in one action. Completed/arrived stops are left
+  // untouched so history, uploads and payments stay with the driver who
+  // actually handled them.
+  const handleReassignDriverSection = async (fromDriver: string) => {
+    const toDriverId = reassignTargetDriverId[fromDriver];
+    if (!toDriverId) return;
+
+    const targetDriver = drivers.find((d) => d.id === toDriverId);
+    if (!targetDriver) return;
+
+    const confirmed = window.confirm(
+      `Reassign all remaining (not yet completed) stops from ${fromDriver} to ${targetDriver.fullName || targetDriver.username}?`
+    );
+    if (!confirmed) return;
+
+    setReassigningDriver(fromDriver);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/routes/${routeId}/reassign-driver`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fromDriver,
+          toDriverId,
+          scope: "remaining",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to reassign driver");
+      }
+
+      setReassignTargetDriverId((prev) => ({ ...prev, [fromDriver]: "" }));
+      await fetchRouteDetails();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred while reassigning the driver");
+    } finally {
+      setReassigningDriver(null);
     }
   };
 
@@ -1085,7 +1154,7 @@ export default function RouteDetailPage({
   };
 
   // Droppable Driver Section Component
-  const DroppableDriverSection = ({ driverName, stops }: { driverName: string; stops: Stop[] }) => {
+  const DroppableDriverSection = ({ driverName, driverId, stops }: { driverName: string; driverId?: string; stops: Stop[] }) => {
     const { setNodeRef, isOver } = useSortable({ id: driverName });
     const driverTotal = getTotalAmount(stops);
     const driverPaymentTotal = getTotalPaymentAmount(stops);
@@ -1096,11 +1165,57 @@ export default function RouteDetailPage({
         className={`overflow-hidden ${isOver ? 'bg-blue-50 border-2 border-blue-300 border-dashed' : ''}`}
       >
         <div className={`bg-gray-100 px-6 py-3 border-l-4 border-blue-500 mb-4 ${isOver ? 'bg-blue-100' : ''}`}>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-md font-medium text-gray-800">
               Driver: {driverName} ({stops.length} stops)
               {isOver && <span className="ml-2 text-blue-600 font-semibold">Drop here to reassign</span>}
             </h3>
+            <div className="flex items-center gap-2">
+              <SearchableSelect
+                options={drivers
+                  .filter((d) => (d.fullName || d.username) !== driverName)
+                  .map((d) => ({ value: d.id, label: d.fullName || d.username }))}
+                value={reassignTargetDriverId[driverName] || ""}
+                onChange={(val) =>
+                  setReassignTargetDriverId((prev) => ({ ...prev, [driverName]: val }))
+                }
+                disabled={reassigningDriver === driverName}
+                placeholder="Reassign remaining stops to..."
+                className="w-56 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => handleReassignDriverSection(driverName)}
+                disabled={!reassignTargetDriverId[driverName] || reassigningDriver === driverName}
+                className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {reassigningDriver === driverName ? "Reassigning..." : "Reassign"}
+              </button>
+              {driverId && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 whitespace-nowrap">
+                    End-of-Route Check-in:
+                  </label>
+                  <SearchableSelect
+                    options={[
+                      { value: "", label: "None" },
+                      { value: "WAREHOUSE", label: "Warehouse" },
+                      { value: "JETRO", label: "Jetro" },
+                    ]}
+                    value={closeoutAssignments[driverId] || ""}
+                    onChange={(val) =>
+                      handleCloseoutAssignmentChange(
+                        driverId,
+                        val as "WAREHOUSE" | "JETRO" | ""
+                      )
+                    }
+                    disabled={savingCloseoutAssignment === driverId}
+                    placeholder="None"
+                    className="w-40 text-sm"
+                  />
+                </div>
+              )}
+            </div>
             <div className="text-right">
               <div className="text-md font-bold text-green-600">
                 Order Total: ${driverTotal.toFixed(2)}
@@ -1415,34 +1530,6 @@ export default function RouteDetailPage({
                   )}
                   {isGeneratingImageReport ? "Archiving..." : `Legacy ZIP Archive`}
                 </button>
-                {/* Send Bulk Emails Button */}
-                <button
-                  onClick={handleSendBulkEmails}
-                  disabled={isSendingEmails}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSendingEmails ? (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    <svg
-                      className="h-4 w-4 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                  )}
-                  {isSendingEmails ? "Sending..." : `Send Emails (${route?.stops?.filter(s => s.status === 'COMPLETED').length || 0})`}
-                </button>
                 {/* Delete Route - Super Admin Only */}
                 {userRole === "SUPER_ADMIN" && (
                   <button
@@ -1629,13 +1716,22 @@ export default function RouteDetailPage({
                       strategy={verticalListSortingStrategy}
                     >
                       {Object.entries(getStopsGroupedByDriver()).map(
-                        ([driverName, stops]) => (
-                          <DroppableDriverSection
-                            key={driverName}
-                            driverName={driverName}
-                            stops={stops}
-                          />
-                        )
+                        ([driverName, stops]) => {
+                          const resolvedDriver = drivers.find(
+                            (d) =>
+                              d.username.toLowerCase() === driverName.trim().toLowerCase() ||
+                              (d.fullName && d.fullName.toLowerCase() === driverName.trim().toLowerCase())
+                          );
+
+                          return (
+                            <DroppableDriverSection
+                              key={driverName}
+                              driverName={driverName}
+                              driverId={resolvedDriver?.id}
+                              stops={stops}
+                            />
+                          );
+                        }
                       )}
                     </SortableContext>
                   </div>
@@ -2081,12 +2177,48 @@ export default function RouteDetailPage({
         onHandleForceDelete={handleForceDelete}
       />
 
-      {/* Email Results Modal */}
-      <EmailResultsModal
-        show={showEmailResults}
-        emailResults={emailResults}
-        onClose={() => setShowEmailResults(false)}
-      />
+      {/* Generate PDF Report - type selection prompt */}
+      {showPdfReportPrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">
+              Generate PDF Report
+            </h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Choose which images to include in the PDF for Route {route?.routeNumber}.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => runGenerateImagePDF(false)}
+                className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+              >
+                <div className="font-medium text-gray-900">All PDF</div>
+                <div className="text-xs text-gray-500">
+                  Every image uploaded for this route — unchanged.
+                </div>
+              </button>
+              <button
+                onClick={() => runGenerateImagePDF(true)}
+                className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors"
+              >
+                <div className="font-medium text-gray-900">All Financial</div>
+                <div className="text-xs text-gray-500">
+                  Only financial documents (invoices, statements, payments, etc.).
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowPdfReportPrompt(false)}
+              className="w-full mt-4 px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
