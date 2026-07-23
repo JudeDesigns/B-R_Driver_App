@@ -296,12 +296,16 @@ export default function DocumentManagementPage() {
     }
   };
 
-  // Refetch stops when filters change
+  // Refetch stops when filters change. Also fetch when the upload modal's
+  // "Stop-Specific" option is selected, since that can happen without ever
+  // switching to the "Stop Documents" tab (which is the only other trigger) -
+  // otherwise the stop dropdown in the modal would show "No stops available"
+  // even when today's route is active.
   useEffect(() => {
-    if (activeTab === 'stop') {
+    if (activeTab === 'stop' || uploadType === 'stop') {
       fetchTodaysStops();
     }
-  }, [selectedDriver, selectedRoute, activeTab]);
+  }, [selectedDriver, selectedRoute, activeTab, uploadType]);
 
   const handleViewStopDetails = (stop: Stop) => {
     setSelectedStopForDetails(stop);
@@ -372,7 +376,9 @@ export default function DocumentManagementPage() {
     const file = formData.get('file') as File;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const type = formData.get('type') as string;
+    // Document Category is now a SearchableSelect (not a native <select>), so
+    // read it from state rather than FormData.
+    const type = selectedDocumentType;
 
     if (!file || !title || !type) {
       showNotification('error', 'Validation Error', 'File, title, and type are required');
@@ -1005,20 +1011,17 @@ export default function DocumentManagementPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Document Category
                   </label>
-                  <select
-                    name="type"
+                  <SearchableSelect
+                    options={documentTypes.map(type => ({
+                      value: type.value,
+                      label: type.label,
+                    }))}
                     value={selectedDocumentType}
-                    onChange={(e) => setSelectedDocumentType(e.target.value)}
+                    onChange={setSelectedDocumentType}
+                    placeholder="Select category..."
                     required
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select category...</option>
-                    {documentTypes.map(type => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+                    emptyMessage="No categories available."
+                  />
                 </div>
 
                 {/* Invoice-specific fields for stop documents */}

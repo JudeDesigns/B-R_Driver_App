@@ -5,7 +5,7 @@ import { verifyToken } from "@/lib/auth";
 // GET /api/driver/stops/[id]/returns - Get all returns for a stop
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -26,7 +26,7 @@ export async function GET(
     }
 
     // Get the stop ID from the URL
-    const id = await params.id;
+    const { id } = await params;
 
     // Check if the stop exists and belongs to a route assigned to the driver
     const stop = await prisma.stop.findFirst({
@@ -86,7 +86,7 @@ export async function GET(
 // POST /api/driver/stops/[id]/returns - Create a new return for a stop
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -103,7 +103,7 @@ export async function POST(
     }
 
     // Get the stop ID from the URL
-    const id = await params.id;
+    const { id } = await params;
 
     // Check if the stop exists and belongs to a route assigned to the driver
     const stop = await prisma.stop.findFirst({

@@ -231,31 +231,52 @@ export async function POST(
 
     console.log(`Last image received. Generating PDF with all ${totalImages} images...`);
 
-    // FIXED: Collect ALL images from current upload session
-    const allImages = [];
+    // Merge = images already confirmed in the database (from a previously
+    // completed upload, i.e. the trusted source of truth) + the images just
+    // uploaded in this session. We deliberately do NOT scan the whole
+    // uploads folder for every file matching this stop's ID — that would
+    // risk resurrecting stale/orphaned files left over from old, incomplete,
+    // or already-superseded sessions. Anchoring to the DB guarantees we only
+    // ever include images that were genuinely part of a real upload.
+    const allImages: { buffer: Buffer; timestamp: number; index: number; name: string }[] = [];
 
-    // Get all images from this upload session (based on sessionId pattern).
-    // Matches both the new `_<cat>_img<N>.jpg` format and the legacy
-    // `_img<N>.jpg` format (for any files already on disk from before this
-    // change), so no in-flight uploads are dropped.
+    const previousImageUrlsForMerge: string[] = Array.isArray(stop.invoiceImageUrls)
+      ? (stop.invoiceImageUrls as string[])
+      : [];
+
+    // 1) Re-read the previously confirmed images from disk (if still present).
+    for (const url of previousImageUrlsForMerge) {
+      const name = path.basename(url);
+      const match = name.match(/^invoice_.+_(\d+)_[^_]+_(?:fin_|dlv_)?img(\d+)\.jpg$/);
+      const filePath = path.join(uploadsDir, name);
+      try {
+        const buffer = await readFileAsync(filePath);
+        allImages.push({
+          buffer,
+          timestamp: match ? parseInt(match[1], 10) : 0,
+          index: match ? parseInt(match[2], 10) : 0,
+          name
+        });
+      } catch {
+        console.warn(`Previously uploaded image missing on disk, skipping: ${name}`);
+      }
+    }
+
+    // 2) Add the images uploaded in THIS session (matched by sessionId).
     const sessionPattern = new RegExp(`invoice_${stop.id}_\\d+_${sessionId}_(?:fin_|dlv_)?img\\d+\\.jpg$`);
-
     try {
       const files = await readdirAsync(uploadsDir);
-      console.log(`Scanning for current session images with sessionId: ${sessionId}`);
-
       for (const file of files) {
         if (sessionPattern.test(file)) {
+          const match = file.match(/^invoice_.+_(\d+)_[^_]+_(?:fin_|dlv_)?img(\d+)\.jpg$/);
           const imagePath = path.join(uploadsDir, file);
-          const imageIndexMatch = file.match(/_img(\d+)\.jpg$/);
-          const fileImageIndex = parseInt(imageIndexMatch?.[1] || '0');
-
           allImages.push({
             buffer: await readFileAsync(imagePath),
-            index: fileImageIndex,
+            timestamp: match ? parseInt(match[1], 10) : timestamp,
+            index: match ? parseInt(match[2], 10) : imageIndex + 1,
             name: file
           });
-          console.log(`Found session image: ${file} (index: ${fileImageIndex})`);
+          console.log(`Found new session image: ${file}`);
         }
       }
     } catch (error) {
@@ -263,15 +284,27 @@ export async function POST(
       // Fallback to current image only
       allImages.push({
         buffer: Buffer.from(fileBuffer),
+        timestamp,
         index: imageIndex + 1,
         name: `${fileName}.jpg`
       });
     }
 
-    console.log(`Total session images found: ${allImages.length}`);
+    // De-duplicate by filename (defensive, shouldn't normally collide)
+    const seen = new Set<string>();
+    const dedupedImages = allImages.filter((img) => {
+      if (seen.has(img.name)) return false;
+      seen.add(img.name);
+      return true;
+    });
+    allImages.length = 0;
+    allImages.push(...dedupedImages);
 
-    // Sort by index
-    allImages.sort((a, b) => a.index - b.index);
+    console.log(`Total merged images (previous + new session): ${allImages.length}`);
+
+    // Sort chronologically (by upload timestamp, then index) so images from
+    // earlier sessions always appear before newly added ones in the PDF.
+    allImages.sort((a, b) => a.timestamp - b.timestamp || a.index - b.index);
     console.log(`Total images to process: ${allImages.length}`);
 
     // Generate image URLs for PDF

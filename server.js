@@ -18,7 +18,9 @@ const hostname = process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost"
 const port = parseInt(process.env.PORT) || 3000;
 
 // Initialize Next.js app
-const app = next({ dev, hostname, port });
+// `turbo: true` enables the Turbopack dev compiler, which is significantly
+// faster than webpack for on-demand route compilation in development.
+const app = next({ dev, hostname, port, turbo: dev });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {

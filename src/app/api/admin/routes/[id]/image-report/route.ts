@@ -7,7 +7,7 @@ import { promises as fs } from "fs";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication and admin access
@@ -35,7 +35,7 @@ export async function POST(
       );
     }
 
-    const routeId = await params.id;
+    const { id: routeId } = await params;
 
     // Get the route with all stops and their images
     const route = await prisma.route.findUnique({

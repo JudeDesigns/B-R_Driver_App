@@ -12,7 +12,7 @@ import { getPSTDate } from "@/lib/timezone";
 // GET /api/driver/stops/[id] - Get a specific stop for the driver
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -29,7 +29,7 @@ export async function GET(
     }
 
     // Get the stop ID from the URL
-    const id = await params.id;
+    const { id } = await params;
 
     // Get the driver's username for safety check verification
     const driver = await prisma.user.findUnique({
@@ -197,7 +197,7 @@ export async function GET(
 // PATCH /api/driver/stops/[id] - Update a stop (driver can update status, arrival time, etc.)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -214,7 +214,7 @@ export async function PATCH(
     }
 
     // Get the stop ID from the URL
-    const id = await params.id;
+    const { id } = await params;
 
     // Get the driver's username for access verification
     const driver = await prisma.user.findUnique({

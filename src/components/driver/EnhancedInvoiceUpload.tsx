@@ -18,11 +18,30 @@ interface EnhancedInvoiceUploadProps {
   onUploadSuccess: (pdfUrl: string) => void;
   onUploadComplete: () => void;
   existingPdfUrl?: string | null;
+  // URLs of images already uploaded (and included in the last generated
+  // PDF, if any) for this stop, from a previous session or a previous page
+  // load. Used only to accurately reflect what's already on the server —
+  // new uploads are always merged with these server-side, never replacing
+  // them.
+  existingImageUrls?: string[] | null;
+}
+
+// Category is embedded in the filename as `_fin_` or `_dlv_` right before
+// `img<N>.jpg`. Images from before this tagging existed have neither tag.
+function categorizeExistingUrl(url: string): UploadCategory | 'unknown' {
+  if (/_dlv_img\d+\.jpg$/.test(url)) return 'delivery';
+  if (/_fin_img\d+\.jpg$/.test(url)) return 'financial';
+  return 'unknown';
 }
 
 const SECTION_CONFIG: Record<
   UploadCategory,
-  { title: string; instructions: string[]; warning: string }
+  {
+    title: string;
+    instructions: string[];
+    warning: string;
+    accentBorder: string;
+  }
 > = {
   financial: {
     title: 'Financial Documents',
@@ -34,6 +53,7 @@ const SECTION_CONFIG: Record<
       'Gas and diesel receipts',
     ],
     warning: 'You have not uploaded any financial documents.',
+    accentBorder: 'border-blue-500',
   },
   delivery: {
     title: 'Proof of Delivery and Execution',
@@ -44,6 +64,7 @@ const SECTION_CONFIG: Record<
       'Fuel pumps and related fueling documentation',
     ],
     warning: 'You have not uploaded any proof-of-delivery or execution images.',
+    accentBorder: 'border-gray-500',
   },
 };
 
@@ -52,6 +73,7 @@ export default function EnhancedInvoiceUpload({
   onUploadSuccess,
   onUploadComplete,
   existingPdfUrl,
+  existingImageUrls,
 }: EnhancedInvoiceUploadProps) {
   const [financialImages, setFinancialImages] = useState<UploadedImage[]>([]);
   const [deliveryImages, setDeliveryImages] = useState<UploadedImage[]>([]);
@@ -66,6 +88,22 @@ export default function EnhancedInvoiceUpload({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   // Track which image is being replaced (if any), per category
   const [replacingImageId, setReplacingImageId] = useState<{ id: string; category: UploadCategory } | null>(null);
+
+  // Images already on the server (from a previous session, possibly with a
+  // PDF already generated). Split by category from the filename tag; any
+  // legacy untagged images (uploaded before category tagging existed) are
+  // counted under "financial" as a reasonable default.
+  const existingByCategory = React.useMemo(() => {
+    const urls = existingImageUrls || [];
+    const result: Record<UploadCategory, string[]> = { financial: [], delivery: [] };
+    for (const url of urls) {
+      const category = categorizeExistingUrl(url);
+      result[category === 'delivery' ? 'delivery' : 'financial'].push(url);
+    }
+    return result;
+  }, [existingImageUrls]);
+
+  const getExistingCount = (category: UploadCategory) => existingByCategory[category].length;
 
   // Gallery/camera inputs — one pair per category so each box's "Take Photo"
   // / "From Gallery" buttons only ever populate that box.
@@ -342,24 +380,29 @@ export default function EnhancedInvoiceUpload({
   const renderUploadBox = (category: UploadCategory) => {
     const config = SECTION_CONFIG[category];
     const images = getImages(category);
+    const existingCount = getExistingCount(category);
+    const hasAnyImages = images.length > 0 || existingCount > 0;
     const skipped = category === 'financial' ? financialSkipped : deliverySkipped;
     const setSkipped = category === 'financial' ? setFinancialSkipped : setDeliverySkipped;
     const fileInputRef = category === 'financial' ? financialFileInputRef : deliveryFileInputRef;
     const cameraInputRef = category === 'financial' ? financialCameraInputRef : deliveryCameraInputRef;
 
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-1">{config.title}</h3>
-        <p className="text-xs text-gray-500 mb-2">
-          {category === 'financial'
-            ? 'Upload the following when applicable:'
-            : 'Upload clear photos of the following when applicable:'}
-        </p>
-        <ul className="list-disc list-inside text-xs text-gray-600 mb-4 space-y-0.5">
-          {config.instructions.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+      <div className={`bg-white rounded-lg shadow-md border-l-4 ${config.accentBorder} p-6`}>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">{config.title}</h3>
+
+        <div className="mb-4 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+          <p className="text-sm font-medium text-gray-700 mb-1">
+            {category === 'financial'
+              ? 'Upload the following when applicable:'
+              : 'Upload clear photos of the following when applicable:'}
+          </p>
+          <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
+            {config.instructions.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
 
         {/* Hidden gallery picker — multi-select, no capture. */}
         <input
@@ -382,54 +425,74 @@ export default function EnhancedInvoiceUpload({
           className="hidden"
         />
 
-        {images.length === 0 && !skipped && (
-          <div className="mb-3 bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-3 py-2 rounded-lg">
-            {config.warning}
-          </div>
-        )}
-
-        {images.length === 0 ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={() => cameraInputRef.current?.click()}
-                disabled={isUploading}
-                className="border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
-              >
-                <div className="space-y-2">
-                  <svg className="mx-auto h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <div className="text-blue-700 font-semibold">Take Photo</div>
-                  <p className="text-xs text-blue-600">Open camera</p>
-                </div>
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
-              >
-                <div className="space-y-2">
-                  <svg className="mx-auto h-10 w-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <div className="text-gray-700 font-semibold">Choose from Gallery</div>
-                  <p className="text-xs text-gray-500">Pick existing photos</p>
-                </div>
-              </button>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={skipped}
-                onChange={(e) => setSkipped(e.target.checked)}
-                disabled={isUploading}
-              />
-              Skip this section (not applicable for this stop)
-            </label>
-          </div>
+        {skipped ? (
+          /* Section skipped: hide the upload controls, keep only the
+             checkbox visible so the driver can un-skip if needed. */
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={skipped}
+              onChange={(e) => setSkipped(e.target.checked)}
+              disabled={isUploading}
+            />
+            Skip this section (not applicable for this stop)
+          </label>
         ) : (
+          <>
+            {!hasAnyImages && (
+              <div className="mb-3 bg-red-50 border border-red-300 text-red-700 text-sm font-medium px-3 py-2 rounded-lg">
+                {config.warning}
+              </div>
+            )}
+
+            {existingCount > 0 && images.length === 0 && (
+              <div className="mb-3 bg-green-50 border border-green-200 text-green-700 text-sm font-medium px-3 py-2 rounded-lg">
+                {existingCount} image{existingCount !== 1 ? 's' : ''} already uploaded for this section. You can add more below if needed — new images are added to, not replacing, what's already uploaded.
+              </div>
+            )}
+
+            {images.length === 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="border-2 border-dashed border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
+                  >
+                    <div className="space-y-2">
+                      <svg className="mx-auto h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div className="text-blue-700 font-semibold">Take Photo</div>
+                      <p className="text-xs text-blue-600">Open camera</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg p-6 text-center transition-colors disabled:opacity-50"
+                  >
+                    <div className="space-y-2">
+                      <svg className="mx-auto h-10 w-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <div className="text-gray-700 font-semibold">Choose from Gallery</div>
+                      <p className="text-xs text-gray-500">Pick existing photos</p>
+                    </div>
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={skipped}
+                    onChange={(e) => setSkipped(e.target.checked)}
+                    disabled={isUploading}
+                  />
+                  Skip this section (not applicable for this stop)
+                </label>
+              </div>
+            ) : (
           <>
             {/* Add More Images — same two-option pattern */}
             <div className="mb-4 flex flex-wrap gap-2">
@@ -577,6 +640,8 @@ export default function EnhancedInvoiceUpload({
               </div>
             </div>
           </>
+            )}
+          </>
         )}
       </div>
     );
@@ -626,7 +691,7 @@ export default function EnhancedInvoiceUpload({
             <div className="flex items-start mb-4">
               <div className="flex-shrink-0">
                 <svg
-                  className="h-6 w-6 text-yellow-600"
+                  className="h-6 w-6 text-blue-600"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -636,23 +701,20 @@ export default function EnhancedInvoiceUpload({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
               </div>
               <div className="ml-3 flex-1">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Warning: Images Will Be Replaced
+                  Regenerate PDF?
                 </h3>
                 <div className="text-sm text-gray-600 space-y-2">
-                  <p className="font-semibold text-yellow-700">
-                    Uploading new images will replace ALL previously uploaded images for this delivery.
+                  <p>
+                    A PDF has already been generated for this delivery. Uploading these new images will add them to the ones already uploaded and regenerate the PDF with everything combined.
                   </p>
                   <p>
-                    Please ensure you are uploading <strong>ALL required images at once</strong>, including any previously uploaded images you want to keep.
-                  </p>
-                  <p>
-                    If you only upload a single missing image, all other images will be lost.
+                    No previously uploaded images will be lost.
                   </p>
                 </div>
               </div>

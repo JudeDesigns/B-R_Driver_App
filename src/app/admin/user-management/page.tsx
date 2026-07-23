@@ -417,6 +417,16 @@ export default function UserManagementPage() {
                     accessor: (user) => (
                       <TableActions
                         actions={[
+                          ...(user.role === "DRIVER"
+                            ? [
+                                {
+                                  label: "View",
+                                  onClick: () =>
+                                    router.push(`/admin/user-management/${user.id}`),
+                                  variant: "default" as const,
+                                },
+                              ]
+                            : []),
                           {
                             label: "Edit",
                             onClick: () => handleEditUser(user),

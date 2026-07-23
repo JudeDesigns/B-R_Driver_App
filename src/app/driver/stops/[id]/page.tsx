@@ -72,6 +72,7 @@ interface Stop {
   arrivalTime: string | null;
   completionTime: string | null;
   signedInvoicePdfUrl: string | null;
+  invoiceImageUrls?: string[] | null;
   driverNotes: string | null;
   isCOD: boolean;
   paymentFlagCash: boolean;
@@ -1155,6 +1156,7 @@ export default function StopDetailPage({
                         <EnhancedInvoiceUpload
                           stopId={stop.id}
                           existingPdfUrl={stop.signedInvoicePdfUrl}
+                          existingImageUrls={stop.invoiceImageUrls}
                           onUploadSuccess={handleUploadSuccess}
                           onUploadComplete={() => {
                             // PDF generated successfully - automatically mark step as completed

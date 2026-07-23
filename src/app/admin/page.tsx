@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSocket } from "@/hooks/useSocket";
+import { useSocket } from "@/contexts/SocketContext";
 import { SocketEvents } from "@/lib/socketClient";
 import WebSocketErrorAlert from "@/components/ui/WebSocketErrorAlert";
 import ClientDate from "@/components/ui/ClientDate";
@@ -93,7 +93,7 @@ export default function AdminDashboard() {
     subscribe,
     error: socketError,
     reconnect,
-  } = useSocket(token);
+  } = useSocket();
 
   // Define fetchDashboardData as a useCallback to avoid dependency issues
   const fetchDashboardData = useCallback(async () => {

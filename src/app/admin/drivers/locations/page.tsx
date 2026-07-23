@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminAuth, AuthLoadingSpinner, AccessDenied } from '@/hooks/useAuth';
-import { useSocket } from '@/hooks/useSocket';
+import { useSocket } from '@/contexts/SocketContext';
 
 interface DriverLocation {
   id: string;
@@ -30,8 +30,8 @@ export default function DriverLocationsPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [activeOnly, setActiveOnly] = useState(true);
 
-  // Initialize socket
-  const { isConnected, joinRoom, subscribe } = useSocket(null);
+  // Use the shared socket connection from context (avoids opening a duplicate connection)
+  const { isConnected, joinRoom, subscribe } = useSocket();
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
 
   const fetchDriverLocations = async (isAutoRefresh = false) => {

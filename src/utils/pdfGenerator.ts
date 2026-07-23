@@ -172,6 +172,12 @@ async function generatePDFWithRetry(
 
     browser = await puppeteer.launch({
       headless: true, // Use stable headless mode
+      // On macOS, Puppeteer's bundled Chromium binary can fail to launch
+      // (unsigned binary crashing with "os/kern failure"), while the
+      // system's own Chrome install launches fine. This only applies to
+      // local macOS dev machines - production (Linux) keeps using the
+      // bundled Chromium exactly as before, unaffected by this change.
+      ...(process.platform === 'darwin' ? { channel: 'chrome' as const } : {}),
       timeout: 60000, // 1 minute timeout for browser launch
       protocolTimeout: 60000, // Protocol timeout
       args: [

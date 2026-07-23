@@ -199,6 +199,11 @@ export default function DriverDocumentsPage() {
   const requiredDocuments = filteredDocuments.filter((doc) => doc.isRequired);
   const referenceDocuments = filteredDocuments.filter((doc) => !doc.isRequired);
   const unacknowledgedCount = documents.filter((doc) => doc.isRequired && !doc.isAcknowledged).length;
+  // Signed documents can't be emailed to the driver (no email on file), so
+  // they get a dedicated download section here instead.
+  const signedDocuments = filteredDocuments.filter(
+    (doc) => doc.requiresSignature && doc.isAcknowledged && doc.signedPdfUrl
+  );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 mobile-spacing">
@@ -392,6 +397,53 @@ export default function DriverDocumentsPage() {
                           </button>
                         )}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Signed Documents Section - download your signed copies here,
+                since signed PDFs can't currently be emailed to the driver */}
+            {signedDocuments.length > 0 && (
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 mb-3">My Signed Documents</h2>
+                <div className="space-y-3">
+                  {signedDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="bg-white rounded-xl border border-green-200 p-4 mobile-card"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">{getCategoryIcon(doc.category)}</span>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{doc.title}</h3>
+                          <p className="text-xs text-gray-500">
+                            {doc.category} • {formatFileSize(doc.fileSize)}
+                          </p>
+                        </div>
+                      </div>
+                      {doc.acknowledgedAt && (
+                        <div className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded inline-flex mb-3">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Signed on {new Date(doc.acknowledgedAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      <a
+                        href={doc.signedPdfUrl!}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block bg-gray-700 text-white text-center px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium touch-manipulation tap-target"
+                      >
+                        Download Signed Copy
+                      </a>
                     </div>
                   ))}
                 </div>
