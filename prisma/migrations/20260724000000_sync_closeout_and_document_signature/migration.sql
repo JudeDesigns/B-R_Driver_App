@@ -5,7 +5,7 @@ CREATE TYPE "CloseoutType" AS ENUM ('WAREHOUSE', 'JETRO');
 DROP INDEX "document_acknowledgments_documentId_driverId_routeId_key";
 
 -- DropIndex
-DROP INDEX "document_acknowledgments_documentid_driverid_routeid_key";
+ALTER TABLE "document_acknowledgments" DROP CONSTRAINT "document_acknowledgments_documentid_driverid_routeid_key";
 
 -- AlterTable
 ALTER TABLE "document_acknowledgments" ADD COLUMN     "documentVersion" INTEGER NOT NULL DEFAULT 1,
