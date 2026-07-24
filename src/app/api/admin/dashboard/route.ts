@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
+import { getTodayStartUTC, getTodayEndUTC } from "@/lib/timezone";
 // Cache removed for cleaner codebase
 
 // GET /api/admin/dashboard - Get dashboard data including today's routes
@@ -37,11 +38,9 @@ export async function GET(request: NextRequest) {
 
     const userId = decoded.id;
 
-    // Get today's date (start and end)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get today's date range in PST timezone (start and end), converted to UTC
+    const today = getTodayStartUTC();
+    const tomorrow = getTodayEndUTC();
 
     if (process.env.NODE_ENV !== "production") {
       console.log(
