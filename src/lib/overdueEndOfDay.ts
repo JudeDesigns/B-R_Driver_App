@@ -11,14 +11,19 @@ import type { PrismaClient } from "@prisma/client";
 // duplicated.
 export async function findOverdueEndOfDayDrivers(prisma: PrismaClient) {
   const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  // Ignore stops older than this — past this point an End-of-Day check is no
+  // longer realistically actionable, so it shouldn't clutter the list forever.
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
-  // Candidate completed stops whose completion time is at least 3 hours old.
+  // Candidate completed stops whose completion time is at least 3 hours old,
+  // but no older than the cutoff.
   const completedStops = await prisma.stop.findMany({
     where: {
       status: "COMPLETED",
       isDeleted: false,
       completionTime: {
         lte: threeHoursAgo,
+        gte: cutoff,
       },
     },
     select: {
