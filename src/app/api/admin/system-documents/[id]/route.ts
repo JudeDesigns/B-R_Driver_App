@@ -95,6 +95,11 @@ export async function PATCH(
 
     const { title, description, documentType, category, isRequired, isActive, requiresSignature } = body;
 
+    const existingDocument = await prisma.systemDocument.findUnique({
+      where: { id, isDeleted: false },
+      select: { requiresSignature: true },
+    });
+
     // Build update data
     const updateData: any = {};
     if (title !== undefined) updateData.title = title;
@@ -104,6 +109,20 @@ export async function PATCH(
     if (isRequired !== undefined) updateData.isRequired = isRequired;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (requiresSignature !== undefined) updateData.requiresSignature = requiresSignature;
+
+    // If signature is newly being turned on for a document that was
+    // previously plain-acknowledge (or vice versa - the requirement itself
+    // changed), bump the version. This invalidates any existing
+    // acknowledgments (which were scoped to the old version/requirement),
+    // so drivers who already acknowledged it in the past will see it
+    // reappear on their Safety Checklist and be prompted to sign it.
+    if (
+      existingDocument &&
+      requiresSignature !== undefined &&
+      requiresSignature !== existingDocument.requiresSignature
+    ) {
+      updateData.version = { increment: 1 };
+    }
 
     const document = await prisma.systemDocument.update({
       where: { id, isDeleted: false },

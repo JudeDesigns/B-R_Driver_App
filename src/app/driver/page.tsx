@@ -34,6 +34,10 @@ export default function DriverDashboard() {
   const [token, setToken] = useState<string | null>(null);
   const [routes, setRoutes] = useState<any[]>([]);
   const [pendingDocuments, setPendingDocuments] = useState(0);
+  const [closeoutStatusByRoute, setCloseoutStatusByRoute] = useState<
+    Record<string, { required: boolean; resolved: boolean }>
+  >({});
+  const [routesWithPendingStops, setRoutesWithPendingStops] = useState<Set<string>>(new Set());
 
   // Attendance status state
   const [attendanceStatus, setAttendanceStatus] = useState<{
@@ -173,6 +177,68 @@ export default function DriverDashboard() {
           }));
           setRoutes(routesWithStatus);
           setRoute(routesWithStatus[0]);
+        }
+      }
+
+      // Fetch end-of-route check-in status for each route, so the dashboard
+      // can surface a way back to the Route Check-in page if the driver
+      // navigated away (e.g. clicked "Back") before resolving it. This is
+      // only relevant once the driver has no pending stops left, so also
+      // fetch the driver's outstanding (non-completed) stops to know if a
+      // new stop was added after the check-in became due - in that case we
+      // want "View Stop Details" to show again instead of the check-in
+      // button, since there's more work to do first.
+      if (routesData.routes && routesData.routes.length > 0) {
+        try {
+          const stopsResponse = await fetch(
+            `/api/driver/stops?date=${today}&t=${Date.now()}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              cache: "no-store",
+            }
+          );
+
+          let pendingRouteIds = new Set<string>();
+          if (stopsResponse.ok) {
+            const stopsData = await stopsResponse.json();
+            pendingRouteIds = new Set(
+              (stopsData.stops || [])
+                .filter((s: any) => s.status !== "CANCELLED")
+                .map((s: any) => s.route?.id || s.routeId)
+            );
+          }
+          setRoutesWithPendingStops(pendingRouteIds);
+
+          const entries = await Promise.all(
+            routesData.routes.map(async (r: any) => {
+              // Skip the check-in status fetch if the driver still has
+              // pending stops on this route - "View Stop Details" should
+              // take priority in that case.
+              if (pendingRouteIds.has(r.id)) {
+                return [r.id, { required: false, resolved: false }] as const;
+              }
+              try {
+                const res = await fetch(
+                  `/api/driver/route-checkin?routeId=${r.id}`,
+                  {
+                    headers: { Authorization: `Bearer ${token}` },
+                    cache: "no-store",
+                  }
+                );
+                if (!res.ok) return [r.id, { required: false, resolved: false }] as const;
+                const d = await res.json();
+                return [
+                  r.id,
+                  { required: !!d.required, resolved: !!d.resolved },
+                ] as const;
+              } catch {
+                return [r.id, { required: false, resolved: false }] as const;
+              }
+            })
+          );
+          setCloseoutStatusByRoute(Object.fromEntries(entries));
+        } catch (closeoutError) {
+          console.error("Error fetching route check-in statuses:", closeoutError);
         }
       }
 
@@ -437,6 +503,22 @@ export default function DriverDashboard() {
                       className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 touch-manipulation mobile-button"
                     >
                       Complete Safety Checklist
+                    </Link>
+                  </div>
+                ) : closeoutStatusByRoute[route.id]?.required &&
+                  !closeoutStatusByRoute[route.id]?.resolved ? (
+                  <div className="mt-6">
+                    <div className="border-l-4 border-yellow-300 pl-4 py-2 mb-4 bg-yellow-50">
+                      <p className="text-sm text-gray-600 mobile-text">
+                        You still need to complete the End-of-Route Check-in
+                        for this route.
+                      </p>
+                    </div>
+                    <Link
+                      href={`/driver/route-checkin?routeId=${route.id}`}
+                      className="w-full block text-center bg-black hover:bg-gray-800 text-white font-medium py-3 px-4 rounded transition duration-200 touch-manipulation mobile-button"
+                    >
+                      Complete End-of-Route Check-in
                     </Link>
                   </div>
                 ) : (

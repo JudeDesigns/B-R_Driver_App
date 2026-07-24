@@ -51,6 +51,23 @@ interface SafetyCheck {
   responses: any;
 }
 
+interface RouteCloseoutCheck {
+  id: string;
+  type: "WAREHOUSE" | "JETRO";
+  contactedPerson: string;
+  pendingPickup: boolean;
+  note: string | null;
+  photoUrl: string;
+  createdAt: string;
+}
+
+interface CloseoutStatus {
+  assigned: boolean;
+  type?: "WAREHOUSE" | "JETRO";
+  latestCheck?: RouteCloseoutCheck | null;
+  resolved?: boolean;
+}
+
 interface OverdueEndOfDayEntry {
   routeId: string;
   routeNumber: string | null;
@@ -192,9 +209,27 @@ export default function SafetyChecksPage() {
     setOffset((page - 1) * limit);
   };
 
+  const [closeoutStatus, setCloseoutStatus] = useState<CloseoutStatus | null>(null);
+  const [loadingCloseoutStatus, setLoadingCloseoutStatus] = useState(false);
+
   const handleViewDetails = (safetyCheck: SafetyCheck) => {
     setSelectedSafetyCheck(safetyCheck);
     setShowDetails(true);
+    setCloseoutStatus(null);
+
+    // Warehouse/Jetro closeout only applies to End-of-Day checks.
+    if (safetyCheck.type === "END_OF_DAY") {
+      setLoadingCloseoutStatus(true);
+      const token = localStorage.getItem("token");
+      fetch(
+        `/api/admin/route-closeout-check?routeId=${safetyCheck.routeId}&driverId=${safetyCheck.driverId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setCloseoutStatus(data))
+        .catch((err) => console.error("Error fetching closeout status:", err))
+        .finally(() => setLoadingCloseoutStatus(false));
+    }
   };
 
   const formatBoolean = (value: boolean | null | undefined) => {
@@ -530,6 +565,58 @@ export default function SafetyChecksPage() {
                         {renderPhotoProof("Left", selectedSafetyCheck.responses.exteriorLeftPhotoUrl)}
                         {renderPhotoProof("Right", selectedSafetyCheck.responses.exteriorRightPhotoUrl)}
                       </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Warehouse/Jetro End-of-Route Check-in (only applies to End-of-Day) */}
+            {selectedSafetyCheck.type === "END_OF_DAY" && (
+              <div className="border-t pt-6 mt-6">
+                <h4 className="text-lg font-bold text-gray-900 mb-4">End-of-Route Check-in</h4>
+                {loadingCloseoutStatus ? (
+                  <div className="text-sm text-gray-500">Loading check-in status...</div>
+                ) : !closeoutStatus?.assigned ? (
+                  <div className="text-sm text-gray-500">
+                    No Warehouse/Jetro check-in was assigned for this driver on this route.
+                  </div>
+                ) : !closeoutStatus.latestCheck ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                    Assigned: <span className="font-medium">{closeoutStatus.type === "WAREHOUSE" ? "Warehouse" : "Jetro"}</span> — no check-in has been submitted yet.
+                  </div>
+                ) : (
+                  <div
+                    className={`p-4 rounded border space-y-2 ${
+                      closeoutStatus.resolved
+                        ? "bg-green-50 border-green-200"
+                        : "bg-amber-50 border-amber-200"
+                    }`}
+                  >
+                    <p className="text-sm">
+                      <span className="font-medium">Type:</span>{" "}
+                      {closeoutStatus.type === "WAREHOUSE" ? "Warehouse" : "Jetro"}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium">Status:</span>{" "}
+                      {closeoutStatus.resolved ? "Resolved (no pending pickup)" : "Pending pickup"}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium">Contacted:</span>{" "}
+                      {closeoutStatus.latestCheck.contactedPerson}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium">Submitted:</span>{" "}
+                      {new Date(closeoutStatus.latestCheck.createdAt).toLocaleString()}
+                    </p>
+                    {closeoutStatus.latestCheck.note && (
+                      <p className="text-sm">
+                        <span className="font-medium">Note:</span>{" "}
+                        {closeoutStatus.latestCheck.note}
+                      </p>
+                    )}
+                    <div className="w-48">
+                      {renderPhotoProof("Check-in Photo", closeoutStatus.latestCheck.photoUrl)}
                     </div>
                   </div>
                 )}

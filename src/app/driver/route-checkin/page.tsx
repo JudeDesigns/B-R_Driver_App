@@ -18,7 +18,7 @@ export default function RouteCheckinPage() {
   const [token, setToken] = useState<string | null>(null);
   const [routeId, setRouteId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState<null | "resolved" | "pending">(null);
+  const [success, setSuccess] = useState<null | "resolved">(null);
 
   const [required, setRequired] = useState(false);
   const [alreadyResolved, setAlreadyResolved] = useState(false);
@@ -140,24 +140,36 @@ export default function RouteCheckinPage() {
 
   const noteRequired = pendingPickup === false;
   const noteSatisfied = !noteRequired || note.trim().length > 0;
+  // The check-in photo proves the driver is physically at the
+  // warehouse/Jetro location, so it's only required when resolving the
+  // check-in (pendingPickup === false). If there's still a pending pickup,
+  // the driver isn't there yet, so no photo/submission is needed at all.
+  const photoRequired = pendingPickup === false;
 
   const canSubmit =
     !submitting &&
-    !!photoUrl &&
+    (!!photoUrl || !photoRequired) &&
     !!contactedPerson &&
     pendingPickup !== null &&
     noteSatisfied;
 
-  const resetForm = () => {
-    setContactedPerson("");
-    setPendingPickup(null);
-    setNote("");
-    setPhotoUrl("");
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !routeId || !canSubmit) return;
+
+    // "Yes, still a pending pickup" doesn't submit anything to the
+    // server - the driver isn't at the location yet, so there's nothing
+    // to record. Just confirm with the driver and send them back to the
+    // dashboard; they'll come back to this page and check in for real
+    // (selecting "No") once the pickup is done.
+    if (pendingPickup === true) {
+      const confirmed = window.confirm(
+        "Confirm: there is still a pending pickup, so this route is not finished yet. You'll be taken back to the dashboard - come back to this page and check in again once the pickup is complete."
+      );
+      if (!confirmed) return;
+      router.push("/driver");
+      return;
+    }
 
     setSubmitting(true);
     setError("");
@@ -185,15 +197,10 @@ export default function RouteCheckinPage() {
         );
       }
 
-      if (pendingPickup === false) {
-        setSuccess("resolved");
-        setTimeout(() => {
-          router.push("/driver/end-of-day");
-        }, 1500);
-      } else {
-        setSuccess("pending");
-        resetForm();
-      }
+      setSuccess("resolved");
+      setTimeout(() => {
+        router.push("/driver/end-of-day");
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -241,11 +248,6 @@ export default function RouteCheckinPage() {
           ) : success === "resolved" ? (
             <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
               Check-in submitted successfully! Redirecting to End-of-Day...
-            </div>
-          ) : success === "pending" ? (
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-6">
-              Understood — go complete the pickup. Come back to this page
-              when you&apos;re done to check in again.
             </div>
           ) : alreadyResolved ? (
             <div className="text-center py-8">
@@ -341,16 +343,27 @@ export default function RouteCheckinPage() {
                     No
                   </label>
                 </div>
+                {pendingPickup === true && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Select &quot;Yes&quot; only if there is still a pickup
+                    left to do. After you submit, you&apos;ll need to go
+                    complete that pickup and come back to check in again
+                    (selecting &quot;No&quot; once it&apos;s done) before you
+                    can move on to the End-of-Day Safety Check.
+                  </p>
+                )}
               </div>
 
-              <SafetyPhotoBox
-                label={photoLabel}
-                type="route_checkin"
-                routeId={routeId || ""}
-                onUploadSuccess={(url: string) => setPhotoUrl(url)}
-                required
-                currentUrl={photoUrl}
-              />
+              {pendingPickup !== true && (
+                <SafetyPhotoBox
+                  label={photoLabel}
+                  type="route_checkin"
+                  routeId={routeId || ""}
+                  onUploadSuccess={(url: string) => setPhotoUrl(url)}
+                  required
+                  currentUrl={photoUrl}
+                />
+              )}
 
               <div>
                 <label
@@ -383,7 +396,11 @@ export default function RouteCheckinPage() {
                   disabled={!canSubmit}
                   className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white font-medium py-4 px-8 rounded-lg transition duration-200 touch-manipulation mobile-button text-lg"
                 >
-                  {submitting ? "Submitting..." : "Submit Check-in"}
+                  {submitting
+                    ? "Submitting..."
+                    : pendingPickup === true
+                    ? "Confirm & Back to Dashboard"
+                    : "Submit Check-in"}
                 </button>
               </div>
             </form>
