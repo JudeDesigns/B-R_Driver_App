@@ -6,6 +6,7 @@ import Link from "next/link";
 import EnhancedTable from "@/components/ui/EnhancedTable";
 import SearchInput from "@/components/ui/SearchInput";
 import Pagination from "@/components/ui/Pagination";
+import { isToday } from "@/lib/timezone";
 
 interface SafetyCheck {
   id: string;
@@ -167,7 +168,10 @@ export default function SafetyChecksPage() {
 
         const data = await response.json();
         const withNotes = (data.safetyChecks || []).filter(
-          (check: SafetyCheck) => check.notes && check.notes.trim().length > 0
+          (check: SafetyCheck) =>
+            check.notes &&
+            check.notes.trim().length > 0 &&
+            isToday(check.createdAt)
         );
         setDriverWarnings(withNotes);
       } catch (err) {
