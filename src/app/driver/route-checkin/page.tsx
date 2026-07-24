@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SafetyPhotoBox from "@/components/driver/SafetyPhotoBox";
@@ -13,6 +13,20 @@ const CONTACT_OPTIONS = [
 ];
 
 export default function RouteCheckinPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-6 flex justify-center items-center h-40">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-blue"></div>
+        </div>
+      }
+    >
+      <RouteCheckinContent />
+    </Suspense>
+  );
+}
+
+function RouteCheckinContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [token, setToken] = useState<string | null>(null);
